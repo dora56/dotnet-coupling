@@ -21,7 +21,7 @@ semantic mode は遅くなるため、将来的に以下のモードを分ける
 
 ```bash
 dotnet coupling --mode syntax ./src
-dotnet coupling --mode semantic ./MyApp.sln
+dotnet coupling --mode semantic ./MyApp.slnx
 ```
 
 ### 28.3 キャッシュ
@@ -479,7 +479,7 @@ CI だけでなく、ローカルの commit 前にも最低限の品質ゲート
 
 ```bash
 # pre-commit
-staged_files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.cs' '*.csproj' '*.sln')
+staged_files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.cs' '*.csproj' '*.slnx' '*.sln')
 if [ -n "$staged_files" ]; then
   dotnet format --verify-no-changes --include $staged_files
 fi

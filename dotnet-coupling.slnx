@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj" />
+  <Project Path="tests/DotnetCoupling.Tests/DotnetCoupling.Tests.csproj" />
+</Solution>

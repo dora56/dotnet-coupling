@@ -178,7 +178,7 @@ MVP では `Microsoft.CodeAnalysis.CSharp` を使い、`SyntaxNode` ベースで
 
 ### 10.2 v0.2: Semantic analyzer
 
-v0.2 では `MSBuildWorkspace` を使い、`.sln` / `.csproj` を読み込む。
+v0.2 では `MSBuildWorkspace` を使い、`.slnx` / `.sln` / `.csproj` を読み込む。
 
 追加で得られる情報:
 

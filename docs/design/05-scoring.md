@@ -100,7 +100,7 @@ MVP では **SameType を Distance として扱わない**。同一型内の sel
 
 MVP の syntax-only では project 境界が曖昧なため、主に namespace と file path で近似する。
 
-v0.2 の semantic mode では `.sln` / `.csproj` を読み込み、project / assembly 境界を正確に判定する。
+v0.2 の semantic mode では `.slnx` / `.sln` / `.csproj` を読み込み、project / assembly 境界を正確に判定する。
 
 ### 13.1 SameType を除外する理由
 
@@ -115,7 +115,7 @@ v0.2 の semantic mode では `.sln` / `.csproj` を読み込み、project / ass
 
 ### 13.2 syntax-only での Distance 推定ルール
 
-MVP の syntax-only では `.sln` / `.csproj` を正式には読まないため、project 境界は namespace と file path から近似する。
+MVP の syntax-only では `.slnx` / `.sln` / `.csproj` を正式には読まないため、project 境界は namespace と file path から近似する。
 
 判定順序:
 
@@ -139,7 +139,7 @@ MyCompany.MyApp.Api -> MyCompany.MyApp.Application
 => 2 segment なので DifferentNamespace
 ```
 
-このヒューリスティックは保守的に倒す。つまり、内部型であることは分かるが近さを確信できない場合は、近いと仮定せず `DifferentProject` へ寄せる。v0.2 の semantic mode では `.sln` / `.csproj` / assembly symbol から project 境界を正確に判定する。
+このヒューリスティックは保守的に倒す。つまり、内部型であることは分かるが近さを確信できない場合は、近いと仮定せず `DifferentProject` へ寄せる。v0.2 の semantic mode では `.slnx` / `.sln` / `.csproj` / assembly symbol から project 境界を正確に判定する。
 
 ### 13.3 外部依存のスコア計算
 

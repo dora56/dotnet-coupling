@@ -7,7 +7,7 @@ Semantic Versioning を採用する。
 | Version | 内容 |
 |---|---|
 | `0.1.0-alpha.1` | syntax-only MVP |
-| `0.2.0-alpha.1` | semantic mode / `.sln` 対応 |
+| `0.2.0-alpha.1` | semantic mode / `.slnx` / `.sln` 対応 |
 | `0.3.0` | baseline / hotspots / SARIF |
 | `0.4.0` | AI output / impact / trace |
 | `1.0.0` | CLI と JSON schema を安定化 |
@@ -60,7 +60,7 @@ Semantic Versioning を採用する。
 ### Phase 3: Semantic mode
 
 - [ ] `MSBuildWorkspace` 導入
-- [ ] `.sln` / `.csproj` 対応
+- [ ] `.slnx` / `.sln` / `.csproj` 対応
 - [ ] symbol resolution
 - [ ] project boundary distance
 - [ ] external package 判定
