@@ -1,0 +1,11 @@
+#!/bin/sh
+
+commit_message_file="$1"
+commit_message="$(cat "$commit_message_file")"
+
+if printf '%s\n' "$commit_message" | grep -Eq '^(feat|fix|docs|refactor|test|chore|ci)(\([^)]+\))?: .+'; then
+  exit 0
+fi
+
+printf '%s\n' "Commit message must follow Conventional Commits, for example: feat(analysis): add parser"
+exit 1
