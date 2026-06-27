@@ -6,15 +6,19 @@
     ],
     "reporters": [
       "progress",
-      "cleartext"
+      "cleartext",
+      "html",
+      "json"
     ],
     "thresholds": {
       "high": 80,
       "low": 60,
-      "break": 0
+      "break": 60
     },
+    "test-runner": "mtp",
     "mutate": [
-      "Analysis/CouplingScoring.cs"
+      "Analysis/CouplingScoring.cs",
+      "Analysis/IssueDetector.cs"
     ]
   }
 }

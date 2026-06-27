@@ -240,6 +240,28 @@ public Property HigherVolatility_LowerOrEqualScore(
 
 テストの品質（kill 率）を検証するため [Stryker.NET](https://github.com/stryker-mutator/stryker-net) を使用する。
 
+Coverage は補助指標として扱う。line / branch coverage は「未実行領域を見つける」
+ために使い、テスト品質の主判定は mutation score に置く。Coverage だけを上げる
+ための浅いテスト追加は避け、coverage で見つかった穴は Stryker の生存 mutant や
+境界条件テストと突き合わせて優先順位を決める。
+
+```bash
+dotnet test --configuration Release \
+  --settings coverage.runsettings \
+  --collect:"XPlat Code Coverage" \
+  --results-directory TestResults/Coverage
+```
+
+Phase 1 の coverage 設定は `coverage.runsettings` に置き、Cobertura XML を出力する。
+対象は `DotnetCoupling.Cli` assembly に絞り、CLI entrypoint の `Program.cs` と
+test assembly は除外する。
+
+CI では mutation testing を独立した必須 job として実行し、`stryker-config.json`
+の `break` threshold で失敗させる。Coverage は同じ CI 内で収集するが、Phase 1
+では threshold gate にしない。CI は `coverage-report` と `mutation-report` を
+artifact として保存し、coverage は Cobertura XML、mutation は Stryker HTML/JSON
+report を確認できるようにする。
+
 #### 対象と除外
 
 | 対象（mutate する） | 除外（mutate しない） |

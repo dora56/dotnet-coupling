@@ -46,9 +46,16 @@ The schema files live under `schemas/`.
 dotnet build --configuration Release
 dotnet test --configuration Release
 dotnet format --verify-no-changes
+dotnet test --configuration Release --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
 dotnet tool restore
 dotnet tool run dotnet-stryker -- --config-file stryker-config.json
 ```
+
+Mutation score is the primary test-quality signal. Coverage is collected as a
+supporting signal to find unexercised areas, not as the main quality gate.
+CI enforces the mutation threshold through `stryker-config.json`; coverage is
+collected without a threshold.
+CI uploads `coverage-report` and `mutation-report` artifacts for inspection.
 
 ## MVP Blind Spots
 
