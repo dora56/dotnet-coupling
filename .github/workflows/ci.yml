@@ -65,7 +65,7 @@ jobs:
         run: dotnet restore dotnet-coupling.slnx --locked-mode
 
       - name: Test
-        run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --no-build --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
+        run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
 
       - name: Upload coverage report
         if: always()
