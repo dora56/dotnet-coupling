@@ -8,6 +8,15 @@
         "resolved": "6.0.4",
         "contentHash": "lkhqpF8Pu2Y7IiN7OntbsTtdbpR1syMsm2F3IgX6ootA4ffRqWL5jF7XipHuZQTdVuWG/gVAAcf8mjk8Tz0xPg=="
       },
+      "FsCheck": {
+        "type": "Direct",
+        "requested": "[3.*, )",
+        "resolved": "3.3.3",
+        "contentHash": "FtJSNzekCwoVTJPLZwK2In1cr9PhIo6WAX/RSM7BL/jQERgnO0111+hdcN14pcog9BByJmqehBrMbjjKpHZULg==",
+        "dependencies": {
+          "FSharp.Core": "5.0.2"
+        }
+      },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
         "requested": "[18.*, )",
@@ -32,6 +41,11 @@
         "dependencies": {
           "xunit.v3.mtp-v1": "[3.2.2]"
         }
+      },
+      "FSharp.Core": {
+        "type": "Transitive",
+        "resolved": "5.0.2",
+        "contentHash": "DpcajqENgb3VXaHw1FKfVS+TWwEzck1PCajqLwBAVrtd1lfxd7T8JISVZBdV1mX9+2g48+tIgpNaVJWObdMrBw=="
       },
       "Microsoft.ApplicationInsights": {
         "type": "Transitive",

@@ -1,4 +1,6 @@
 using DotnetCoupling.Cli.Analysis;
+using FsCheck;
+using FsCheck.Fluent;
 using Xunit;
 
 namespace DotnetCoupling.Tests;
@@ -57,34 +59,51 @@ public sealed class CouplingScoringTests
     [Fact]
     public void Calculate_HigherVolatility_NeverIncreasesScoreForSameStrengthAndDistance()
     {
-        foreach (IntegrationStrength strength in Enum.GetValues<IntegrationStrength>())
-            foreach (Distance distance in Enum.GetValues<Distance>())
+        Prop.ForAll(
+            Arb.From(Gen.Elements(Enum.GetValues<IntegrationStrength>())),
+            Arb.From(Gen.Elements(Enum.GetValues<Distance>())),
+            (IntegrationStrength strength, Distance distance) =>
             {
                 double low = CouplingScoring.Calculate(Coupling(strength, distance, Volatility.Low)).Score;
                 double medium = CouplingScoring.Calculate(Coupling(strength, distance, Volatility.Medium)).Score;
                 double high = CouplingScoring.Calculate(Coupling(strength, distance, Volatility.High)).Score;
 
-                Assert.True(low >= medium);
-                Assert.True(medium >= high);
-            }
+                return low >= medium && medium >= high;
+            }).QuickCheckThrowOnFailure();
     }
 
     [Fact]
-    public void Calculate_RepresentativeEnumBackedValues_ClampsScorePartsWithinUnitInterval()
+    public void Calculate_AnyEnumBackedValues_ClampsScorePartsWithinUnitInterval()
     {
-        foreach (int strength in RepresentativeEnumBackedValues())
-            foreach (int distance in RepresentativeEnumBackedValues())
-                foreach (int volatility in RepresentativeEnumBackedValues())
-                {
-                    BalanceScore score = CouplingScoring.Calculate(Coupling(
-                        (IntegrationStrength)strength,
-                        (Distance)distance,
-                        (Volatility)volatility));
+        Prop.ForAll<int, int, int>((strength, distance, volatility) =>
+        {
+            BalanceScore score = CouplingScoring.Calculate(Coupling(
+                (IntegrationStrength)strength,
+                (Distance)distance,
+                (Volatility)volatility));
 
-                    Assert.InRange(score.Score, 0.0, 1.0);
-                    Assert.InRange(score.Alignment, 0.0, 1.0);
-                    Assert.InRange(score.VolatilityImpact, 0.0, 1.0);
-                }
+            return IsUnitInterval(score.Score)
+                && IsUnitInterval(score.Alignment)
+                && IsUnitInterval(score.VolatilityImpact);
+        }).QuickCheckThrowOnFailure();
+    }
+
+    [Fact]
+    public void ToScore_UnknownEnumBackedValues_ReturnFallbackScore()
+    {
+        Prop.ForAll<int>(value =>
+        {
+            if (Enum.IsDefined((IntegrationStrength)value)
+                || Enum.IsDefined((Distance)value)
+                || Enum.IsDefined((Volatility)value))
+            {
+                return true;
+            }
+
+            return CouplingScoring.ToScore((IntegrationStrength)value) == 0.50
+                && CouplingScoring.ToScore((Distance)value) == 0.50
+                && CouplingScoring.ToScore((Volatility)value) == 0.00;
+        }).QuickCheckThrowOnFailure();
     }
 
     [Theory]
@@ -117,6 +136,29 @@ public sealed class CouplingScoringTests
         Assert.Equal("issue-density", grade.Basis);
     }
 
+    [Fact]
+    public void CalculateGrade_AddingIssue_NeverImprovesGrade()
+    {
+        Prop.ForAll<(int Critical, int High, int Medium, int InternalCouplings, int Severity)>(values =>
+        {
+            int critical = Bounded(values.Critical, 20);
+            int high = Bounded(values.High, 20);
+            int medium = Bounded(values.Medium, 50);
+            int internalCouplings = Bounded(values.InternalCouplings, 200);
+            Severity addedSeverity = Enum.GetValues<Severity>()[Bounded(values.Severity, Enum.GetValues<Severity>().Length - 1)];
+            List<CouplingIssue> issues = CreateIssues(Severity.Critical, critical)
+                .Concat(CreateIssues(Severity.High, high))
+                .Concat(CreateIssues(Severity.Medium, medium))
+                .ToList();
+
+            GradeResult before = CouplingScoring.CalculateGrade(internalCouplings, issues);
+            issues.Add(CreateIssue(addedSeverity));
+            GradeResult after = CouplingScoring.CalculateGrade(internalCouplings, issues);
+
+            return GradeRank(after.Letter) >= GradeRank(before.Letter);
+        }).QuickCheckThrowOnFailure();
+    }
+
     private static CouplingMetrics Coupling(IntegrationStrength strength, Distance distance, Volatility volatility)
     {
         return new CouplingMetrics(
@@ -131,24 +173,48 @@ public sealed class CouplingScoringTests
             new SourceLocation("Sample.cs", 1));
     }
 
-    private static int[] RepresentativeEnumBackedValues()
+    private static bool IsUnitInterval(double value)
     {
-        return [-100, -1, 0, 1, 2, 3, 4, 100];
+        return value is >= 0.0 and <= 1.0;
+    }
+
+    private static int Bounded(int value, int maxInclusive)
+    {
+        return (int)((uint)value % (uint)(maxInclusive + 1));
     }
 
     private static IEnumerable<CouplingIssue> CreateIssues(Severity severity, int count)
     {
         for (int i = 0; i < count; i++)
         {
-            yield return new CouplingIssue(
-                IssueType.GlobalComplexity,
-                severity,
-                "Sample.Source",
-                "Sample.Target",
-                0.5,
-                "Problem",
-                "Recommendation",
-                null);
+            yield return CreateIssue(severity);
         }
+    }
+
+    private static CouplingIssue CreateIssue(Severity severity)
+    {
+        return new CouplingIssue(
+            IssueType.GlobalComplexity,
+            severity,
+            "Sample.Source",
+            "Sample.Target",
+            0.5,
+            "Problem",
+            "Recommendation",
+            null);
+    }
+
+    private static int GradeRank(string grade)
+    {
+        return grade switch
+        {
+            "S" => 0,
+            "A" => 1,
+            "B" => 2,
+            "C" => 3,
+            "D" => 4,
+            "F" => 5,
+            _ => 3,
+        };
     }
 }
