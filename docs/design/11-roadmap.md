@@ -58,6 +58,8 @@ Semantic Versioning を採用する。
 - [ ] NuGet.org に `0.1.0-alpha.1` 公開
 - [ ] GitHub Releases 作成
 - [ ] サンプルプロジェクトで dogfooding
+- [ ] `dotnet-coupling` 自身のリポジトリに対する dogfooding を定例化
+- [ ] `cargo-coupling` と同等に、継続的 dogfooding を前提に false positive を継続改善
 - [ ] false positive を issue 化
 - [ ] `--no-git` / Git なし環境の出力改善
 
