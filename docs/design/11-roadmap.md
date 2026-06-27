@@ -29,6 +29,8 @@ Semantic Versioning を採用する。
 - [x] Roslyn syntax-only 解析の土台
 - [x] text / summary / json 出力の土台
 - [x] GitHub Actions release 雛形
+- [x] GitHub Actions ci 雛形
+- [x] husky.Net 導入、設定
 
 ### Phase 1: MVP hardening
 
@@ -38,9 +40,11 @@ Semantic Versioning を採用する。
 - [ ] `Visibility` / `UsageContext` / `Distance` の単体テスト
 - [ ] Balance Score の clamp 境界値テスト
 - [ ] issue density ベース Grade の単体テスト
+- [ ] Property-Based Testing 追加
 - [ ] Hidden Coupling / temporal co-change の MVP 実装
 - [ ] Scattered External Coupling の MVP 実装
 - [ ] issue 検出ロジックの単体テスト
+- [ ] Mutation Testing 追加
 - [ ] JSON schema 固定
 - [ ] manifest / blind spots 出力
 - [ ] README 整備
