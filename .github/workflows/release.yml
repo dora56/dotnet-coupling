@@ -22,17 +22,51 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Cache .NET dependencies
+        uses: actions/cache@6
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/toolResolverCache
+          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            dotnet-${{ runner.os }}-
+
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore dotnet-coupling.slnx --locked-mode
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build dotnet-coupling.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test --configuration Release --no-build
+        run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --no-build
+
+      - name: Format
+        run: dotnet format dotnet-coupling.slnx --verify-no-changes --no-restore
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Mutation test
+        run: dotnet tool run dotnet-stryker -- --config-file stryker-config.json
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: StrykerOutput/**
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Pack
         run: dotnet pack src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj --configuration Release --no-build
+
+      - name: Local tool install smoke
+        run: |
+          tool_path="$(mktemp -d)"
+          dotnet tool install dotnet-coupling --tool-path "$tool_path" --add-source src/DotnetCoupling.Cli/nupkg --version 0.2.0-alpha.1
+          "$tool_path/dotnet-coupling" --summary --no-git ./src
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
@@ -51,6 +85,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          body_path: docs/release-notes-0.2.0-alpha.1.md
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: src/DotnetCoupling.Cli/nupkg/*.nupkg

@@ -1,0 +1,42 @@
+name: False positive
+description: Report a coupling issue that should not have been reported.
+title: "False positive: "
+labels:
+  - dogfood
+  - false-positive
+body:
+  - type: input
+    id: version
+    attributes:
+      label: dotnet-coupling version
+      placeholder: 0.2.0-alpha.1
+    validations:
+      required: true
+  - type: input
+    id: repository
+    attributes:
+      label: Repository and commit
+      placeholder: https://github.com/example/project @ abc123
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      render: shell
+      placeholder: dotnet-coupling --summary ./src
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: Reported finding
+      description: Include issue type, severity, source, target, and location.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this is a false positive
+    validations:
+      required: true

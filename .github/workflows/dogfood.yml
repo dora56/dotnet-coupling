@@ -1,0 +1,73 @@
+name: dogfood
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-dogfood:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Cache .NET dependencies
+        uses: actions/cache@6
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/toolResolverCache
+          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            dotnet-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore dotnet-coupling.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build dotnet-coupling.slnx --configuration Release --no-restore
+
+      - name: Pack
+        run: dotnet pack src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj --configuration Release --no-build
+
+      - name: Install local tool
+        run: |
+          TOOL_PATH="$(mktemp -d)"
+          echo "TOOL_PATH=$TOOL_PATH" >> "$GITHUB_ENV"
+          dotnet tool install dotnet-coupling --tool-path "$TOOL_PATH" --add-source src/DotnetCoupling.Cli/nupkg --version 0.2.0-alpha.1
+
+      - name: Dogfood summary
+        run: |
+          "$TOOL_PATH/dotnet-coupling" --summary ./src | tee dogfood-summary.txt
+
+      - name: Dogfood no-git summary
+        run: |
+          "$TOOL_PATH/dotnet-coupling" --summary --no-git ./src | tee dogfood-no-git-summary.txt
+
+      - name: Dogfood JSON
+        run: |
+          "$TOOL_PATH/dotnet-coupling" --json --no-git ./src > dogfood-report.json
+
+      - name: Upload dogfood reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dogfood-reports
+          path: |
+            dogfood-summary.txt
+            dogfood-no-git-summary.txt
+            dogfood-report.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,41 @@
+name: False negative
+description: Report a coupling risk that dotnet-coupling missed.
+title: "False negative: "
+labels:
+  - dogfood
+  - false-negative
+body:
+  - type: input
+    id: version
+    attributes:
+      label: dotnet-coupling version
+      placeholder: 0.2.0-alpha.1
+    validations:
+      required: true
+  - type: input
+    id: repository
+    attributes:
+      label: Repository and commit
+      placeholder: https://github.com/example/project @ abc123
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      render: shell
+      placeholder: dotnet-coupling --json ./src
+    validations:
+      required: true
+  - type: textarea
+    id: missed_risk
+    attributes:
+      label: Missed risk
+      description: Include expected issue type, source, target, and why it should be reported.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Include relevant source snippets or architectural notes if possible.
