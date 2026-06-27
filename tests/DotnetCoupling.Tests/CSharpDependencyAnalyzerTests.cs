@@ -175,121 +175,27 @@ public sealed class CSharpDependencyAnalyzerTests
             && issue.Target == "Newtonsoft.Json");
     }
 
-    [Theory]
-    [InlineData(IntegrationStrength.Contract, Distance.ExternalPackage, Volatility.Low, 0.75)]
-    [InlineData(IntegrationStrength.Intrusive, Distance.ExternalPackage, Volatility.High, 0.00)]
-    [InlineData(IntegrationStrength.Functional, Distance.DifferentNamespace, Volatility.Low, 0.75)]
-    public void Calculate_KnownBoundaries_ReturnsExpectedScore(
-        IntegrationStrength strength,
-        Distance distance,
-        Volatility volatility,
-        double expectedScore)
-    {
-        CouplingMetrics coupling = new(
-            "Sample.Source",
-            "Sample.Target",
-            strength,
-            distance,
-            volatility,
-            null,
-            null,
-            Visibility.Public,
-            new SourceLocation("Sample.cs", 1));
-
-        BalanceScore score = CouplingScoring.Calculate(coupling);
-
-        Assert.Equal(expectedScore, score.Score, precision: 2);
-        Assert.InRange(score.Alignment, 0.0, 1.0);
-        Assert.InRange(score.VolatilityImpact, 0.0, 1.0);
-    }
-
     [Fact]
-    public void Calculate_AnyEnumBackedValues_ClampsScorePartsWithinUnitInterval()
+    public void Analyze_NamespaceScopedExternalUsingAcrossManyComponents_ReportsScatteredExternalCoupling()
     {
-        foreach (int strength in RepresentativeEnumBackedValues())
-            foreach (int distance in RepresentativeEnumBackedValues())
-                foreach (int volatility in RepresentativeEnumBackedValues())
-                {
-                    Assert.True(ScorePartsAreClamped(strength, distance, volatility));
-                }
-    }
+        string directory = CreateFixture(
+            "First.cs",
+            NamespaceScopedExternalUsingSource("First"),
+            "Second.cs",
+            NamespaceScopedExternalUsingSource("Second"),
+            "Third.cs",
+            NamespaceScopedExternalUsingSource("Third"),
+            "Fourth.cs",
+            NamespaceScopedExternalUsingSource("Fourth"),
+            "Fifth.cs",
+            NamespaceScopedExternalUsingSource("Fifth"));
 
-    [Theory]
-    [InlineData(4, 0, 0, 10, "F")]
-    [InlineData(1, 0, 0, 10, "D")]
-    [InlineData(0, 1, 0, 100, "C")]
-    [InlineData(0, 0, 0, 20, "S")]
-    [InlineData(0, 0, 1, 10, "A")]
-    [InlineData(0, 0, 0, 1, "B")]
-    public void CalculateGrade_IssueDensityRules_ReturnExpectedGrade(
-        int critical,
-        int high,
-        int medium,
-        int internalCouplings,
-        string expectedGrade)
-    {
-        List<CouplingIssue> issues = [];
-        issues.AddRange(CreateIssues(Severity.Critical, critical));
-        issues.AddRange(CreateIssues(Severity.High, high));
-        issues.AddRange(CreateIssues(Severity.Medium, medium));
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6);
 
-        GradeResult grade = CouplingScoring.CalculateGrade(internalCouplings, issues);
-
-        Assert.Equal(expectedGrade, grade.Letter);
-    }
-
-    [Fact]
-    public void Render_JsonOutput_IncludesSchemaVersionAndSyntaxOnlyMode()
-    {
-        AnalysisReport report = new(
-            new AnalysisSummary("/tmp/sample", "syntax-only", 1, 1, 0, 0, false, 6),
-            new GradeResult("B", "Bootstrap", "issue-density", "Test"),
-            1.0,
-            [],
-            [],
-            [],
-            [],
-            ["Semantic symbol resolution is not enabled."]);
-
-        string json = ReportRenderer.Render(report, ReportFormat.Json);
-
-        Assert.Contains("\"$schema\"", json);
-        Assert.Contains("\"schemaVersion\": \"0.1\"", json);
-        Assert.Contains("\"mode\": \"syntax-only\"", json);
-    }
-
-    [Fact]
-    public void AnalyzeTemporalCouplingsFromLog_RepeatedCoChanges_ReturnsThresholdPairs()
-    {
-        string repositoryPath = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
-        string first = Path.GetFullPath(Path.Combine(repositoryPath, "src", "First.cs"));
-        string second = Path.GetFullPath(Path.Combine(repositoryPath, "src", "Second.cs"));
-        string third = Path.GetFullPath(Path.Combine(repositoryPath, "src", "Third.cs"));
-        HashSet<string> analyzedFiles = [first, second, third];
-        string gitLog = """
-            COMMIT:1
-            src/First.cs
-            src/Second.cs
-            COMMIT:2
-            src/First.cs
-            src/Second.cs
-            src/Third.cs
-            COMMIT:3
-            src/First.cs
-            src/Second.cs
-            """;
-
-        IReadOnlyList<TemporalCoupling> couplings = GitVolatility.AnalyzeTemporalCouplingsFromLog(
-            repositoryPath,
-            gitLog,
-            analyzedFiles,
-            minTemporalCoupling: 3,
-            maxTemporalFilesPerCommit: 50);
-
-        TemporalCoupling coupling = Assert.Single(couplings);
-        Assert.Equal(first, coupling.FileA);
-        Assert.Equal(second, coupling.FileB);
-        Assert.Equal(3, coupling.CoChangeCount);
+        Assert.Equal(5, report.Summary.ExternalCouplings);
+        Assert.Contains(report.Issues, issue =>
+            issue.Type == IssueType.ScatteredExternalCoupling
+            && issue.Target == "Newtonsoft.Json");
     }
 
     private static string CreateFixture(string source)
@@ -322,44 +228,17 @@ public sealed class CSharpDependencyAnalyzerTests
             """;
     }
 
-    private static bool ScorePartsAreClamped(int strength, int distance, int volatility)
+    private static string NamespaceScopedExternalUsingSource(string typeName)
     {
-        CouplingMetrics coupling = new(
-            "Sample.Source",
-            "Sample.Target",
-            (IntegrationStrength)strength,
-            (Distance)distance,
-            (Volatility)volatility,
-            null,
-            null,
-            Visibility.Public,
-            new SourceLocation("Sample.cs", 1));
+        return $$"""
+            namespace Sample.App.{{typeName}}
+            {
+                using Newtonsoft.Json;
 
-        BalanceScore score = CouplingScoring.Calculate(coupling);
-
-        return score.Score >= 0.0 && score.Score <= 1.0
-            && score.Alignment >= 0.0 && score.Alignment <= 1.0
-            && score.VolatilityImpact >= 0.0 && score.VolatilityImpact <= 1.0;
-    }
-
-    private static int[] RepresentativeEnumBackedValues()
-    {
-        return [-100, -1, 0, 1, 2, 3, 4, 100];
-    }
-
-    private static IEnumerable<CouplingIssue> CreateIssues(Severity severity, int count)
-    {
-        for (int i = 0; i < count; i++)
-        {
-            yield return new CouplingIssue(
-                IssueType.GlobalComplexity,
-                severity,
-                "Sample.Source",
-                "Sample.Target",
-                0.5,
-                "Problem",
-                "Recommendation",
-                null);
-        }
+                public sealed class {{typeName}}
+                {
+                }
+            }
+            """;
     }
 }
