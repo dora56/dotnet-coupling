@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RollForward>Major</RollForward>
+
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>dotnet-coupling</ToolCommandName>
+    <PackageOutputPath>./nupkg</PackageOutputPath>
+
+    <PackageId>dotnet-coupling</PackageId>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>dora56</Authors>
+    <Description>Experimental coupling balance analyzer for C#/.NET projects.</Description>
+    <PackageTags>coupling;architecture;analysis;dotnet-tool;roslyn</PackageTags>
+    <PackageProjectUrl>https://github.com/dora56/dotnet-coupling</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dora56/dotnet-coupling</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.*" />
+    <PackageReference Include="System.CommandLine" Version="2.*" />
+  </ItemGroup>
+</Project>
