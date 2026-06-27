@@ -6,67 +6,40 @@
 
 MVP では `.coupling.json` / `coupling.json` のみサポートする。理由は単純で、`System.Text.Json` だけで実装でき、NuGet 依存を増やさずに済むためである。
 
-TOML は v0.2 で追加する。`cargo-coupling` との親和性を考えると `.coupling.toml` は魅力的だが、MVP で設定ファイル形式を増やすと本体より設定ローダーの世話が増える。沼は小さいうちに埋める。
+TOML は semantic mode 以降で検討する。`cargo-coupling` との親和性を考えると `.coupling.toml` は魅力的だが、Phase 2 で設定ファイル形式を増やすと本体より設定ローダーの世話が増える。
 
 ### 21.2 探索順
-
-MVP:
 
 1. 明示された `--config <file>`
 2. `.coupling.json`
 3. `coupling.json`
 
-v0.2 以降:
-
-1. 明示された `--config <file>`
-2. `.coupling.toml`
-3. `coupling.toml`
-4. `.coupling.json`
-5. `coupling.json`
-
-`.coupling.toml` が存在するが MVP で未対応の場合は、無視せず warning を出す。
-
-```text
-Warning: .coupling.toml was found but TOML config is not supported in v0.1. Use .coupling.json or upgrade when v0.2 is available.
-```
+Phase 2 では `.coupling.toml` / `coupling.toml` は未対応である。明示的に
+`--config` へ渡された場合は CLI 引数エラーとして扱う。
 
 ### 21.3 JSON 例
 
 ```json
 {
+  "$schema": "schemas/dotnet-coupling-config-0.2.schema.json",
   "analysis": {
-    "excludeTests": true,
     "exclude": [
-      "**/bin/**",
-      "**/obj/**",
-      "**/.git/**",
-      "**/.vs/**",
       "**/Generated/**",
       "**/*.g.cs",
-      "**/*.generated.cs",
-      "**/*.Designer.cs",
-      "**/*.AssemblyInfo.cs",
-      "**/GlobalUsings.g.cs"
+      "**/*.generated.cs"
     ]
   },
   "thresholds": {
     "maxDependencies": 20,
     "maxDependents": 30,
-    "strongCoupling": 0.75,
-    "farDistance": 0.50,
-    "highVolatility": 0.75,
     "minTemporalCoupling": 3,
     "maxTemporalFilesPerCommit": 50,
     "scatteredExternalBreadth": 5
   },
-  "volatility": {
-    "high": ["src/MyApp.Domain/Core/**"],
-    "low": ["src/MyApp.Infrastructure/Shared/**"]
-  },
-  "subdomains": {
-    "core": ["src/MyApp.Domain/**"],
-    "supporting": ["src/MyApp.Application/**"],
-    "generic": ["src/MyApp.Infrastructure/**"]
+  "ignore": {
+    "paths": ["**/Legacy/**"],
+    "namespaces": ["MyApp.Legacy"],
+    "issueTypes": ["ScatteredExternalCoupling"]
   }
 }
 ```

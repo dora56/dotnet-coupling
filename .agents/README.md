@@ -6,8 +6,8 @@ This directory is the primary entrypoint for AI agents working in this repositor
 
 1. Read `../AGENTS.md` for repository workflow and commands.
 2. Read `rules/csharp.md` for coding conventions.
-3. Read `docs/khononov-framework.md` for scoring intent.
-4. Read `docs/issue-types.md` for detection rules and severities.
+3. Read `../docs/reference/khononov-framework.md` for scoring intent.
+4. Read `../docs/reference/issue-types.md` for detection rules and severities.
 
 ## Design Specification (split)
 

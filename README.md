@@ -24,6 +24,8 @@ dotnet-coupling --summary ./src
 dotnet-coupling --json ./src
 dotnet-coupling --check --min-grade B ./src
 dotnet-coupling --no-git ./src
+dotnet-coupling --config .coupling.json ./src
+dotnet-coupling --check --baseline main --fail-on High ./src
 ```
 
 ## Output
@@ -39,6 +41,21 @@ JSON output includes:
 - syntax-only manifest and blind spots
 
 The schema files live under `schemas/`.
+
+## Configuration
+
+Phase 2 supports JSON configuration via `--config <file>`, `.coupling.json`, or
+`coupling.json`. The supported MVP settings are analysis excludes, fan-in/out
+thresholds, temporal coupling thresholds, scattered external breadth, and
+ignore rules for paths, namespaces, and issue types. See `.coupling.example.json`
+and `schemas/dotnet-coupling-config-0.2.schema.json`.
+
+## Baseline Gate
+
+`--baseline <ref>` compares current issues with a Git ref and classifies issues
+as new, resolved, or unchanged. With `--check --baseline`, the gate fails only
+for new issues at `--fail-on` severity or higher. If `--fail-on` is omitted, the
+baseline gate uses `High`.
 
 ## Development
 
@@ -63,3 +80,7 @@ CI uploads `coverage-report` and `mutation-report` artifacts for inspection.
 - Runtime DI container dependencies are not analyzed.
 - Reflection and `dynamic` calls may be incomplete.
 - Generated code is excluded by default.
+
+## License
+
+MIT. See `LICENSE`.

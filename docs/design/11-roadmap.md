@@ -81,41 +81,41 @@ Phase 1 では、当初 Phase 2 以降でもよかった品質基盤を前倒し
 
 ### Phase 2: Public alpha
 
-Goal: `0.1.0-alpha.1` を外へ出し、syntax-only MVP の false positive / false
-negative を実利用で把握する。
+Goal: `0.2.0-alpha.1` を外へ出し、syntax-only MVP と Phase 2 の config /
+baseline gate の false positive / false negative を実利用で把握する。
 
 Release readiness:
 
 - [ ] GitHub Actions を remote で実走し、cache / locked restore / artifacts を確認
-- [ ] `dotnet pack` artifact を CI で保存
-- [ ] local tool install smoke を CI に追加
+- [x] `dotnet pack` artifact を CI で保存
+- [x] local tool install smoke を CI に追加
 - [ ] GitHub Releases 作成
-- [ ] NuGet.org に `0.1.0-alpha.1` 公開
-- [ ] Release notes に schema version / blind spots / syntax-only limitation を明記
+- [ ] NuGet.org に `0.2.0-alpha.1` 公開
+- [x] Release notes に schema version / blind spots / syntax-only limitation を明記
 
 Dogfooding:
 
-- [ ] `dotnet-coupling` 自身のリポジトリに対する dogfooding を定例化
+- [x] `dotnet-coupling` 自身のリポジトリに対する dogfooding を定例化
 - [ ] 2-3 個の小規模 OSS / サンプルプロジェクトで dogfooding
 - [ ] false positive / false negative を issue 化
-- [ ] `--no-git` / Git なし環境の出力改善
+- [x] `--no-git` / Git なし環境の出力改善
 - [ ] System / Microsoft / internal namespace 除外ルールの実例検証
 - [ ] Hidden Coupling の commit size / threshold の実例検証
 
 Configuration and alpha feedback:
 
-- [ ] `.coupling.json` MVP 対応
-- [ ] threshold 設定: fan-in/out, scattered external breadth, temporal coupling
-- [ ] ignore 設定: path / namespace / issue type
-- [ ] `--config` の実装
-- [ ] config schema / sample config
+- [x] `.coupling.json` MVP 対応
+- [x] threshold 設定: fan-in/out, scattered external breadth, temporal coupling
+- [x] ignore 設定: path / namespace / issue type
+- [x] `--config` の実装
+- [x] config schema / sample config
 
 Baseline and team gate:
 
-- [ ] `--baseline <ref>` MVP
-- [ ] new / resolved / unchanged issues の分類
-- [ ] ratchet gate: new High 以上のみ fail
-- [ ] GitHub Actions 利用例
+- [x] `--baseline <ref>` MVP
+- [x] new / resolved / unchanged issues の分類
+- [x] ratchet gate: new High 以上のみ fail
+- [x] GitHub Actions 利用例
 
 ### Phase 3: Semantic mode and project model
 
