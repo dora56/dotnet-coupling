@@ -87,10 +87,14 @@ public static class ReportRenderer
             {
                 Confidence = "syntax-only",
                 RunNotes = new[] { "Semantic symbol resolution is not enabled." },
-                BlindSpots = report.BlindSpots.Select(blindSpot => new
+                BlindSpots = report.BlindSpots.Select(blindSpot =>
                 {
-                    Kind = blindSpot.Split(' ', 2)[0],
-                    Description = blindSpot,
+                    string kind = blindSpot.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Unknown";
+                    return new
+                    {
+                        Kind = kind,
+                        Description = blindSpot,
+                    };
                 }),
             },
         };

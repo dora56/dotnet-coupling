@@ -120,6 +120,10 @@ rootCommand.SetAction(parseResult =>
     catch (Exception ex)
     {
         Console.Error.WriteLine($"Unexpected analysis error: {ex.Message}");
+        if (!string.IsNullOrEmpty(ex.StackTrace))
+        {
+            Console.Error.WriteLine($"Details: {ex.StackTrace}");
+        }
         return 4;
     }
 });

@@ -16,6 +16,7 @@ public static class GitVolatility
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
+
             startInfo.ArgumentList.Add("log");
             startInfo.ArgumentList.Add("--pretty=format:");
             startInfo.ArgumentList.Add("--name-only");
@@ -37,13 +38,14 @@ public static class GitVolatility
             foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 string fullPath = Path.GetFullPath(Path.Combine(repositoryPath, line));
-                counts[fullPath] = counts.TryGetValue(fullPath, out int count) ? count + 1 : 1;
+                counts[fullPath] = counts.GetValueOrDefault(fullPath) + 1;
             }
 
             return counts;
         }
         catch
         {
+            /* git not available or repository unavailable; skip volatility analysis */
             return new Dictionary<string, int>(StringComparer.Ordinal);
         }
     }
