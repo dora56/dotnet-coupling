@@ -23,7 +23,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Cache .NET dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.nuget/packages
@@ -52,7 +52,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Cache .NET dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.nuget/packages
@@ -90,7 +90,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Cache .NET dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.nuget/packages
@@ -119,7 +119,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Cache .NET dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.nuget/packages
