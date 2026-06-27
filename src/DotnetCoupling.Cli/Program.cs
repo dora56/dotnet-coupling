@@ -3,10 +3,10 @@ using System.CommandLine;
 
 RootCommand rootCommand = new("Analyze coupling balance in C#/.NET projects.");
 
-Argument<DirectoryInfo> pathArgument = new("path")
+Argument<string> pathArgument = new("path")
 {
-    Description = "Directory to analyze.",
-    DefaultValueFactory = _ => new DirectoryInfo("."),
+    Description = "Directory or C# file to analyze.",
+    DefaultValueFactory = _ => ".",
 };
 
 Option<bool> summaryOption = new("--summary")
@@ -69,24 +69,26 @@ rootCommand.Options.Add(configOption);
 
 rootCommand.SetAction(parseResult =>
 {
-    DirectoryInfo targetPath = parseResult.GetValue(pathArgument)!;
+    string targetPath = parseResult.GetValue(pathArgument) ?? ".";
     bool summary = parseResult.GetValue(summaryOption);
     bool json = parseResult.GetValue(jsonOption);
     FileInfo? output = parseResult.GetValue(outputOption);
     bool check = parseResult.GetValue(checkOption);
     string minGrade = parseResult.GetValue(minGradeOption) ?? "C";
+    string? failOn = parseResult.GetValue(failOnOption);
     bool noGit = parseResult.GetValue(noGitOption);
     int gitMonths = parseResult.GetValue(gitMonthsOption);
 
-    if (!targetPath.Exists)
+    string fullTargetPath = Path.GetFullPath(targetPath);
+    if (!Directory.Exists(fullTargetPath) && !File.Exists(fullTargetPath))
     {
-        Console.Error.WriteLine($"Target path does not exist: {targetPath.FullName}");
+        Console.Error.WriteLine($"Target path does not exist: {fullTargetPath}");
         return 3;
     }
 
     try
     {
-        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(targetPath.FullName, !noGit, gitMonths);
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fullTargetPath, !noGit, gitMonths);
 
         ReportFormat format = json
             ? ReportFormat.Json
@@ -115,7 +117,18 @@ rootCommand.SetAction(parseResult =>
             return 0;
         }
 
-        return GradeRank(report.Grade.Letter) <= GradeRank(minGrade) ? 0 : 1;
+        if (GradeRank(report.Grade.Letter) > GradeRank(minGrade))
+        {
+            return 1;
+        }
+
+        if (!string.IsNullOrWhiteSpace(failOn) && TryParseSeverity(failOn, out Severity threshold))
+        {
+            bool hasFailingSeverity = report.Issues.Any(issue => SeverityRank(issue.Severity) >= SeverityRank(threshold));
+            return hasFailingSeverity ? 1 : 0;
+        }
+
+        return 0;
     }
     catch (Exception ex)
     {
@@ -141,5 +154,22 @@ static int GradeRank(string grade)
         "D" => 4,
         "F" => 5,
         _ => 3,
+    };
+}
+
+static bool TryParseSeverity(string value, out Severity severity)
+{
+    return Enum.TryParse(value, ignoreCase: true, out severity);
+}
+
+static int SeverityRank(Severity severity)
+{
+    return severity switch
+    {
+        Severity.Low => 0,
+        Severity.Medium => 1,
+        Severity.High => 2,
+        Severity.Critical => 3,
+        _ => 0,
     };
 }

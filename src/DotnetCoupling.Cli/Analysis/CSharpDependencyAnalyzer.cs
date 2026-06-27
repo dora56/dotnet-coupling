@@ -14,11 +14,13 @@ public sealed class CSharpDependencyAnalyzer
         string[] files = DiscoverCSharpFiles(fullPath);
         List<Component> components = [];
         List<DependencyObservation> observations = [];
+        Dictionary<string, List<UsingNamespace>> usingNamespacesByFile = new(StringComparer.Ordinal);
 
         foreach (string file in files)
         {
             SyntaxTree tree = CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: file);
             CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
+            usingNamespacesByFile[file] = CollectUsingNamespaces(tree, root);
             string namespaceName = FindNamespace(root);
             ComponentWalker walker = new(tree, namespaceName, file);
             walker.Visit(root);
@@ -29,10 +31,19 @@ public sealed class CSharpDependencyAnalyzer
         Dictionary<string, Component> componentsByName = components
             .GroupBy(component => component.Name)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        Dictionary<string, Component> componentsById = components.ToDictionary(component => component.Id, StringComparer.Ordinal);
+        HashSet<string> internalNamespaces = components
+            .Select(component => component.Namespace)
+            .Where(namespaceName => !string.IsNullOrWhiteSpace(namespaceName))
+            .ToHashSet(StringComparer.Ordinal);
+        HashSet<string> analyzedFiles = files.ToHashSet(StringComparer.Ordinal);
 
         IReadOnlyDictionary<string, int> changeCounts = useGit
             ? GitVolatility.GetChangeCounts(fullPath, gitMonths)
             : new Dictionary<string, int>(StringComparer.Ordinal);
+        IReadOnlyList<TemporalCoupling> temporalCouplings = useGit
+            ? GitVolatility.GetTemporalCouplings(fullPath, gitMonths, analyzedFiles)
+            : [];
 
         List<CouplingMetrics> couplings = [];
         foreach (DependencyObservation observation in observations)
@@ -47,8 +58,7 @@ public sealed class CSharpDependencyAnalyzer
                 continue;
             }
 
-            Component? source = components.FirstOrDefault(component => component.Id == observation.SourceComponentId);
-            if (source is null)
+            if (!componentsById.TryGetValue(observation.SourceComponentId, out Component? source))
             {
                 continue;
             }
@@ -67,25 +77,31 @@ public sealed class CSharpDependencyAnalyzer
                 new SourceLocation(observation.FilePath, observation.Line)));
         }
 
-        GradeResult grade = new("B", "Bootstrap", "issue-density", "Phase 0 provides analysis plumbing; issue detection is not enabled yet.");
+        AddExternalUsingCouplings(couplings, components, usingNamespacesByFile, internalNamespaces);
+
+        List<BalanceScore> scores = couplings.Select(CouplingScoring.Calculate).ToList();
+        int internalCouplingCount = couplings.Count(coupling => coupling.Distance != Distance.ExternalPackage);
+        int externalCouplingCount = couplings.Count - internalCouplingCount;
+        List<CouplingIssue> issues = DetectIssues(scores, temporalCouplings, componentsById);
+        GradeResult grade = CouplingScoring.CalculateGrade(internalCouplingCount, issues);
         AnalysisSummary summary = new(
             fullPath,
             "syntax-only",
             files.Length,
             components.Count,
-            couplings.Count,
-            0,
+            internalCouplingCount,
+            externalCouplingCount,
             useGit && changeCounts.Count > 0,
             gitMonths);
 
         return new AnalysisReport(
             summary,
             grade,
-            couplings.Count == 0 ? 1.0 : 0.75,
+            scores.Count == 0 ? 1.0 : scores.Average(score => score.Score),
             components,
             observations,
             couplings,
-            [],
+            issues,
             [
                 "Semantic symbol resolution is not enabled.",
                 "DI container runtime resolution is not analyzed in syntax-only mode.",
@@ -121,9 +137,24 @@ public sealed class CSharpDependencyAnalyzer
     private static bool IsGeneratedFile(string file)
     {
         string fileName = Path.GetFileName(file);
-        return fileName.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase)
+        if (fileName.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase)
             || fileName.EndsWith(".generated.cs", StringComparison.OrdinalIgnoreCase)
-            || fileName.EndsWith(".designer.cs", StringComparison.OrdinalIgnoreCase);
+            || fileName.EndsWith(".designer.cs", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        using StreamReader reader = File.OpenText(file);
+        for (int i = 0; i < 5 && !reader.EndOfStream; i++)
+        {
+            string? line = reader.ReadLine();
+            if (line is not null && line.Contains("<auto-generated", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string FindNamespace(CompilationUnitSyntax root)
@@ -136,6 +167,25 @@ public sealed class CSharpDependencyAnalyzer
 
         NamespaceDeclarationSyntax? blockScoped = root.Members.OfType<NamespaceDeclarationSyntax>().FirstOrDefault();
         return blockScoped?.Name.ToString() ?? "";
+    }
+
+    private static List<UsingNamespace> CollectUsingNamespaces(SyntaxTree tree, CompilationUnitSyntax root)
+    {
+        List<UsingNamespace> usingNamespaces = [];
+        foreach (UsingDirectiveSyntax usingDirective in root.Usings)
+        {
+            if (usingDirective.Alias is not null || usingDirective.Name is null)
+            {
+                continue;
+            }
+
+            FileLinePositionSpan span = tree.GetLineSpan(usingDirective.Span);
+            usingNamespaces.Add(new UsingNamespace(
+                usingDirective.Name.ToString(),
+                span.StartLinePosition.Line + 1));
+        }
+
+        return usingNamespaces;
     }
 
     private static IntegrationStrength ResolveStrength(DependencyObservation observation, Component target)
@@ -183,6 +233,349 @@ public sealed class CSharpDependencyAnalyzer
             <= 10 => Volatility.Medium,
             _ => Volatility.High,
         };
+    }
+
+    private static void AddExternalUsingCouplings(
+        List<CouplingMetrics> couplings,
+        IReadOnlyCollection<Component> components,
+        IReadOnlyDictionary<string, List<UsingNamespace>> usingNamespacesByFile,
+        IReadOnlySet<string> internalNamespaces)
+    {
+        foreach (IGrouping<string, Component> fileComponents in components.GroupBy(component => component.FilePath, StringComparer.Ordinal))
+        {
+            if (!usingNamespacesByFile.TryGetValue(fileComponents.Key, out List<UsingNamespace>? usingNamespaces))
+            {
+                continue;
+            }
+
+            foreach (UsingNamespace usingNamespace in usingNamespaces)
+            {
+                if (IsFrameworkUsing(usingNamespace.Name) || IsInternalUsing(usingNamespace.Name, internalNamespaces))
+                {
+                    continue;
+                }
+
+                string packageName = NormalizeExternalPackageName(usingNamespace.Name);
+                foreach (Component source in fileComponents)
+                {
+                    couplings.Add(new CouplingMetrics(
+                        source.Id,
+                        packageName,
+                        IntegrationStrength.Contract,
+                        Distance.ExternalPackage,
+                        Volatility.Low,
+                        source.ProjectName,
+                        packageName,
+                        Visibility.Public,
+                        new SourceLocation(source.FilePath, usingNamespace.Line)));
+                }
+            }
+        }
+    }
+
+    private static bool IsFrameworkUsing(string namespaceName)
+    {
+        return namespaceName == "System"
+            || namespaceName.StartsWith("System.", StringComparison.Ordinal)
+            || namespaceName == "Microsoft"
+            || namespaceName.StartsWith("Microsoft.", StringComparison.Ordinal);
+    }
+
+    private static bool IsInternalUsing(string namespaceName, IReadOnlySet<string> internalNamespaces)
+    {
+        return internalNamespaces.Any(internalNamespace =>
+            namespaceName == internalNamespace
+            || namespaceName.StartsWith(internalNamespace + ".", StringComparison.Ordinal)
+            || internalNamespace.StartsWith(namespaceName + ".", StringComparison.Ordinal));
+    }
+
+    private static string NormalizeExternalPackageName(string namespaceName)
+    {
+        string[] segments = namespaceName.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length >= 2)
+        {
+            return $"{segments[0]}.{segments[1]}";
+        }
+
+        return segments.FirstOrDefault() ?? namespaceName;
+    }
+
+    private static List<CouplingIssue> DetectIssues(
+        IReadOnlyCollection<BalanceScore> scores,
+        IReadOnlyList<TemporalCoupling> temporalCouplings,
+        IReadOnlyDictionary<string, Component> componentsById)
+    {
+        List<CouplingIssue> issues = [];
+
+        foreach (BalanceScore score in scores)
+        {
+            CouplingMetrics coupling = score.Coupling;
+            if (coupling.Strength >= IntegrationStrength.Functional && coupling.Distance >= Distance.DifferentNamespace)
+            {
+                issues.Add(new CouplingIssue(
+                    IssueType.GlobalComplexity,
+                    score.Score < 0.40 ? Severity.High : Severity.Medium,
+                    coupling.Source,
+                    coupling.Target,
+                    score.Score,
+                    "Strong coupling spans a namespace or project boundary.",
+                    "Introduce an interface, move the dependency closer, or add a port/adapter.",
+                    coupling.Location));
+            }
+
+            if (coupling.Strength >= IntegrationStrength.Functional && coupling.Volatility == Volatility.High)
+            {
+                issues.Add(new CouplingIssue(
+                    IssueType.CascadingChangeRisk,
+                    Severity.High,
+                    coupling.Source,
+                    coupling.Target,
+                    score.Score,
+                    "Strong coupling targets a frequently changing component.",
+                    "Stabilize the target API, introduce an interface, or invert the dependency.",
+                    coupling.Location));
+            }
+
+            if (coupling.Strength == IntegrationStrength.Intrusive && coupling.Distance >= Distance.DifferentNamespace)
+            {
+                issues.Add(new CouplingIssue(
+                    IssueType.InappropriateIntimacy,
+                    Severity.High,
+                    coupling.Source,
+                    coupling.Target,
+                    score.Score,
+                    "Intrusive implementation-detail access crosses a boundary.",
+                    "Encapsulate the implementation detail behind a stable API.",
+                    coupling.Location));
+            }
+        }
+
+        AddFanInFanOutIssues(scores.Select(score => score.Coupling), issues);
+        AddCircularDependencyIssues(scores.Select(score => score.Coupling), issues);
+        AddHiddenCouplingIssues(temporalCouplings, scores.Select(score => score.Coupling), componentsById, issues);
+        AddScatteredExternalCouplingIssues(scores.Select(score => score.Coupling), issues);
+        return issues;
+    }
+
+    private static void AddFanInFanOutIssues(IEnumerable<CouplingMetrics> couplings, List<CouplingIssue> issues)
+    {
+        const int maxDependencies = 20;
+        const int maxDependents = 30;
+
+        foreach (IGrouping<string, CouplingMetrics> group in couplings.GroupBy(coupling => coupling.Source))
+        {
+            int count = group.Select(coupling => coupling.Target).Distinct(StringComparer.Ordinal).Count();
+            if (count > maxDependencies)
+            {
+                issues.Add(new CouplingIssue(
+                    IssueType.HighEfferentCoupling,
+                    count > maxDependencies * 2 ? Severity.High : Severity.Medium,
+                    group.Key,
+                    "",
+                    1.0,
+                    "Component depends on too many distinct targets.",
+                    "Split responsibilities or extract focused sub-modules.",
+                    null));
+            }
+        }
+
+        foreach (IGrouping<string, CouplingMetrics> group in couplings.GroupBy(coupling => coupling.Target))
+        {
+            int count = group.Select(coupling => coupling.Source).Distinct(StringComparer.Ordinal).Count();
+            if (count > maxDependents)
+            {
+                issues.Add(new CouplingIssue(
+                    IssueType.HighAfferentCoupling,
+                    count > maxDependents * 2 ? Severity.High : Severity.Medium,
+                    "",
+                    group.Key,
+                    1.0,
+                    "Component has too many distinct dependents.",
+                    "Stabilize the public API or split the shared model.",
+                    null));
+            }
+        }
+    }
+
+    private static void AddCircularDependencyIssues(IEnumerable<CouplingMetrics> couplings, List<CouplingIssue> issues)
+    {
+        Dictionary<string, HashSet<string>> graph = new(StringComparer.Ordinal);
+        foreach (CouplingMetrics coupling in couplings)
+        {
+            string sourceNamespace = NamespaceOf(coupling.Source);
+            string targetNamespace = NamespaceOf(coupling.Target);
+            if (string.IsNullOrWhiteSpace(sourceNamespace) || sourceNamespace == targetNamespace)
+            {
+                continue;
+            }
+
+            if (!graph.TryGetValue(sourceNamespace, out HashSet<string>? targets))
+            {
+                targets = new HashSet<string>(StringComparer.Ordinal);
+                graph[sourceNamespace] = targets;
+            }
+
+            targets.Add(targetNamespace);
+            graph.TryAdd(targetNamespace, new HashSet<string>(StringComparer.Ordinal));
+        }
+
+        foreach (IReadOnlyCollection<string> component in FindStronglyConnectedComponents(graph))
+        {
+            if (component.Count <= 1)
+            {
+                continue;
+            }
+
+            string source = string.Join(" -> ", component.Order(StringComparer.Ordinal));
+            issues.Add(new CouplingIssue(
+                IssueType.CircularDependency,
+                Severity.High,
+                source,
+                source,
+                0.0,
+                "Namespaces form a circular dependency.",
+                "Invert one direction via an interface, extract a shared contract, or use events.",
+                null));
+        }
+    }
+
+    private static void AddHiddenCouplingIssues(
+        IReadOnlyList<TemporalCoupling> temporalCouplings,
+        IEnumerable<CouplingMetrics> couplings,
+        IReadOnlyDictionary<string, Component> componentsById,
+        List<CouplingIssue> issues)
+    {
+        HashSet<(string FileA, string FileB)> explicitFilePairs = new();
+        foreach (CouplingMetrics coupling in couplings)
+        {
+            if (!componentsById.TryGetValue(coupling.Source, out Component? source)
+                || !componentsById.TryGetValue(coupling.Target, out Component? target))
+            {
+                continue;
+            }
+
+            if (source.FilePath == target.FilePath)
+            {
+                continue;
+            }
+
+            explicitFilePairs.Add(OrderPair(source.FilePath, target.FilePath));
+        }
+
+        foreach (TemporalCoupling temporalCoupling in temporalCouplings)
+        {
+            (string FileA, string FileB) pair = OrderPair(temporalCoupling.FileA, temporalCoupling.FileB);
+            if (explicitFilePairs.Contains(pair))
+            {
+                continue;
+            }
+
+            issues.Add(new CouplingIssue(
+                IssueType.HiddenCoupling,
+                temporalCoupling.CoChangeCount >= 6 ? Severity.High : Severity.Medium,
+                temporalCoupling.FileA,
+                temporalCoupling.FileB,
+                0.50,
+                $"Files changed together {temporalCoupling.CoChangeCount} times without an explicit code dependency.",
+                "Review whether a shared concept should be extracted, duplicated logic unified, or the dependency made explicit.",
+                null));
+        }
+    }
+
+    private static void AddScatteredExternalCouplingIssues(IEnumerable<CouplingMetrics> couplings, List<CouplingIssue> issues)
+    {
+        const int scatteredExternalBreadth = 5;
+
+        foreach (IGrouping<string, CouplingMetrics> group in couplings
+            .Where(coupling => coupling.Distance == Distance.ExternalPackage)
+            .GroupBy(coupling => coupling.Target, StringComparer.Ordinal))
+        {
+            int directUsers = group.Select(coupling => coupling.Source).Distinct(StringComparer.Ordinal).Count();
+            if (directUsers < scatteredExternalBreadth)
+            {
+                continue;
+            }
+
+            issues.Add(new CouplingIssue(
+                IssueType.ScatteredExternalCoupling,
+                Severity.Medium,
+                "",
+                group.Key,
+                0.50,
+                $"External package namespace is used directly by {directUsers} internal components.",
+                "Introduce a wrapper or adapter so upgrade risk is concentrated behind an internal API.",
+                null));
+        }
+    }
+
+    private static (string FileA, string FileB) OrderPair(string first, string second)
+    {
+        return string.CompareOrdinal(first, second) <= 0 ? (first, second) : (second, first);
+    }
+
+    private static string NamespaceOf(string componentId)
+    {
+        int lastDot = componentId.LastIndexOf('.');
+        return lastDot < 0 ? "" : componentId[..lastDot];
+    }
+
+    private static List<IReadOnlyCollection<string>> FindStronglyConnectedComponents(Dictionary<string, HashSet<string>> graph)
+    {
+        int index = 0;
+        Stack<string> stack = new();
+        HashSet<string> onStack = new(StringComparer.Ordinal);
+        Dictionary<string, int> indexes = new(StringComparer.Ordinal);
+        Dictionary<string, int> lowLinks = new(StringComparer.Ordinal);
+        List<IReadOnlyCollection<string>> components = [];
+
+        foreach (string node in graph.Keys.Order(StringComparer.Ordinal))
+        {
+            if (!indexes.ContainsKey(node))
+            {
+                StrongConnect(node);
+            }
+        }
+
+        return components;
+
+        void StrongConnect(string node)
+        {
+            indexes[node] = index;
+            lowLinks[node] = index;
+            index++;
+            stack.Push(node);
+            onStack.Add(node);
+
+            foreach (string target in graph[node].Order(StringComparer.Ordinal))
+            {
+                if (!indexes.ContainsKey(target))
+                {
+                    StrongConnect(target);
+                    lowLinks[node] = Math.Min(lowLinks[node], lowLinks[target]);
+                }
+                else if (onStack.Contains(target) && indexes.TryGetValue(target, out int targetIndex))
+                {
+                    lowLinks[node] = Math.Min(lowLinks[node], targetIndex);
+                }
+            }
+
+            if (lowLinks[node] != indexes[node])
+            {
+                return;
+            }
+
+            List<string> component = [];
+            string current;
+            do
+            {
+                current = stack.Pop();
+                onStack.Remove(current);
+                component.Add(current);
+            }
+            while (current != node);
+
+            components.Add(component);
+        }
     }
 
     private sealed class ComponentWalker(SyntaxTree tree, string namespaceName, string filePath) : CSharpSyntaxWalker
@@ -346,4 +739,6 @@ public sealed class CSharpDependencyAnalyzer
             };
         }
     }
+
+    private sealed record UsingNamespace(string Name, int Line);
 }

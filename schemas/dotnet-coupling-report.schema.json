@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.1.schema.json",
+  "title": "dotnet-coupling report",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "tool",
+    "version",
+    "analysis",
+    "grade",
+    "scores",
+    "issueCounts",
+    "issues",
+    "manifest"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.1"
+    },
+    "tool": {
+      "const": "dotnet-coupling"
+    },
+    "version": {
+      "type": "string"
+    },
+    "analysis": {
+      "type": "object",
+      "required": [
+        "path",
+        "mode",
+        "files",
+        "components",
+        "couplings",
+        "gitUsed",
+        "gitMonths"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "mode": {
+          "const": "syntax-only"
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "couplings": {
+          "$ref": "#/$defs/couplingCounts"
+        },
+        "gitUsed": {
+          "type": "boolean"
+        },
+        "gitMonths": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "grade": {
+      "type": "object",
+      "required": [
+        "letter",
+        "display",
+        "basis",
+        "rationale"
+      ],
+      "properties": {
+        "letter": {
+          "enum": [
+            "S",
+            "A",
+            "B",
+            "C",
+            "D",
+            "F"
+          ]
+        },
+        "display": {
+          "type": "string"
+        },
+        "basis": {
+          "const": "issue-density"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scores": {
+      "type": "object",
+      "required": [
+        "averageBalanceScore"
+      ],
+      "properties": {
+        "averageBalanceScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "issueCounts": {
+      "$ref": "#/$defs/issueCounts"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "required": [
+        "confidence",
+        "runNotes",
+        "blindSpots"
+      ],
+      "properties": {
+        "confidence": {
+          "const": "syntax-only"
+        },
+        "runNotes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blindSpots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/blindSpot"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "couplingCounts": {
+      "type": "object",
+      "required": [
+        "total",
+        "internal",
+        "external"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "internal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "external": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "issueCounts": {
+      "type": "object",
+      "required": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "properties": {
+        "critical": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "high": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "medium": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "low": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "issue": {
+      "type": "object",
+      "required": [
+        "type",
+        "severity",
+        "source",
+        "target",
+        "score",
+        "problem",
+        "recommendation",
+        "location"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "Low",
+            "Medium",
+            "High",
+            "Critical"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "problem": {
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/location"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "location": {
+      "type": "object",
+      "required": [
+        "file",
+        "line"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "blindSpot": {
+      "type": "object",
+      "required": [
+        "kind",
+        "description"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

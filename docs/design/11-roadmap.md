@@ -34,22 +34,22 @@ Semantic Versioning を採用する。
 
 ### Phase 1: MVP hardening
 
-- [ ] CLI parser 整理
-- [ ] 解析対象ファイル探索の安定化
-- [ ] generated code 除外
-- [ ] `Visibility` / `UsageContext` / `Distance` の単体テスト
-- [ ] Balance Score の clamp 境界値テスト
-- [ ] issue density ベース Grade の単体テスト
-- [ ] Property-Based Testing 追加
-- [ ] Hidden Coupling / temporal co-change の MVP 実装
-- [ ] Scattered External Coupling の MVP 実装
-- [ ] issue 検出ロジックの単体テスト
-- [ ] Mutation Testing 追加
-- [ ] JSON schema 固定
-- [ ] manifest / blind spots 出力
-- [ ] README 整備
-- [ ] NuGet metadata 整備
-- [ ] ローカル tool install 検証
+- [x] CLI parser 整理
+- [x] 解析対象ファイル探索の安定化
+- [x] generated code 除外
+- [x] `Visibility` / `UsageContext` / `Distance` の単体テスト
+- [x] Balance Score の clamp 境界値テスト
+- [x] issue density ベース Grade の単体テスト
+- [x] Property-Based Testing 追加
+- [x] Hidden Coupling / temporal co-change の MVP 実装
+- [x] Scattered External Coupling の MVP 実装
+- [x] issue 検出ロジックの単体テスト
+- [x] Mutation Testing 追加
+- [x] JSON schema 固定
+- [x] manifest / blind spots 出力
+- [x] README 整備
+- [x] NuGet metadata 整備
+- [x] ローカル tool install 検証
 - [x] GitHub Release ノート生成
 - [x] ローカル pre-commit ガード
 

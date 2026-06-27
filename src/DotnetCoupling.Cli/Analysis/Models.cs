@@ -97,9 +97,14 @@ public enum Volatility
 
 public enum IssueType
 {
-    InappropriateIntimacy,
     GlobalComplexity,
+    CascadingChangeRisk,
+    InappropriateIntimacy,
+    HighEfferentCoupling,
+    HighAfferentCoupling,
+    CircularDependency,
     HiddenCoupling,
+    AccidentalVolatility,
     ScatteredExternalCoupling,
 }
 
@@ -149,6 +154,11 @@ public sealed record CouplingIssue(
     string Problem,
     string Recommendation,
     SourceLocation? Location);
+
+public sealed record TemporalCoupling(
+    string FileA,
+    string FileB,
+    int CoChangeCount);
 
 public sealed record AnalysisSummary(
     string Path,

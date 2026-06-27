@@ -21,6 +21,7 @@
     <PackageProjectUrl>https://github.com/dora56/dotnet-coupling</PackageProjectUrl>
     <RepositoryUrl>https://github.com/dora56/dotnet-coupling</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
@@ -28,5 +29,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.*" />
     <PackageReference Include="System.CommandLine" Version="2.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>

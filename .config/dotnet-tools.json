@@ -6,7 +6,15 @@
       "version": "0.9.1",
       "commands": [
         "husky"
-      ]
+      ],
+      "rollForward": false
+    },
+    "dotnet-stryker": {
+      "version": "4.15.0",
+      "commands": [
+        "dotnet-stryker"
+      ],
+      "rollForward": false
     }
   }
 }
