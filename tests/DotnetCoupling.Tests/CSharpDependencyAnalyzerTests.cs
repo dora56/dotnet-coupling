@@ -176,6 +176,90 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_ConfigExcludePathPattern_RemovesMatchingFilesFromAnalysis()
+    {
+        string directory = CreateFixture(
+            "Kept.cs",
+            """
+            namespace Sample.App;
+
+            public sealed class Kept
+            {
+            }
+            """,
+            "Ignored.cs",
+            """
+            namespace Sample.App;
+
+            public sealed class Ignored
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            ExcludePathPatterns = ["**/Ignored.cs"],
+        };
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Component component = Assert.Single(report.Components);
+        Assert.Equal("Kept", component.Name);
+    }
+
+    [Fact]
+    public void Analyze_ConfigScatteredExternalThreshold_ChangesIssueBoundary()
+    {
+        string directory = CreateFixture(
+            "First.cs",
+            ExternalUsingSource("First"),
+            "Second.cs",
+            ExternalUsingSource("Second"));
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            Thresholds = AnalysisOptions.Default.Thresholds with { ScatteredExternalBreadth = 2 },
+        };
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.Contains(report.Issues, issue => issue.Type == IssueType.ScatteredExternalCoupling);
+    }
+
+    [Fact]
+    public void Analyze_ConfigIgnoreIssueType_RemovesIssueBeforeGradeCalculation()
+    {
+        string directory = CreateFixture(
+            "Api.cs",
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    _ = new Repository();
+                }
+            }
+            """,
+            "Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            IgnoreIssueTypes = new HashSet<IssueType> { IssueType.GlobalComplexity },
+        };
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.DoesNotContain(report.Issues, issue => issue.Type == IssueType.GlobalComplexity);
+        Assert.Equal("B", report.Grade.Letter);
+    }
+
+    [Fact]
     public void Analyze_NamespaceScopedExternalUsingAcrossManyComponents_ReportsScatteredExternalCoupling()
     {
         string directory = CreateFixture(

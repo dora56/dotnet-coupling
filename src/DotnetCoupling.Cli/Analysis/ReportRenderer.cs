@@ -33,7 +33,9 @@ public static class ReportRenderer
         builder.AppendLine();
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade: {report.Grade.Letter} ({report.Grade.Display}) | Avg Score: {report.AverageBalanceScore:0.00} | Issues: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade basis: {report.Grade.Basis} across {report.Summary.InternalCouplings} internal couplings");
+        builder.AppendLine(DescribeGit(report));
         builder.AppendLine("Analysis confidence: syntax-only");
+        AppendBaselineText(builder, report);
         builder.AppendLine();
         builder.AppendLine("Top Issues");
         builder.AppendLine("------------------------------------------------------------");
@@ -64,6 +66,8 @@ public static class ReportRenderer
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade: {report.Grade.Letter} | Avg Score: {report.AverageBalanceScore:0.00} | Basis: {report.Grade.Basis}");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Files: {report.Summary.Files} | Types: {report.Summary.Components} | Couplings: {report.Summary.InternalCouplings} internal / {report.Summary.ExternalCouplings} external");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Issues: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
+        builder.AppendLine(DescribeGit(report));
+        AppendBaselineSummary(builder, report);
         if (report.Grade.Letter == "S")
         {
             builder.AppendLine("Grade: S (Over-optimized warning)");
@@ -75,28 +79,22 @@ public static class ReportRenderer
 
     private static string RenderJson(AnalysisReport report)
     {
+        object document = report.Baseline is null ? CreateJsonDocument(report) : CreateJsonDocumentWithBaseline(report);
+
+        string json = JsonSerializer.Serialize(document, JsonOptions);
+        return json.Replace("\"schema\"", "\"$schema\"", StringComparison.Ordinal);
+    }
+
+    private static object CreateJsonDocument(AnalysisReport report)
+    {
         IssueCounts counts = CountIssues(report);
-        object document = new
+        return new
         {
             Schema = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
             SchemaVersion = "0.1",
             Tool = "dotnet-coupling",
-            Version = "0.1.0-alpha.1",
-            Analysis = new
-            {
-                report.Summary.Path,
-                report.Summary.Mode,
-                report.Summary.Files,
-                Components = report.Summary.Components,
-                Couplings = new
-                {
-                    Total = report.Summary.InternalCouplings + report.Summary.ExternalCouplings,
-                    Internal = report.Summary.InternalCouplings,
-                    External = report.Summary.ExternalCouplings,
-                },
-                report.Summary.GitUsed,
-                report.Summary.GitMonths,
-            },
+            Version = "0.2.0-alpha.1",
+            Analysis = CreateAnalysisJson(report),
             Grade = report.Grade,
             Scores = new
             {
@@ -110,24 +108,121 @@ public static class ReportRenderer
                 counts.Low,
             },
             Issues = report.Issues,
-            Manifest = new
-            {
-                Confidence = "syntax-only",
-                RunNotes = new[] { "Semantic symbol resolution is not enabled." },
-                BlindSpots = report.BlindSpots.Select(blindSpot =>
-                {
-                    string kind = blindSpot.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Unknown";
-                    return new
-                    {
-                        Kind = kind,
-                        Description = blindSpot,
-                    };
-                }),
-            },
+            Manifest = CreateManifestJson(report),
         };
+    }
 
-        string json = JsonSerializer.Serialize(document, JsonOptions);
-        return json.Replace("\"schema\"", "\"$schema\"", StringComparison.Ordinal);
+    private static object CreateJsonDocumentWithBaseline(AnalysisReport report)
+    {
+        IssueCounts counts = CountIssues(report);
+        BaselineComparison baseline = report.Baseline ?? throw new InvalidOperationException("Baseline comparison is required.");
+        return new
+        {
+            Schema = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.2.schema.json",
+            SchemaVersion = "0.2",
+            Tool = "dotnet-coupling",
+            Version = "0.2.0-alpha.1",
+            Analysis = CreateAnalysisJson(report),
+            Grade = report.Grade,
+            Scores = new
+            {
+                AverageBalanceScore = report.AverageBalanceScore,
+            },
+            IssueCounts = new
+            {
+                counts.Critical,
+                counts.High,
+                counts.Medium,
+                counts.Low,
+            },
+            Issues = report.Issues,
+            Baseline = new
+            {
+                Ref = baseline.Ref,
+                New = CountIssues(baseline.NewIssues),
+                Resolved = CountIssues(baseline.ResolvedIssues),
+                Unchanged = CountIssues(baseline.UnchangedIssues),
+                NewIssues = baseline.NewIssues,
+                ResolvedIssues = baseline.ResolvedIssues,
+                UnchangedIssues = baseline.UnchangedIssues,
+            },
+            Manifest = CreateManifestJson(report),
+        };
+    }
+
+    private static object CreateAnalysisJson(AnalysisReport report)
+    {
+        return new
+        {
+            report.Summary.Path,
+            report.Summary.Mode,
+            report.Summary.Files,
+            Components = report.Summary.Components,
+            Couplings = new
+            {
+                Total = report.Summary.InternalCouplings + report.Summary.ExternalCouplings,
+                Internal = report.Summary.InternalCouplings,
+                External = report.Summary.ExternalCouplings,
+            },
+            report.Summary.GitUsed,
+            report.Summary.GitMonths,
+        };
+    }
+
+    private static string DescribeGit(AnalysisReport report)
+    {
+        if (!report.Summary.GitRequested)
+        {
+            return "Git: disabled (--no-git)";
+        }
+
+        return report.Summary.GitUsed
+            ? $"Git: used ({report.Summary.GitMonths} months)"
+            : "Git: unavailable or no matching history";
+    }
+
+    private static object CreateManifestJson(AnalysisReport report)
+    {
+        return new
+        {
+            Confidence = "syntax-only",
+            RunNotes = new[] { "Semantic symbol resolution is not enabled." },
+            BlindSpots = report.BlindSpots.Select(blindSpot =>
+            {
+                string kind = blindSpot.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Unknown";
+                return new
+                {
+                    Kind = kind,
+                    Description = blindSpot,
+                };
+            }),
+        };
+    }
+
+    private static void AppendBaselineText(StringBuilder builder, AnalysisReport report)
+    {
+        if (report.Baseline is null)
+        {
+            return;
+        }
+
+        builder.AppendLine();
+        AppendBaselineSummary(builder, report);
+    }
+
+    private static void AppendBaselineSummary(StringBuilder builder, AnalysisReport report)
+    {
+        if (report.Baseline is null)
+        {
+            return;
+        }
+
+        IssueCounts newCounts = CountIssues(report.Baseline.NewIssues);
+        IssueCounts resolvedCounts = CountIssues(report.Baseline.ResolvedIssues);
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Baseline: {report.Baseline.Ref}");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"New Issues: {newCounts.Critical} Critical, {newCounts.High} High, {newCounts.Medium} Medium, {newCounts.Low} Low");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Resolved Issues: {resolvedCounts.Critical} Critical, {resolvedCounts.High} High, {resolvedCounts.Medium} Medium, {resolvedCounts.Low} Low");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Unchanged Issues: {report.Baseline.UnchangedIssues.Count}");
     }
 
     private static IssueCounts CountIssues(AnalysisReport report)
@@ -137,6 +232,15 @@ public static class ReportRenderer
             report.Issues.Count(issue => issue.Severity == Severity.High),
             report.Issues.Count(issue => issue.Severity == Severity.Medium),
             report.Issues.Count(issue => issue.Severity == Severity.Low));
+    }
+
+    private static IssueCounts CountIssues(IReadOnlyList<CouplingIssue> issues)
+    {
+        return new IssueCounts(
+            issues.Count(issue => issue.Severity == Severity.Critical),
+            issues.Count(issue => issue.Severity == Severity.High),
+            issues.Count(issue => issue.Severity == Severity.Medium),
+            issues.Count(issue => issue.Severity == Severity.Low));
     }
 
     private sealed record IssueCounts(int Critical, int High, int Medium, int Low);

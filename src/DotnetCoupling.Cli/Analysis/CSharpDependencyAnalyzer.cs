@@ -2,10 +2,11 @@ namespace DotnetCoupling.Cli.Analysis;
 
 public sealed class CSharpDependencyAnalyzer
 {
-    public static AnalysisReport Analyze(string targetPath, bool useGit, int gitMonths)
+    public static AnalysisReport Analyze(string targetPath, bool useGit, int gitMonths, AnalysisOptions? options = null)
     {
+        options ??= AnalysisOptions.Default;
         string fullPath = Path.GetFullPath(targetPath);
-        string[] files = FileDiscovery.DiscoverCSharpFiles(fullPath);
+        string[] files = FileDiscovery.DiscoverCSharpFiles(fullPath, options);
         List<Component> components = [];
         List<DependencyObservation> observations = [];
         Dictionary<string, List<UsingNamespace>> usingNamespacesByFile = new(StringComparer.Ordinal);
@@ -29,7 +30,12 @@ public sealed class CSharpDependencyAnalyzer
             ? GitVolatility.GetChangeCounts(fullPath, gitMonths)
             : new Dictionary<string, int>(StringComparer.Ordinal);
         IReadOnlyList<TemporalCoupling> temporalCouplings = useGit
-            ? GitVolatility.GetTemporalCouplings(fullPath, gitMonths, analyzedFiles)
+            ? GitVolatility.GetTemporalCouplings(
+                fullPath,
+                gitMonths,
+                analyzedFiles,
+                options.Thresholds.MinTemporalCoupling,
+                options.Thresholds.MaxTemporalFilesPerCommit)
             : [];
 
         List<CouplingMetrics> couplings = CouplingResolver.Resolve(components, observations, changeCounts);
@@ -38,7 +44,7 @@ public sealed class CSharpDependencyAnalyzer
         List<BalanceScore> scores = couplings.Select(CouplingScoring.Calculate).ToList();
         int internalCouplingCount = couplings.Count(coupling => coupling.Distance != Distance.ExternalPackage);
         int externalCouplingCount = couplings.Count - internalCouplingCount;
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(scores, temporalCouplings, componentsById);
+        List<CouplingIssue> issues = IssueDetector.DetectIssues(scores, temporalCouplings, componentsById, options);
         GradeResult grade = CouplingScoring.CalculateGrade(internalCouplingCount, issues);
         AnalysisSummary summary = new(
             fullPath,
@@ -47,6 +53,7 @@ public sealed class CSharpDependencyAnalyzer
             components.Count,
             internalCouplingCount,
             externalCouplingCount,
+            useGit,
             useGit && changeCounts.Count > 0,
             gitMonths);
 

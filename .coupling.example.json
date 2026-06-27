@@ -1,0 +1,28 @@
+{
+  "$schema": "schemas/dotnet-coupling-config-0.2.schema.json",
+  "analysis": {
+    "exclude": [
+      "**/Generated/**",
+      "**/*.g.cs",
+      "**/*.generated.cs"
+    ]
+  },
+  "thresholds": {
+    "maxDependencies": 20,
+    "maxDependents": 30,
+    "minTemporalCoupling": 3,
+    "maxTemporalFilesPerCommit": 50,
+    "scatteredExternalBreadth": 5
+  },
+  "ignore": {
+    "paths": [
+      "**/Legacy/**"
+    ],
+    "namespaces": [
+      "Sample.Legacy"
+    ],
+    "issueTypes": [
+      "ScatteredExternalCoupling"
+    ]
+  }
+}

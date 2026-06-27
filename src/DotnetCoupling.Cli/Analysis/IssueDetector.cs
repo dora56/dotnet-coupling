@@ -10,8 +10,10 @@ internal static class IssueDetector
     internal static List<CouplingIssue> DetectIssues(
         IReadOnlyCollection<BalanceScore> scores,
         IReadOnlyList<TemporalCoupling> temporalCouplings,
-        IReadOnlyDictionary<string, Component> componentsById)
+        IReadOnlyDictionary<string, Component> componentsById,
+        AnalysisOptions? options = null)
     {
+        options ??= AnalysisOptions.Default;
         List<CouplingIssue> issues = [];
 
         foreach (BalanceScore score in scores)
@@ -57,23 +59,27 @@ internal static class IssueDetector
             }
         }
 
-        AddFanInFanOutIssues(scores.Select(score => score.Coupling), issues);
+        AddFanInFanOutIssues(scores.Select(score => score.Coupling), issues, options.Thresholds);
         AddCircularDependencyIssues(scores.Select(score => score.Coupling), issues);
         AddHiddenCouplingIssues(temporalCouplings, scores.Select(score => score.Coupling), componentsById, issues);
-        AddScatteredExternalCouplingIssues(scores.Select(score => score.Coupling), issues);
-        return issues;
+        AddScatteredExternalCouplingIssues(scores.Select(score => score.Coupling), issues, options.Thresholds);
+        return ApplyIgnores(issues, options).ToList();
     }
 
-    internal static void AddFanInFanOutIssues(IEnumerable<CouplingMetrics> couplings, List<CouplingIssue> issues)
+    internal static void AddFanInFanOutIssues(
+        IEnumerable<CouplingMetrics> couplings,
+        List<CouplingIssue> issues,
+        AnalysisThresholds? thresholds = null)
     {
+        thresholds ??= AnalysisThresholds.Default;
         foreach (IGrouping<string, CouplingMetrics> group in couplings.GroupBy(coupling => coupling.Source))
         {
             int count = group.Select(coupling => coupling.Target).Distinct(StringComparer.Ordinal).Count();
-            if (count > MaxDependencies)
+            if (count > thresholds.MaxDependencies)
             {
                 issues.Add(new CouplingIssue(
                     IssueType.HighEfferentCoupling,
-                    count > MaxDependencies * 2 ? Severity.High : Severity.Medium,
+                    count > thresholds.MaxDependencies * 2 ? Severity.High : Severity.Medium,
                     group.Key,
                     "",
                     1.0,
@@ -86,11 +92,11 @@ internal static class IssueDetector
         foreach (IGrouping<string, CouplingMetrics> group in couplings.GroupBy(coupling => coupling.Target))
         {
             int count = group.Select(coupling => coupling.Source).Distinct(StringComparer.Ordinal).Count();
-            if (count > MaxDependents)
+            if (count > thresholds.MaxDependents)
             {
                 issues.Add(new CouplingIssue(
                     IssueType.HighAfferentCoupling,
-                    count > MaxDependents * 2 ? Severity.High : Severity.Medium,
+                    count > thresholds.MaxDependents * 2 ? Severity.High : Severity.Medium,
                     "",
                     group.Key,
                     1.0,
@@ -186,14 +192,18 @@ internal static class IssueDetector
         }
     }
 
-    internal static void AddScatteredExternalCouplingIssues(IEnumerable<CouplingMetrics> couplings, List<CouplingIssue> issues)
+    internal static void AddScatteredExternalCouplingIssues(
+        IEnumerable<CouplingMetrics> couplings,
+        List<CouplingIssue> issues,
+        AnalysisThresholds? thresholds = null)
     {
+        thresholds ??= AnalysisThresholds.Default;
         foreach (IGrouping<string, CouplingMetrics> group in couplings
             .Where(coupling => coupling.Distance == Distance.ExternalPackage)
             .GroupBy(coupling => coupling.Target, StringComparer.Ordinal))
         {
             int directUsers = group.Select(coupling => coupling.Source).Distinct(StringComparer.Ordinal).Count();
-            if (directUsers < ScatteredExternalBreadth)
+            if (directUsers < thresholds.ScatteredExternalBreadth)
             {
                 continue;
             }
@@ -219,6 +229,36 @@ internal static class IssueDetector
     {
         int lastDot = componentId.LastIndexOf('.');
         return lastDot < 0 ? "" : componentId[..lastDot];
+    }
+
+    private static IEnumerable<CouplingIssue> ApplyIgnores(IEnumerable<CouplingIssue> issues, AnalysisOptions options)
+    {
+        foreach (CouplingIssue issue in issues)
+        {
+            if (options.IgnoreIssueTypes.Contains(issue.Type)
+                || MatchesAnyNamespace(issue.Source, options.IgnoreNamespaces)
+                || MatchesAnyNamespace(issue.Target, options.IgnoreNamespaces)
+                || MatchesAnyPath(issue.Source, options.IgnorePathPatterns)
+                || MatchesAnyPath(issue.Target, options.IgnorePathPatterns)
+                || issue.Location is not null && MatchesAnyPath(issue.Location.File, options.IgnorePathPatterns))
+            {
+                continue;
+            }
+
+            yield return issue;
+        }
+    }
+
+    private static bool MatchesAnyNamespace(string value, IReadOnlyList<string> namespaces)
+    {
+        return namespaces.Any(namespaceName =>
+            value == namespaceName
+            || value.StartsWith(namespaceName + ".", StringComparison.Ordinal));
+    }
+
+    private static bool MatchesAnyPath(string value, IReadOnlyList<string> patterns)
+    {
+        return !string.IsNullOrWhiteSpace(value) && FileDiscovery.IsIgnoredByPattern(value, patterns);
     }
 
     private static List<IReadOnlyCollection<string>> FindStronglyConnectedComponents(Dictionary<string, HashSet<string>> graph)

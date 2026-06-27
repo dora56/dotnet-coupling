@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-config-0.2.schema.json",
+  "title": "dotnet-coupling configuration",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "analysis": {
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "thresholds": {
+      "type": "object",
+      "properties": {
+        "maxDependencies": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxDependents": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minTemporalCoupling": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxTemporalFilesPerCommit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scatteredExternalBreadth": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "ignore": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "namespaces": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "issueTypes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "GlobalComplexity",
+              "CascadingChangeRisk",
+              "InappropriateIntimacy",
+              "HighEfferentCoupling",
+              "HighAfferentCoupling",
+              "CircularDependency",
+              "HiddenCoupling",
+              "AccidentalVolatility",
+              "ScatteredExternalCoupling"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

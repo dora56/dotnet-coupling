@@ -47,10 +47,42 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void Render_JsonOutputWithBaseline_SatisfiesReportSchemaContract()
+    {
+        CouplingIssue issue = new(
+            IssueType.GlobalComplexity,
+            Severity.Medium,
+            "Sample.Api.Handler",
+            "Sample.Infrastructure.Repository",
+            0.50,
+            "Problem",
+            "Recommendation",
+            new SourceLocation("/tmp/sample/Api.cs", 1));
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, false, false, 6),
+            new GradeResult("C", "Needs attention", "issue-density", "Test"),
+            0.50,
+            [],
+            [],
+            [],
+            [issue],
+            [],
+            new BaselineComparison("main", [issue], [], []));
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestPaths.RepositoryRoot, "schemas", "dotnet-coupling-report-0.2.schema.json")));
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        AssertRequiredProperties(schema.RootElement, document.RootElement);
+        Assert.Equal("0.2", document.RootElement.GetProperty("schemaVersion").GetString());
+        JsonElement baseline = document.RootElement.GetProperty("baseline");
+        Assert.Equal("main", baseline.GetProperty("ref").GetString());
+        Assert.Equal(1, baseline.GetProperty("newIssues").GetArrayLength());
+    }
+
+    [Fact]
     public void Render_SummaryOutput_IncludesSGradeWarning()
     {
         AnalysisReport report = new(
-            new AnalysisSummary("/tmp/sample", "syntax-only", 1, 20, 20, 0, false, 6),
+            new AnalysisSummary("/tmp/sample", "syntax-only", 1, 20, 20, 0, false, false, 6),
             new GradeResult("S", "Over-optimized warning", "issue-density", "Test"),
             1.0,
             [],

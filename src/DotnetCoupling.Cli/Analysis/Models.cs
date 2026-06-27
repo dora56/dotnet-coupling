@@ -116,6 +116,36 @@ public enum Severity
     Critical,
 }
 
+public sealed record AnalysisOptions(
+    IReadOnlyList<string> ExcludePathPatterns,
+    IReadOnlyList<string> IgnorePathPatterns,
+    IReadOnlyList<string> IgnoreNamespaces,
+    IReadOnlySet<IssueType> IgnoreIssueTypes,
+    AnalysisThresholds Thresholds)
+{
+    public static AnalysisOptions Default { get; } = new(
+        [],
+        [],
+        [],
+        new HashSet<IssueType>(),
+        AnalysisThresholds.Default);
+}
+
+public sealed record AnalysisThresholds(
+    int MaxDependencies,
+    int MaxDependents,
+    int MinTemporalCoupling,
+    int MaxTemporalFilesPerCommit,
+    int ScatteredExternalBreadth)
+{
+    public static AnalysisThresholds Default { get; } = new(
+        20,
+        30,
+        3,
+        50,
+        5);
+}
+
 public sealed record SourceLocation(string File, int Line);
 
 public sealed record DependencyObservation(
@@ -167,6 +197,7 @@ public sealed record AnalysisSummary(
     int Components,
     int InternalCouplings,
     int ExternalCouplings,
+    bool GitRequested,
     bool GitUsed,
     int GitMonths);
 
@@ -184,7 +215,14 @@ public sealed record AnalysisReport(
     IReadOnlyList<DependencyObservation> Observations,
     IReadOnlyList<CouplingMetrics> Couplings,
     IReadOnlyList<CouplingIssue> Issues,
-    IReadOnlyList<string> BlindSpots);
+    IReadOnlyList<string> BlindSpots,
+    BaselineComparison? Baseline = null);
+
+public sealed record BaselineComparison(
+    string Ref,
+    IReadOnlyList<CouplingIssue> NewIssues,
+    IReadOnlyList<CouplingIssue> ResolvedIssues,
+    IReadOnlyList<CouplingIssue> UnchangedIssues);
 
 public enum ReportFormat
 {

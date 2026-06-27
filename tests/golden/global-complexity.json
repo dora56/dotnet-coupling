@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
   "schemaVersion": "0.1",
   "tool": "dotnet-coupling",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-alpha.1",
   "analysis": {
     "path": "<FIXTURE>",
     "mode": "syntax-only",

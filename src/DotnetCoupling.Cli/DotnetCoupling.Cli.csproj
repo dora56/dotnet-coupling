@@ -14,7 +14,7 @@
     <PackageOutputPath>./nupkg</PackageOutputPath>
 
     <PackageId>dotnet-coupling</PackageId>
-    <Version>0.1.0-alpha.1</Version>
+    <Version>0.2.0-alpha.1</Version>
     <Authors>dora56</Authors>
     <Description>Experimental coupling balance analyzer for C#/.NET projects.</Description>
     <PackageTags>coupling;architecture;analysis;dotnet-tool;roslyn</PackageTags>

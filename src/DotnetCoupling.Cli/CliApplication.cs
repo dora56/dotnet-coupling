@@ -62,6 +62,11 @@ public static class CliApplication
             Description = "Configuration file path.",
         };
 
+        Option<string?> baselineOption = new("--baseline")
+        {
+            Description = "Compare issues against the specified Git ref.",
+        };
+
         rootCommand.Arguments.Add(pathArgument);
         rootCommand.Options.Add(summaryOption);
         rootCommand.Options.Add(jsonOption);
@@ -72,6 +77,7 @@ public static class CliApplication
         rootCommand.Options.Add(noGitOption);
         rootCommand.Options.Add(gitMonthsOption);
         rootCommand.Options.Add(configOption);
+        rootCommand.Options.Add(baselineOption);
 
         rootCommand.SetAction(parseResult =>
         {
@@ -84,6 +90,8 @@ public static class CliApplication
             string? failOn = parseResult.GetValue(failOnOption);
             bool noGit = parseResult.GetValue(noGitOption);
             int gitMonths = parseResult.GetValue(gitMonthsOption);
+            FileInfo? config = parseResult.GetValue(configOption);
+            string? baselineRef = parseResult.GetValue(baselineOption);
 
             if (!string.IsNullOrWhiteSpace(failOn) && !TryParseSeverity(failOn, out _))
             {
@@ -100,7 +108,27 @@ public static class CliApplication
 
             try
             {
-                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fullTargetPath, !noGit, gitMonths);
+                ConfigurationLoadResult configuration = ConfigurationLoader.Load(fullTargetPath, config);
+                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fullTargetPath, !noGit, gitMonths, configuration.Options);
+                if (!string.IsNullOrWhiteSpace(baselineRef))
+                {
+                    string? repositoryRoot = FindGitRepositoryRoot(fullTargetPath);
+                    if (repositoryRoot is null)
+                    {
+                        Console.Error.WriteLine("Baseline comparison requires a Git repository.");
+                        return 4;
+                    }
+
+                    using BaselineWorkspace baselineWorkspace = BaselineWorkspace.Create(repositoryRoot, fullTargetPath, baselineRef);
+                    AnalysisReport baselineReport = CSharpDependencyAnalyzer.Analyze(
+                        baselineWorkspace.TargetPath,
+                        useGit: false,
+                        gitMonths,
+                        configuration.Options);
+                    report = BaselineComparer.WithBaseline(
+                        report,
+                        BaselineComparer.Compare(baselineRef, report, baselineReport));
+                }
 
                 ReportFormat format = json
                     ? ReportFormat.Json
@@ -129,6 +157,15 @@ public static class CliApplication
                     return 0;
                 }
 
+                if (report.Baseline is not null)
+                {
+                    Severity baselineThreshold = !string.IsNullOrWhiteSpace(failOn) && TryParseSeverity(failOn, out Severity parsed)
+                        ? parsed
+                        : Severity.High;
+                    bool hasNewFailingIssue = report.Baseline.NewIssues.Any(issue => SeverityRank(issue.Severity) >= SeverityRank(baselineThreshold));
+                    return hasNewFailingIssue ? 1 : 0;
+                }
+
                 if (GradeRank(report.Grade.Letter) > GradeRank(minGrade))
                 {
                     return 1;
@@ -141,6 +178,16 @@ public static class CliApplication
                 }
 
                 return 0;
+            }
+            catch (ConfigurationException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 2;
+            }
+            catch (BaselineException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 4;
             }
             catch (Exception ex)
             {
@@ -191,5 +238,24 @@ public static class CliApplication
             Severity.Critical => 3,
             _ => 0,
         };
+    }
+
+    private static string? FindGitRepositoryRoot(string targetPath)
+    {
+        DirectoryInfo? directory = File.Exists(targetPath)
+            ? new FileInfo(targetPath).Directory
+            : new DirectoryInfo(targetPath);
+
+        while (directory is not null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return null;
     }
 }

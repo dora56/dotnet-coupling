@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.2.schema.json",
+  "title": "dotnet-coupling report",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "tool",
+    "version",
+    "analysis",
+    "grade",
+    "scores",
+    "issueCounts",
+    "issues",
+    "baseline",
+    "manifest"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "0.2"
+    },
+    "tool": {
+      "const": "dotnet-coupling"
+    },
+    "version": {
+      "type": "string"
+    },
+    "analysis": {
+      "$ref": "dotnet-coupling-report-0.1.schema.json#/properties/analysis"
+    },
+    "grade": {
+      "$ref": "dotnet-coupling-report-0.1.schema.json#/properties/grade"
+    },
+    "scores": {
+      "$ref": "dotnet-coupling-report-0.1.schema.json#/properties/scores"
+    },
+    "issueCounts": {
+      "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issueCounts"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issue"
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "required": [
+        "ref",
+        "new",
+        "resolved",
+        "unchanged",
+        "newIssues",
+        "resolvedIssues",
+        "unchangedIssues"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "new": {
+          "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issueCounts"
+        },
+        "resolved": {
+          "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issueCounts"
+        },
+        "unchanged": {
+          "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issueCounts"
+        },
+        "newIssues": {
+          "type": "array",
+          "items": {
+            "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issue"
+          }
+        },
+        "resolvedIssues": {
+          "type": "array",
+          "items": {
+            "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issue"
+          }
+        },
+        "unchangedIssues": {
+          "type": "array",
+          "items": {
+            "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issue"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "manifest": {
+      "$ref": "dotnet-coupling-report-0.1.schema.json#/properties/manifest"
+    }
+  },
+  "additionalProperties": false
+}
