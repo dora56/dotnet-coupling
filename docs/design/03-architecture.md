@@ -55,6 +55,37 @@ dotnet-coupling/
 
 MVP は1プロジェクトでよいが、`Core` と `Roslyn` の境界は意識しておく。あとで分割できる形にしておくと、未来の自分に優しい。未来の自分はだいたい疲れている。
 
+### 7.3 Phase 1 内部モジュール境界
+
+Phase 1 では NuGet tool と CLI 契約を安定させるため、物理プロジェクトは
+`DotnetCoupling.Cli` のまま維持する。ただし、実装上は v0.2 以降の分割先を
+意識して、次の責務境界を守る。
+
+| Phase 1 module | Responsibility | Future package |
+|---|---|---|
+| `CliApplication` / `Program` | CLI options, exit codes, output routing | `DotnetCoupling.Cli` |
+| `FileDiscovery` | target path expansion, generated-code exclusion | `DotnetCoupling.Core` or `DotnetCoupling.Roslyn` |
+| `CSharpSyntaxDependencyCollector` | syntax-only Roslyn traversal and observations | `DotnetCoupling.Roslyn` |
+| `CouplingResolver` | observations to coupling metrics | `DotnetCoupling.Core` |
+| `CouplingScoring` | score and grade policy | `DotnetCoupling.Core` |
+| `IssueDetector` | issue policy and graph/temporal heuristics | `DotnetCoupling.Core` |
+| `ExternalCouplingDetector` | external namespace/package usage detection | `DotnetCoupling.Core` |
+| `GitVolatility` | git log parsing and temporal co-change | `DotnetCoupling.Git` |
+| `ReportRenderer` | text, summary, JSON rendering | `DotnetCoupling.Core` now; dedicated reporting package if formats grow |
+| `Models` | report and analysis data contracts | `DotnetCoupling.Core` |
+
+Guardrails:
+
+- CLI code may orchestrate analysis, but must not contain Roslyn traversal,
+  scoring policy, or issue detection rules.
+- Roslyn collection may produce components, observations, and using namespaces,
+  but must not calculate grades, render output, or inspect CLI options.
+- Git volatility must remain recoverable: git absence or log failure should
+  degrade to no volatility data rather than failing normal analysis.
+- JSON schema shape and CLI exit codes are public contracts for Phase 1.
+- Internal helper methods used for tests should remain `internal` with test
+  assembly access, not accidental public API.
+
 ---
 
 ## 8. 解析パイプライン

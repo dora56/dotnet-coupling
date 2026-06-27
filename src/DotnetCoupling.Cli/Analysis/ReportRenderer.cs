@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace DotnetCoupling.Cli.Analysis;
 
@@ -10,6 +11,7 @@ public static class ReportRenderer
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() },
     };
 
     public static string Render(AnalysisReport report, ReportFormat format)

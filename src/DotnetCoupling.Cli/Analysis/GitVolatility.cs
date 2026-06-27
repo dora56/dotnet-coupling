@@ -36,20 +36,25 @@ public static class GitVolatility
                 return new Dictionary<string, int>(StringComparer.Ordinal);
             }
 
-            Dictionary<string, int> counts = new(StringComparer.Ordinal);
-            foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                string fullPath = Path.GetFullPath(Path.Combine(repositoryPath, line));
-                counts[fullPath] = counts.GetValueOrDefault(fullPath) + 1;
-            }
-
-            return counts;
+            return AnalyzeChangeCountsFromLog(repositoryPath, output);
         }
         catch
         {
             /* git not available or repository unavailable; skip volatility analysis */
             return new Dictionary<string, int>(StringComparer.Ordinal);
         }
+    }
+
+    internal static IReadOnlyDictionary<string, int> AnalyzeChangeCountsFromLog(string repositoryPath, string gitLogOutput)
+    {
+        Dictionary<string, int> counts = new(StringComparer.Ordinal);
+        foreach (string line in gitLogOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string fullPath = Path.GetFullPath(Path.Combine(repositoryPath, line));
+            counts[fullPath] = counts.GetValueOrDefault(fullPath) + 1;
+        }
+
+        return counts;
     }
 
     public static IReadOnlyList<TemporalCoupling> GetTemporalCouplings(
