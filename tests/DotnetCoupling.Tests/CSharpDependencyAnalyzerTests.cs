@@ -23,8 +23,7 @@ public sealed class CSharpDependencyAnalyzerTests
             }
             """);
 
-        CSharpDependencyAnalyzer analyzer = new();
-        AnalysisReport report = analyzer.Analyze(directory, useGit: false, gitMonths: 6);
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6);
 
         Assert.Equal(2, report.Components.Count);
         Assert.Contains(report.Couplings, coupling =>

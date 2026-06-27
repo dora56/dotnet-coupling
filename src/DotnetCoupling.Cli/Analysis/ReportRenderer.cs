@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 
@@ -24,11 +25,11 @@ public static class ReportRenderer
     private static string RenderText(AnalysisReport report)
     {
         StringBuilder builder = new();
-        builder.AppendLine($"Analyzing project at '{report.Summary.Path}'...");
-        builder.AppendLine($"Analysis complete: {report.Summary.Files} files, {report.Summary.Components} types");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Analyzing project at '{report.Summary.Path}'...");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Analysis complete: {report.Summary.Files} files, {report.Summary.Components} types");
         builder.AppendLine();
-        builder.AppendLine($"Grade: {report.Grade.Letter} ({report.Grade.Display}) | Avg Score: {report.AverageBalanceScore:0.00} | Issues: 0 Critical, 0 High, 0 Medium");
-        builder.AppendLine($"Grade basis: {report.Grade.Basis} across {report.Summary.InternalCouplings} internal couplings");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Grade: {report.Grade.Letter} ({report.Grade.Display}) | Avg Score: {report.AverageBalanceScore:0.00} | Issues: 0 Critical, 0 High, 0 Medium");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Grade basis: {report.Grade.Basis} across {report.Summary.InternalCouplings} internal couplings");
         builder.AppendLine("Analysis confidence: syntax-only");
         builder.AppendLine();
         builder.AppendLine("Top Issues");
@@ -40,8 +41,8 @@ public static class ReportRenderer
     private static string RenderSummary(AnalysisReport report)
     {
         StringBuilder builder = new();
-        builder.AppendLine($"Grade: {report.Grade.Letter} | Avg Score: {report.AverageBalanceScore:0.00} | Basis: {report.Grade.Basis}");
-        builder.AppendLine($"Files: {report.Summary.Files} | Types: {report.Summary.Components} | Couplings: {report.Summary.InternalCouplings} internal / {report.Summary.ExternalCouplings} external");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Grade: {report.Grade.Letter} | Avg Score: {report.AverageBalanceScore:0.00} | Basis: {report.Grade.Basis}");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Files: {report.Summary.Files} | Types: {report.Summary.Components} | Couplings: {report.Summary.InternalCouplings} internal / {report.Summary.ExternalCouplings} external");
         builder.AppendLine("Issues: 0 Critical, 0 High, 0 Medium");
         return builder.ToString().TrimEnd();
     }

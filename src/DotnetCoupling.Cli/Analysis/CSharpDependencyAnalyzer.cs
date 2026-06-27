@@ -8,10 +8,10 @@ public sealed class CSharpDependencyAnalyzer
 {
     private static readonly string[] ExcludedDirectoryNames = [".git", ".vs", "bin", "obj"];
 
-    public AnalysisReport Analyze(string targetPath, bool useGit, int gitMonths)
+    public static AnalysisReport Analyze(string targetPath, bool useGit, int gitMonths)
     {
         string fullPath = Path.GetFullPath(targetPath);
-        IReadOnlyList<string> files = DiscoverCSharpFiles(fullPath);
+        string[] files = DiscoverCSharpFiles(fullPath);
         List<Component> components = [];
         List<DependencyObservation> observations = [];
 
@@ -71,7 +71,7 @@ public sealed class CSharpDependencyAnalyzer
         AnalysisSummary summary = new(
             fullPath,
             "syntax-only",
-            files.Count,
+            files.Length,
             components.Count,
             couplings.Count,
             0,
@@ -94,7 +94,7 @@ public sealed class CSharpDependencyAnalyzer
             ]);
     }
 
-    private static IReadOnlyList<string> DiscoverCSharpFiles(string fullPath)
+    private static string[] DiscoverCSharpFiles(string fullPath)
     {
         if (File.Exists(fullPath) && fullPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
         {

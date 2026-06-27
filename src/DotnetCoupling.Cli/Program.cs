@@ -86,8 +86,7 @@ rootCommand.SetAction(parseResult =>
 
     try
     {
-        CSharpDependencyAnalyzer analyzer = new();
-        AnalysisReport report = analyzer.Analyze(targetPath.FullName, !noGit, gitMonths);
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(targetPath.FullName, !noGit, gitMonths);
 
         ReportFormat format = json
             ? ReportFormat.Json
