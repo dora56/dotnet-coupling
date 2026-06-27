@@ -86,11 +86,11 @@ baseline gate の false positive / false negative を実利用で把握する。
 
 Release readiness:
 
-- [ ] GitHub Actions を remote で実走し、cache / locked restore / artifacts を確認
+- [x] GitHub Actions を remote で実走し、cache / locked restore / artifacts を確認
 - [x] `dotnet pack` artifact を CI で保存
 - [x] local tool install smoke を CI に追加
-- [ ] GitHub Releases 作成
-- [ ] NuGet.org に `0.2.0-alpha.1` 公開
+- [x] GitHub Releases 作成
+- [x] NuGet.org に `0.2.0-alpha.1` 公開
 - [x] Release notes に schema version / blind spots / syntax-only limitation を明記
 
 Dogfooding:
