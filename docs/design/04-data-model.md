@@ -57,7 +57,7 @@ public enum Visibility
 | `PrivateProtected` | 同 assembly の派生型のみ。狭いが継承密結合の疑い |
 | `Private` | 通常は外部アクセス不可。reflection / nested type 経由の疑いがある場合のみ intrusive |
 
-MVP の syntax-only では「本当に別 assembly から見えているか」を完全には判断できない。v0.2 の semantic mode で project / assembly 境界と合わせて精度を上げる。
+MVP の syntax-only では「本当に別 assembly から見えているか」を完全には判断できない。v0.3 の semantic mode で project / assembly 境界と合わせて精度を上げる。
 
 ### 11.3 UsageContext
 

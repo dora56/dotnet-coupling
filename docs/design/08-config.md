@@ -156,7 +156,7 @@ MVP では除外し、v0.3 以降の design smell として追加する。
 
 MVP では NuGet package の完全解決はしない。
 
-v0.2 以降で `.csproj` / `project.assets.json` / `packages.lock.json` を読み、外部 package 依存を推定する。
+v0.3 以降で `.csproj` / `project.assets.json` / `packages.lock.json` を読み、外部 package 依存を推定する。
 
 ### 22.3 ExternalPackage Distance
 
