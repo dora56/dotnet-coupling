@@ -22,8 +22,18 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Cache .NET dependencies
+        uses: actions/cache@6
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/toolResolverCache
+          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            dotnet-${{ runner.os }}-
+
       - name: Restore
-        run: dotnet restore dotnet-coupling.slnx
+        run: dotnet restore dotnet-coupling.slnx --locked-mode
 
       - name: Build
         run: dotnet build dotnet-coupling.slnx --configuration Release --no-restore
@@ -41,8 +51,18 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Cache .NET dependencies
+        uses: actions/cache@6
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/toolResolverCache
+          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            dotnet-${{ runner.os }}-
+
       - name: Restore
-        run: dotnet restore dotnet-coupling.slnx
+        run: dotnet restore dotnet-coupling.slnx --locked-mode
 
       - name: Test
         run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --no-build --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
@@ -69,8 +89,18 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Cache .NET dependencies
+        uses: actions/cache@6
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/toolResolverCache
+          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            dotnet-${{ runner.os }}-
+
       - name: Restore
-        run: dotnet restore dotnet-coupling.slnx
+        run: dotnet restore dotnet-coupling.slnx --locked-mode
 
       - name: Format
         run: dotnet format dotnet-coupling.slnx --verify-no-changes --no-restore
@@ -88,8 +118,18 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Cache .NET dependencies
+        uses: actions/cache@6
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/toolResolverCache
+          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            dotnet-${{ runner.os }}-
+
       - name: Restore
-        run: dotnet restore dotnet-coupling.slnx
+        run: dotnet restore dotnet-coupling.slnx --locked-mode
 
       - name: Restore tools
         run: dotnet tool restore
