@@ -96,3 +96,9 @@ Observed result:
 This confirms that the remaining Phase 3c gap is no longer artifact collection.
 It is specifically **semantic workspace loadability on representative large
 repositories**.
+
+After `fix(cli): stabilize semantic workspace load failures`, the same large
+target now fails with a **stable single-line semantic workspace error** instead
+of an `Unexpected analysis error` banner followed by a stack trace. The
+loadability problem remains, but the failure mode is now fit for CI logs and
+perf artifacts.
