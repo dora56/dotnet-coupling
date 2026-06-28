@@ -207,6 +207,18 @@ public sealed record AnalysisDiagnostic(
     string Message,
     string? Path);
 
+public sealed record ProjectMetadata(
+    int ProjectCount,
+    IReadOnlyList<ProjectMetadataEntry> Projects);
+
+public sealed record ProjectMetadataEntry(
+    string ProjectPath,
+    string ProjectName,
+    string AssemblyName,
+    int SourceFileCount,
+    IReadOnlyList<string> ProjectReferences,
+    IReadOnlyList<string> PackageReferences);
+
 public sealed record GradeResult(
     string Letter,
     string Display,
@@ -223,7 +235,8 @@ public sealed record AnalysisReport(
     IReadOnlyList<CouplingIssue> Issues,
     IReadOnlyList<string> BlindSpots,
     BaselineComparison? Baseline = null,
-    IReadOnlyList<AnalysisDiagnostic>? Diagnostics = null);
+    IReadOnlyList<AnalysisDiagnostic>? Diagnostics = null,
+    ProjectMetadata? ProjectMetadata = null);
 
 public sealed record BaselineComparison(
     string Ref,

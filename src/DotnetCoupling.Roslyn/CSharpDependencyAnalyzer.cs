@@ -36,6 +36,7 @@ public sealed class CSharpDependencyAnalyzer
         IReadOnlyList<ProjectFile> projectFiles;
         IReadOnlyList<AnalysisDiagnostic> diagnostics;
         string analysisModeLabel;
+        ProjectMetadata? projectMetadata = null;
         List<Component> components = [];
         List<DependencyObservation> observations = [];
         Dictionary<string, List<UsingNamespace>> usingNamespacesByFile = new(StringComparer.Ordinal);
@@ -50,6 +51,7 @@ public sealed class CSharpDependencyAnalyzer
                 .ToArray();
             diagnostics = workspace.Diagnostics;
             analysisModeLabel = "semantic-preview";
+            projectMetadata = CreateProjectMetadata(workspace.Projects, options);
 
             foreach (SemanticWorkspaceProject project in workspace.Projects)
             {
@@ -86,6 +88,7 @@ public sealed class CSharpDependencyAnalyzer
                     diagnostic.Path))
                 .ToArray();
             analysisModeLabel = "syntax-only";
+            projectMetadata = CreateProjectMetadata(projectModel);
 
             foreach (ProjectFile projectFile in projectFiles)
             {
@@ -134,7 +137,8 @@ public sealed class CSharpDependencyAnalyzer
             couplings,
             issues,
             CreateBlindSpots(mode),
-            Diagnostics: diagnostics);
+            Diagnostics: diagnostics,
+            ProjectMetadata: projectMetadata);
     }
 
     private sealed record ProjectFile(string FilePath, string? ProjectName);
@@ -167,5 +171,64 @@ public sealed class CSharpDependencyAnalyzer
             "Reflection and dynamic calls may be incomplete.",
             "Generated code is excluded by default.",
         ];
+    }
+
+    private static ProjectMetadata? CreateProjectMetadata(ProjectModel projectModel)
+    {
+        if (projectModel.Projects.Count == 0)
+        {
+            return null;
+        }
+
+        return new ProjectMetadata(
+            projectModel.Projects.Count,
+            projectModel.Projects
+                .OrderBy(project => project.ProjectName, StringComparer.Ordinal)
+                .Select(project => new ProjectMetadataEntry(
+                    project.ProjectPath,
+                    project.ProjectName,
+                    project.AssemblyName,
+                    project.SourceFiles.Count,
+                    project.ProjectReferences.Select(reference => reference.TargetProjectName).OrderBy(name => name, StringComparer.Ordinal).ToArray(),
+                    project.PackageReferences.Select(reference => reference.PackageId).OrderBy(name => name, StringComparer.Ordinal).ToArray()))
+                .ToArray());
+    }
+
+    private static ProjectMetadata? CreateProjectMetadata(
+        IReadOnlyList<SemanticWorkspaceProject> projects,
+        AnalysisOptions options)
+    {
+        if (projects.Count == 0)
+        {
+            return null;
+        }
+
+        return new ProjectMetadata(
+            projects.Count,
+            projects
+                .OrderBy(project => project.ProjectName, StringComparer.Ordinal)
+                .Select(project =>
+                {
+                    ProjectModelProject? syntaxProject = File.Exists(project.ProjectPath)
+                        ? ProjectModel.Load(project.ProjectPath, options).Projects.SingleOrDefault()
+                        : null;
+                    return new ProjectMetadataEntry(
+                        project.ProjectPath,
+                        project.ProjectName,
+                        project.AssemblyName,
+                        project.SourceFiles.Count,
+                        project.RoslynProject.ProjectReferences
+                            .Select(reference => project.RoslynProject.Solution.GetProject(reference.ProjectId))
+                            .Where(targetProject => targetProject is not null)
+                            .Select(targetProject => targetProject!.AssemblyName ?? targetProject.Name)
+                            .OrderBy(name => name, StringComparer.Ordinal)
+                            .ToArray(),
+                        syntaxProject?.PackageReferences
+                            .Select(reference => reference.PackageId)
+                            .OrderBy(name => name, StringComparer.Ordinal)
+                            .ToArray()
+                        ?? []);
+                })
+                .ToArray());
     }
 }

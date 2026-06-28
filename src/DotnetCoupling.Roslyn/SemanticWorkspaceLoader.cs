@@ -66,10 +66,13 @@ internal static class SemanticWorkspaceLoader
         }
 
         SemanticWorkspaceProject[] projects = solution.Projects
-            .Select(project => new SemanticWorkspaceProject(
+            .Select(project =>
+            {
+                string projectName = project.AssemblyName ?? project.Name;
+                return new SemanticWorkspaceProject(
                 project,
                 project.FilePath ?? project.Name,
-                project.Name,
+                projectName,
                 project.AssemblyName ?? project.Name,
                 project.Documents
                     .Where(document => document.SourceCodeKind == SourceCodeKind.Regular && document.FilePath is not null)
@@ -77,7 +80,8 @@ internal static class SemanticWorkspaceLoader
                     .Where(filePath => IsAnalyzableSource(filePath, options))
                     .Where(filePath => filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
                     .OrderBy(filePath => filePath, StringComparer.Ordinal)
-                    .ToArray()))
+                    .ToArray());
+            })
             .Where(project => project.SourceFiles.Count > 0)
             .ToArray();
 

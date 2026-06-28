@@ -199,6 +199,40 @@ public sealed class ReportRendererTests
         Assert.Equal(semanticExpected, semanticActual);
     }
 
+    [Fact]
+    public void Render_JsonOutput_CsprojInput_IncludesProjectMetadata()
+    {
+        string projectPath = CreateProjectMetadataFixture();
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(projectPath, useGit: false, gitMonths: 6);
+
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        JsonElement projectModel = document.RootElement.GetProperty("projectModel");
+        Assert.Equal(1, projectModel.GetProperty("projectCount").GetInt32());
+        JsonElement project = Assert.Single(projectModel.GetProperty("projects").EnumerateArray());
+        Assert.Equal("Sample.App.Assembly", project.GetProperty("projectName").GetString());
+        Assert.Equal("Sample.App.Assembly", project.GetProperty("assemblyName").GetString());
+        Assert.Equal(2, project.GetProperty("sourceFileCount").GetInt32());
+        string[] packageReferences = project.GetProperty("packageReferences").EnumerateArray().Select(item => item.GetString()!).ToArray();
+        Assert.Contains("Spectre.Console", packageReferences);
+    }
+
+    [Fact]
+    public void Render_JsonOutput_SemanticMode_IncludesProjectMetadata()
+    {
+        string projectPath = CreateProjectMetadataFixture();
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        JsonElement projectModel = document.RootElement.GetProperty("projectModel");
+        Assert.Equal(1, projectModel.GetProperty("projectCount").GetInt32());
+        JsonElement project = Assert.Single(projectModel.GetProperty("projects").EnumerateArray());
+        Assert.Equal("Sample.App.Assembly", project.GetProperty("projectName").GetString());
+        Assert.Equal("Sample.App.Assembly", project.GetProperty("assemblyName").GetString());
+        Assert.Equal(2, project.GetProperty("sourceFileCount").GetInt32());
+    }
+
     private static JsonElement Parse(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);
@@ -285,6 +319,47 @@ public sealed class ReportRendererTests
             Path.Combine(directory, "Repository.cs"),
             """
             namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """);
+
+        return Path.Combine(directory, "Sample.App.csproj");
+    }
+
+    private static string CreateProjectMetadataFixture()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "Sample.App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <AssemblyName>Sample.App.Assembly</AssemblyName>
+                <RootNamespace>Sample.App</RootNamespace>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Spectre.Console" Version="0.49.1" />
+              </ItemGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            Path.Combine(directory, "Handler.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+                public Repository Repository { get; } = new();
+            }
+            """);
+        File.WriteAllText(
+            Path.Combine(directory, "Repository.cs"),
+            """
+            namespace Sample.App;
 
             public sealed class Repository
             {

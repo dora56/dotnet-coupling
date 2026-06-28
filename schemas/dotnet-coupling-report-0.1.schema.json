@@ -124,6 +124,9 @@
         "$ref": "#/$defs/issue"
       }
     },
+    "projectModel": {
+      "$ref": "#/$defs/projectModel"
+    },
     "manifest": {
       "type": "object",
       "required": [
@@ -323,6 +326,65 @@
             "string",
             "null"
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "projectModel": {
+      "type": "object",
+      "required": [
+        "projectCount",
+        "projects"
+      ],
+      "properties": {
+        "projectCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/projectMetadataEntry"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "projectMetadataEntry": {
+      "type": "object",
+      "required": [
+        "projectPath",
+        "projectName",
+        "assemblyName",
+        "sourceFileCount",
+        "projectReferences",
+        "packageReferences"
+      ],
+      "properties": {
+        "projectPath": {
+          "type": "string"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "assemblyName": {
+          "type": "string"
+        },
+        "sourceFileCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projectReferences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "packageReferences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
