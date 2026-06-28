@@ -36,10 +36,13 @@ public sealed class CSharpDependencyAnalyzer
         IReadOnlyList<ProjectFile> projectFiles;
         IReadOnlyList<AnalysisDiagnostic> diagnostics;
         string analysisModeLabel;
+        List<Component> components = [];
+        List<DependencyObservation> observations = [];
+        Dictionary<string, List<UsingNamespace>> usingNamespacesByFile = new(StringComparer.Ordinal);
 
         if (mode == AnalysisMode.Semantic)
         {
-            SemanticWorkspaceLoadResult workspace = SemanticWorkspaceLoader.Load(fullPath, options);
+            using SemanticWorkspaceSession workspace = SemanticWorkspaceLoader.Load(fullPath, options);
             projectFiles = workspace.Projects
                 .SelectMany(project => project.SourceFiles.Select(file => new ProjectFile(file, project.ProjectName)))
                 .DistinctBy(projectFile => projectFile.FilePath)
@@ -47,6 +50,21 @@ public sealed class CSharpDependencyAnalyzer
                 .ToArray();
             diagnostics = workspace.Diagnostics;
             analysisModeLabel = "semantic-preview";
+
+            foreach (SemanticWorkspaceProject project in workspace.Projects)
+            {
+                HashSet<string> projectSourceFiles = project.SourceFiles.ToHashSet(StringComparer.Ordinal);
+                foreach (Microsoft.CodeAnalysis.Document document in project.RoslynProject.Documents.Where(document =>
+                             document.SourceCodeKind == Microsoft.CodeAnalysis.SourceCodeKind.Regular
+                             && document.FilePath is not null
+                             && projectSourceFiles.Contains(document.FilePath)))
+                {
+                    SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeDocument(document, project.ProjectName);
+                    usingNamespacesByFile[document.FilePath!] = syntaxFile.UsingNamespaces.ToList();
+                    components.AddRange(syntaxFile.Components);
+                    observations.AddRange(syntaxFile.Observations);
+                }
+            }
         }
         else
         {
@@ -68,17 +86,14 @@ public sealed class CSharpDependencyAnalyzer
                     diagnostic.Path))
                 .ToArray();
             analysisModeLabel = "syntax-only";
-        }
-        List<Component> components = [];
-        List<DependencyObservation> observations = [];
-        Dictionary<string, List<UsingNamespace>> usingNamespacesByFile = new(StringComparer.Ordinal);
 
-        foreach (ProjectFile projectFile in projectFiles)
-        {
-            SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeFile(projectFile.FilePath, projectFile.ProjectName);
-            usingNamespacesByFile[projectFile.FilePath] = syntaxFile.UsingNamespaces.ToList();
-            components.AddRange(syntaxFile.Components);
-            observations.AddRange(syntaxFile.Observations);
+            foreach (ProjectFile projectFile in projectFiles)
+            {
+                SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeFile(projectFile.FilePath, projectFile.ProjectName);
+                usingNamespacesByFile[projectFile.FilePath] = syntaxFile.UsingNamespaces.ToList();
+                components.AddRange(syntaxFile.Components);
+                observations.AddRange(syntaxFile.Observations);
+            }
         }
 
         components = CoalesceComponents(components);
@@ -118,12 +133,7 @@ public sealed class CSharpDependencyAnalyzer
             observations,
             couplings,
             issues,
-            [
-                "Semantic symbol resolution is not enabled.",
-                "DI container runtime resolution is not analyzed in syntax-only mode.",
-                "Reflection and dynamic calls may be incomplete.",
-                "Generated code is excluded by default.",
-            ],
+            CreateBlindSpots(mode),
             Diagnostics: diagnostics);
     }
 
@@ -135,5 +145,27 @@ public sealed class CSharpDependencyAnalyzer
             .GroupBy(component => component.Id, StringComparer.Ordinal)
             .Select(group => group.First())
             .ToList();
+    }
+
+    private static IReadOnlyList<string> CreateBlindSpots(AnalysisMode mode)
+    {
+        if (mode == AnalysisMode.Semantic)
+        {
+            return
+            [
+                "Full semantic symbol resolution is not enabled yet.",
+                "DI container runtime resolution is not analyzed.",
+                "Reflection and dynamic calls may be incomplete.",
+                "Generated code is excluded by default.",
+            ];
+        }
+
+        return
+        [
+            "Semantic symbol resolution is not enabled.",
+            "DI container runtime resolution is not analyzed in syntax-only mode.",
+            "Reflection and dynamic calls may be incomplete.",
+            "Generated code is excluded by default.",
+        ];
     }
 }

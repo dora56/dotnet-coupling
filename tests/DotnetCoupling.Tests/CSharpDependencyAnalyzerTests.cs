@@ -372,6 +372,45 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_SemanticMode_ResolvesGlobalUsingAliasToInternalType()
+    {
+        string projectPath = CreateProjectFixture(
+            ("GlobalUsings.cs",
+            """
+            global using InfraRepo = Sample.App.Infrastructure.Repository;
+            """),
+            ("Handler.cs",
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    _ = new InfraRepo();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Couplings, coupling => coupling.Source == "Sample.App.Api.Handler");
+        Assert.Contains(semanticReport.Couplings, coupling =>
+            coupling.Source == "Sample.App.Api.Handler"
+            && coupling.Target == "Sample.App.Infrastructure.Repository"
+            && coupling.Strength == IntegrationStrength.Functional);
+    }
+
+    [Fact]
     public void Analyze_PartialTypeAcrossFiles_MergesLogicalComponent()
     {
         string directory = CreateFixture(
@@ -446,6 +485,28 @@ public sealed class CSharpDependencyAnalyzerTests
         }
 
         return directory;
+    }
+
+    private static string CreateProjectFixture(params (string FileName, string Source)[] files)
+    {
+        string directory = CreateFixture([]);
+        string projectPath = Path.Combine(directory, "Sample.App.csproj");
+        File.WriteAllText(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        foreach ((string fileName, string source) in files)
+        {
+            File.WriteAllText(Path.Combine(directory, fileName), source);
+        }
+
+        return projectPath;
     }
 
     private static string ExternalUsingSource(string typeName)

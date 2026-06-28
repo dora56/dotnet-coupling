@@ -10,7 +10,7 @@ internal static class SemanticWorkspaceLoader
     private static readonly Lock RegistrationLock = new();
     private static bool _registered;
 
-    internal static SemanticWorkspaceLoadResult Load(string targetPath, AnalysisOptions options)
+    internal static SemanticWorkspaceSession Load(string targetPath, AnalysisOptions options)
     {
         string fullPath = Path.GetFullPath(targetPath);
         if (!File.Exists(fullPath) || (!fullPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) && !fullPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)))
@@ -20,13 +20,14 @@ internal static class SemanticWorkspaceLoader
 
         EnsureMsBuildRegistered();
 
-        using MSBuildWorkspace workspace = MSBuildWorkspace.Create();
+        MSBuildWorkspace workspace = MSBuildWorkspace.Create();
         Solution solution = fullPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
             ? workspace.OpenProjectAsync(fullPath).GetAwaiter().GetResult().Solution
             : workspace.OpenSolutionAsync(fullPath).GetAwaiter().GetResult();
 
         SemanticWorkspaceProject[] projects = solution.Projects
             .Select(project => new SemanticWorkspaceProject(
+                project,
                 project.FilePath ?? project.Name,
                 project.Name,
                 project.AssemblyName ?? project.Name,
@@ -48,7 +49,7 @@ internal static class SemanticWorkspaceLoader
                 fullPath))
             .ToArray();
 
-        return new SemanticWorkspaceLoadResult(projects, diagnostics);
+        return new SemanticWorkspaceSession(workspace, projects, diagnostics);
     }
 
     private static void EnsureMsBuildRegistered()
@@ -74,11 +75,23 @@ internal static class SemanticWorkspaceLoader
     }
 }
 
-internal sealed record SemanticWorkspaceLoadResult(
-    IReadOnlyList<SemanticWorkspaceProject> Projects,
-    IReadOnlyList<AnalysisDiagnostic> Diagnostics);
+internal sealed class SemanticWorkspaceSession(
+    MSBuildWorkspace workspace,
+    IReadOnlyList<SemanticWorkspaceProject> projects,
+    IReadOnlyList<AnalysisDiagnostic> diagnostics) : IDisposable
+{
+    internal IReadOnlyList<SemanticWorkspaceProject> Projects { get; } = projects;
+
+    internal IReadOnlyList<AnalysisDiagnostic> Diagnostics { get; } = diagnostics;
+
+    public void Dispose()
+    {
+        workspace.Dispose();
+    }
+}
 
 internal sealed record SemanticWorkspaceProject(
+    Project RoslynProject,
     string ProjectPath,
     string ProjectName,
     string AssemblyName,

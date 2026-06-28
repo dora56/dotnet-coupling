@@ -11,8 +11,30 @@ internal static class CSharpSyntaxDependencyCollector
     {
         SyntaxTree tree = CSharpSyntaxTree.ParseText(File.ReadAllText(filePath), path: filePath);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
+        return AnalyzeRoot(tree, root, filePath, projectName, semanticModel: null);
+    }
+
+    internal static SyntaxFileAnalysis AnalyzeDocument(Document document, string? projectName = null)
+    {
+        SyntaxTree tree = document.GetSyntaxTreeAsync().GetAwaiter().GetResult()
+            ?? throw new InvalidOperationException($"Document has no syntax tree: {document.FilePath ?? document.Name}");
+        CompilationUnitSyntax root = document.GetSyntaxRootAsync().GetAwaiter().GetResult() as CompilationUnitSyntax
+            ?? throw new InvalidOperationException($"Document root is not a compilation unit: {document.FilePath ?? document.Name}");
+        SemanticModel semanticModel = document.GetSemanticModelAsync().GetAwaiter().GetResult()
+            ?? throw new InvalidOperationException($"Document has no semantic model: {document.FilePath ?? document.Name}");
+
+        return AnalyzeRoot(tree, root, document.FilePath ?? tree.FilePath, projectName, semanticModel);
+    }
+
+    private static SyntaxFileAnalysis AnalyzeRoot(
+        SyntaxTree tree,
+        CompilationUnitSyntax root,
+        string filePath,
+        string? projectName,
+        SemanticModel? semanticModel)
+    {
         string namespaceName = FindNamespace(root);
-        ComponentWalker walker = new(tree, namespaceName, filePath, projectName);
+        ComponentWalker walker = new(tree, namespaceName, filePath, projectName, semanticModel);
         walker.Visit(root);
 
         return new SyntaxFileAnalysis(
@@ -52,7 +74,12 @@ internal static class CSharpSyntaxDependencyCollector
         return usingNamespaces;
     }
 
-    private sealed class ComponentWalker(SyntaxTree tree, string namespaceName, string filePath, string? projectName) : CSharpSyntaxWalker
+    private sealed class ComponentWalker(
+        SyntaxTree tree,
+        string namespaceName,
+        string filePath,
+        string? projectName,
+        SemanticModel? semanticModel) : CSharpSyntaxWalker
     {
         private readonly Stack<Component> _componentStack = new();
 
@@ -168,7 +195,7 @@ internal static class CSharpSyntaxDependencyCollector
                 return;
             }
 
-            string targetName = ExtractTypeName(type);
+            string targetName = ExtractTypeName(type, semanticModel);
             if (string.IsNullOrWhiteSpace(targetName))
             {
                 return;
@@ -185,19 +212,86 @@ internal static class CSharpSyntaxDependencyCollector
                 type.ToString()));
         }
 
-        private static string ExtractTypeName(TypeSyntax type)
+        private static string ExtractTypeName(TypeSyntax type, SemanticModel? semanticModel)
         {
+            string? resolvedName = TryResolveTypeName(type, semanticModel);
+            if (!string.IsNullOrWhiteSpace(resolvedName))
+            {
+                return resolvedName;
+            }
+
             return type switch
             {
                 IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
                 QualifiedNameSyntax qualified => ExtractSimpleName(qualified.Right),
                 AliasQualifiedNameSyntax aliasQualified => ExtractSimpleName(aliasQualified.Name),
                 GenericNameSyntax generic => CreateTypeIdentity(generic.Identifier.ValueText, generic.TypeArgumentList.Arguments.Count),
-                NullableTypeSyntax nullable => ExtractTypeName(nullable.ElementType),
-                ArrayTypeSyntax array => ExtractTypeName(array.ElementType),
+                NullableTypeSyntax nullable => ExtractTypeName(nullable.ElementType, semanticModel),
+                ArrayTypeSyntax array => ExtractTypeName(array.ElementType, semanticModel),
                 PredefinedTypeSyntax => "",
                 _ => type.ToString().Split('.').Last().Split('<').First(),
             };
+        }
+
+        private static string? TryResolveTypeName(TypeSyntax type, SemanticModel? semanticModel)
+        {
+            if (semanticModel is null)
+            {
+                return null;
+            }
+
+            ITypeSymbol? typeSymbol = semanticModel.GetTypeInfo(type).Type;
+            if (typeSymbol is null)
+            {
+                SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(type);
+                ISymbol? symbol = symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
+                if (symbol is IAliasSymbol aliasSymbol)
+                {
+                    symbol = aliasSymbol.Target;
+                }
+
+                typeSymbol = symbol switch
+                {
+                    ITypeSymbol directType => directType,
+                    IMethodSymbol methodSymbol => methodSymbol.ReturnType,
+                    IPropertySymbol propertySymbol => propertySymbol.Type,
+                    IFieldSymbol fieldSymbol => fieldSymbol.Type,
+                    _ => null,
+                };
+            }
+
+            return typeSymbol switch
+            {
+                IArrayTypeSymbol arrayType => TryCreateSymbolIdentity(arrayType.ElementType),
+                INamedTypeSymbol namedType => TryCreateSymbolIdentity(namedType),
+                _ => null,
+            };
+        }
+
+        private static string? TryCreateSymbolIdentity(ITypeSymbol typeSymbol)
+        {
+            if (typeSymbol is INamedTypeSymbol namedType)
+            {
+                return TryCreateSymbolIdentity(namedType);
+            }
+
+            return null;
+        }
+
+        private static string? TryCreateSymbolIdentity(INamedTypeSymbol namedType)
+        {
+            if (namedType.SpecialType != SpecialType.None)
+            {
+                return null;
+            }
+
+            if (namedType.ContainingNamespace is null || namedType.ContainingNamespace.IsGlobalNamespace)
+            {
+                return namedType.MetadataName;
+            }
+
+            string namespacePrefix = namedType.ContainingNamespace.ToDisplayString();
+            return $"{namespacePrefix}.{namedType.MetadataName}";
         }
 
         private static string ExtractSimpleName(SimpleNameSyntax name)
