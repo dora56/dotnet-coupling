@@ -185,6 +185,8 @@ public sealed class GitVolatilityTests
         RunGit(repositoryPath, "init");
         RunGit(repositoryPath, "config", "user.email", "tests@example.invalid");
         RunGit(repositoryPath, "config", "user.name", "Dotnet Coupling Tests");
+        RunGit(repositoryPath, "config", "commit.gpgsign", "false");
+        RunGit(repositoryPath, "config", "tag.gpgsign", "false");
         return repositoryPath;
     }
 

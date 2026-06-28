@@ -46,6 +46,8 @@ public sealed class ReportRendererTests
         Assert.Equal("issue-density", document.RootElement.GetProperty("grade").GetProperty("basis").GetString());
         Assert.Equal("GlobalComplexity", document.RootElement.GetProperty("issues")[0].GetProperty("type").GetString());
         Assert.Equal("Medium", document.RootElement.GetProperty("issues")[0].GetProperty("severity").GetString());
+        Assert.Equal("syntax-only", document.RootElement.GetProperty("analysis").GetProperty("mode").GetString());
+        Assert.Equal("syntax-only", document.RootElement.GetProperty("manifest").GetProperty("confidence").GetString());
     }
 
     [Fact]
@@ -97,6 +99,17 @@ public sealed class ReportRendererTests
 
         Assert.Contains("Grade: S (Over-optimized warning)", rendered);
         Assert.Contains("This is not a trophy.", rendered);
+    }
+
+    [Fact]
+    public void Render_SummaryOutput_SyntaxOnly_OmitsModeLine()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Summary);
+
+        Assert.DoesNotContain("Mode:", rendered, StringComparison.Ordinal);
     }
 
     [Fact]

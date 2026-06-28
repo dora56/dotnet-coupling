@@ -117,6 +117,17 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_DefaultSummary_MatchesExplicitSyntaxSummary()
+    {
+        CommandResult defaultResult = await RunCliAsync("--summary", "--no-git", TestPaths.Fixture("global-complexity"));
+        CommandResult syntaxResult = await RunCliAsync("--mode", "syntax", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, defaultResult.ExitCode);
+        Assert.Equal(defaultResult.Output, syntaxResult.Output);
+        Assert.Equal(defaultResult.Error, syntaxResult.Error);
+    }
+
+    [Fact]
     public async Task RunAsync_InvalidMode_ReturnsCliArgumentError()
     {
         CommandResult result = await RunCliAsync("--mode", "future", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
@@ -285,6 +296,8 @@ public sealed class CliApplicationTests
         RunGit(repositoryPath, "init");
         RunGit(repositoryPath, "config", "user.email", "tests@example.invalid");
         RunGit(repositoryPath, "config", "user.name", "Dotnet Coupling Tests");
+        RunGit(repositoryPath, "config", "commit.gpgsign", "false");
+        RunGit(repositoryPath, "config", "tag.gpgsign", "false");
         return repositoryPath;
     }
 
