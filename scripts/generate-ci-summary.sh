@@ -51,7 +51,10 @@ import xml.etree.ElementTree as ET
 coverage_dir = pathlib.Path(sys.argv[1])
 mutation_dir = pathlib.Path(sys.argv[2])
 
-coverage_files = sorted(coverage_dir.rglob("coverage.cobertura.xml"))
+coverage_files = sorted(
+    list(coverage_dir.rglob("coverage.cobertura.xml"))
+    + list(coverage_dir.rglob("*.coverage.cobertura.xml"))
+)
 mutation_files = sorted(mutation_dir.rglob("mutation-report.json"))
 
 if not coverage_files:
