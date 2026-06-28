@@ -150,6 +150,7 @@ jobs:
   mutation:
     runs-on: ubuntu-slim
     needs: build
+    timeout-minutes: 20
 
     steps:
       - name: Checkout

@@ -285,13 +285,35 @@ report を確認できるようにする。
     "thresholds": {
       "high": 80,
       "low": 60,
-      "break": 50
+      "break": 60
     },
     "reporters": ["html", "json", "progress"],
-    "concurrency": 4
+    "concurrency": 4,
+    "mutation-level": "Standard",
+    "ignore-mutations": [
+      "assignment",
+      "initializer",
+      "block",
+      "statement",
+      "unary",
+      "update",
+      "string",
+      "stringmethod",
+      "linq",
+      "math",
+      "checked",
+      "regex",
+      "bitwise"
+    ],
+    "test-runner": "mtp"
   }
 }
 ```
+
+`mtp` を使うのは、現在のテスト構成では coverage-based optimization が安定して効き、
+`vstest` より mutation 対象数と実行時間を抑えやすいためである。
+また Phase 3 時点では、score / grade / issue 境界を守る回帰検知を優先し、
+`arithmetic` / `logical` / `equality` / `boolean` を主対象として残す。
 
 #### 特に有効なミューテーション
 
@@ -308,7 +330,7 @@ report を確認できるようにする。
 |---|---|---|
 | `high` | 80% | この以上なら十分 |
 | `low` | 60% | この以下は要改善 |
-| `break` | 50% | CI を失敗させる最低ライン |
+| `break` | 60% | CI を失敗させる最低ライン |
 
 #### CI 配置
 
@@ -316,7 +338,7 @@ report を確認できるようにする。
 |---|---|---|
 | PR gate | No | 実行に数分かかる。feedback loop を遅くしない |
 | Nightly | Yes | mutation score の regression を検知 |
-| Release gate | Yes + `--break-at 50` | リリース品質の最低ラインを強制 |
+| Release gate | Yes + `break = 60` | リリース品質の最低ラインを強制 |
 
 ### 30.7 テスト依存パッケージ
 
@@ -343,7 +365,7 @@ dotnet tool install --global dotnet-stryker
 |---|---|---|---|
 | PR gate | push / PR | Static + Unit (small) + Integration (medium) | < 3 min |
 | Nightly | schedule | All above + Stryker.NET mutation | < 15 min |
-| Release | tag push | All + E2E + Stryker `--break-at 50` | < 20 min |
+| Release | tag push | All + E2E + Stryker `break = 60` | < 20 min |
 
 ---
 
