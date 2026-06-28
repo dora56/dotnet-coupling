@@ -8,7 +8,7 @@ Semantic Versioning を採用する。
 |---|---|
 | `0.1.0-alpha.1` | syntax-only MVP |
 | `0.2.0-alpha.1` | public alpha feedback / config / baseline |
-| `0.3.0-alpha.1` | semantic mode / `.slnx` / `.sln` / `.csproj` 対応 |
+| `0.3.0-alpha.1` | project model / semantic mode foundation |
 | `0.4.0` | SARIF / team CI integration / hotspots |
 | `0.5.0` | AI output / impact / trace |
 | `0.6.0` | complexity-assisted risk prioritization |
@@ -117,9 +117,20 @@ Baseline and team gate:
 - [x] ratchet gate: new High 以上のみ fail
 - [x] GitHub Actions 利用例
 
-### Phase 3: Semantic mode and project model
+### Phase 3: Project model first, then semantic mode
 
-Goal: syntax-only の限界を越え、project / assembly / package 境界を正確に扱う。
+Goal: Phase 2 dogfooding で見えた syntax-only の限界と実運用の痛点を踏まえ、
+semantic resolution の前に project model を安定させる。Phase 3 は大幅な機能拡張
+ではなく、既存 CLI / JSON 契約を壊さずに semantic mode の土台を固める。
+
+Non-goals and compatibility:
+
+- syntax mode は既定 mode として残す。
+- semantic mode は明示オプションで追加する。
+- JSON schema は optional fields で拡張し、既存 consumer を壊さない。
+- Grade / issue の差分は意図的な改善として記録し、silent behavior change にしない。
+- Phase 2 で改善済みの syntax-only partial class 統合は完了扱いとし、Phase 3 では
+  semantic mode でも partial / symbol identity が安定することを確認する。
 
 Architecture:
 
@@ -127,21 +138,42 @@ Architecture:
 - [ ] structural fitness test: CLI から Roslyn / issue policy への依存方向を固定
 - [ ] `Models` の public API 境界整理
 
-Semantic analysis:
+#### Phase 3a: Project Model
+
+Goal: `.slnx` / `.sln` / `.csproj` 入力から、project / assembly / package 境界を
+syntax mode と semantic mode の共通土台として扱えるようにする。
+
+- [ ] `.slnx` / `.sln` / `.csproj` 入力対応
+- [ ] project graph 抽出
+- [ ] project boundary distance の表現追加
+- [ ] assembly / NuGet package 判定
+- [ ] workspace load diagnostics
+- [ ] workspace load failure を recoverable diagnostic として出力
+- [ ] syntax mode の CLI / JSON / exit code 契約を維持する regression tests
+
+#### Phase 3b: Semantic Resolution
+
+Goal: project model の上で symbol resolution を追加し、syntax-only の曖昧さを
+減らす。既定動作は変えず、明示 semantic mode として導入する。
 
 - [ ] `MSBuildWorkspace` 導入
-- [ ] `.slnx` / `.sln` / `.csproj` 対応
 - [ ] symbol resolution
-- [ ] project boundary distance
-- [ ] assembly / NuGet package 判定
-- [ ] partial class 統合
+- [ ] semantic mode で partial / symbol identity が安定することを確認
 - [ ] alias / global using 解決
 - [ ] attribute / invocation / member access の精度向上
+- [ ] syntax mode との出力差分 golden tests
+- [ ] JSON schema optional fields で semantic / project metadata を追加
 
-Performance:
+#### Phase 3c: Stability Gate
+
+Goal: semantic 精度だけでなく、既存ユーザーが使う CLI / JSON 契約を壊していない
+ことを確認してから Phase 3 を完了する。
 
 - [ ] syntax mode と semantic mode の明示的な mode 分離
-- [ ] workspace load diagnostics
+- [ ] `dotnet-coupling` 自身で syntax / semantic mode を比較
+- [ ] Phase 2 dogfooding の OSS 3件で syntax / semantic mode を比較
+- [ ] Grade / issue 差分レポートを記録
+- [ ] JSON / CLI 後方互換テスト
 - [ ] 大規模 repo の perf baseline
 
 ### Phase 4: CI / team use
