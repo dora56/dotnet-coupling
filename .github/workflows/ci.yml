@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   changes:
@@ -80,6 +82,22 @@ jobs:
       - name: Build
         run: dotnet build dotnet-coupling.slnx --configuration Release --no-restore
 
+      - name: Pack
+        run: dotnet pack src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj --configuration Release --no-build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-artifacts
+          path: |
+            src/**/bin/Release/**
+            src/**/obj/Release/**
+            tests/**/bin/Release/**
+            tests/**/obj/Release/**
+            src/DotnetCoupling.Cli/nupkg/*.nupkg
+          if-no-files-found: error
+          retention-days: 14
+
   test:
     runs-on: ubuntu-slim
     needs: build
@@ -106,15 +124,43 @@ jobs:
       - name: Restore
         run: dotnet restore dotnet-coupling.slnx --locked-mode
 
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: build-artifacts
+          path: .
+
+      - name: Restore executable bits
+        shell: bash
+        run: |
+          find tests -type f -path '*/bin/Release/*' -exec chmod +x {} +
+
       - name: Test
-        run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
+        run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --no-build --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
+
+      - name: Stage coverage report
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/coverage
+          mapfile -t coverage_reports < <(find . -type f -name 'coverage.cobertura.xml' \
+            -not -path './artifacts/coverage/*' | sort)
+
+          if [[ "${#coverage_reports[@]}" -eq 0 ]]; then
+            echo "No coverage report was generated." >&2
+            exit 1
+          fi
+
+          for report in "${coverage_reports[@]}"; do
+            cp "$report" "artifacts/coverage/$(basename "$(dirname "$report")").coverage.cobertura.xml"
+          done
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: TestResults/Coverage/**/*.xml
+          path: artifacts/coverage
           if-no-files-found: error
           retention-days: 14
 
@@ -216,24 +262,11 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Cache .NET dependencies
-        uses: actions/cache@v6
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8.0.1
         with:
-          path: |
-            ~/.nuget/packages
-            ~/.dotnet/toolResolverCache
-          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
-          restore-keys: |
-            dotnet-${{ runner.os }}-
-
-      - name: Restore
-        run: dotnet restore dotnet-coupling.slnx --locked-mode
-
-      - name: Build
-        run: dotnet build dotnet-coupling.slnx --configuration Release --no-restore
-
-      - name: Pack
-        run: dotnet pack src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj --configuration Release --no-build
+          name: build-artifacts
+          path: .
 
       - name: Read package version
         shell: bash
@@ -250,3 +283,74 @@ jobs:
       - name: Self-benchmark
         run: |
           "$TOOL_PATH/dotnet-coupling" --check --min-grade A --no-git ./src
+
+  report:
+    runs-on: ubuntu-slim
+    needs:
+      - changes
+      - test
+      - mutation
+      - self-benchmark
+    if: always() && needs.changes.outputs.docs_only != 'true'
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download coverage report
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: coverage-report
+          path: artifacts/coverage
+
+      - name: Download mutation report
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: mutation-report
+          path: artifacts/mutation
+
+      - name: Generate CI summary
+        shell: bash
+        run: |
+          scripts/generate-ci-summary.sh \
+            --coverage-dir artifacts/coverage \
+            --mutation-dir artifacts/mutation \
+            | tee ci-summary.md | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- dotnet-coupling-ci-report -->';
+            const body = fs.readFileSync('ci-summary.md', 'utf8');
+            const commentBody = `${marker}\n${body}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: commentBody,
+              });
+            }
