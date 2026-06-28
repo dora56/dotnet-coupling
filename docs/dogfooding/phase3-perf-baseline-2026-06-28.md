@@ -106,3 +106,27 @@ perf artifacts.
 The perf baseline script now also classifies this state explicitly as
 `LOAD_BLOCKED(exit=4)`, which makes the difference between `measured semantic
 run` and `semantic workspace precondition failure` visible in a single table.
+
+## Measured Large-Target Baseline
+
+A second scripted run was taken against the full `commandlineparser/commandline`
+solution as a larger target that can satisfy semantic workspace prerequisites:
+
+```bash
+scripts/generate-perf-baseline-report.sh \
+  src/DotnetCoupling.Cli/bin/Release/net10.0/DotnetCoupling.Cli \
+  /private/tmp/dotnet-coupling-phase3-oss-compare/commandline/CommandLine.sln \
+  /private/tmp/dotnet-coupling-phase3-oss-compare/commandline-sln-perf-baseline
+```
+
+Observed result:
+
+- target scale: `182` C# files in solution scope
+- `syntax`: PASS in `0.35s`
+- `semantic-preview`: PASS in `4.72s`
+- semantic run completed with `8` recoverable diagnostics, not a load failure
+
+This gives Phase 3c a representative **measured** semantic baseline in addition
+to the earlier `LOAD_BLOCKED` large-target evidence. The remaining question is
+no longer whether a measured large-target semantic baseline is possible, but how
+often semantic mode is expected to be loadable across heterogeneous OSS targets.
