@@ -207,9 +207,12 @@ MVP では `Microsoft.CodeAnalysis.CSharp` を使い、`SyntaxNode` ベースで
 | `GenericNameSyntax` | generic type 依存 |
 | `AttributeSyntax` | attribute 依存 |
 
-### 10.2 v0.2: Semantic analyzer
+### 10.2 v0.3: Project model and semantic analyzer
 
-v0.2 では `MSBuildWorkspace` を使い、`.slnx` / `.sln` / `.csproj` を読み込む。
+v0.3 では semantic resolution の前に project model を固める。まず `.slnx` /
+`.sln` / `.csproj` から project graph、project boundary distance、assembly /
+NuGet package 境界、workspace load diagnostics を得られるようにし、その上で
+`MSBuildWorkspace` による symbol resolution を追加する。
 
 追加で得られる情報:
 
