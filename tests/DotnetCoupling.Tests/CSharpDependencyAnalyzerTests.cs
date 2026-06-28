@@ -445,6 +445,40 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_SemanticMode_PartialTypeAcrossFiles_MergesLogicalComponent()
+    {
+        string projectPath = CreateProjectFixture(
+            ("GuardAgainstNull.cs",
+            """
+            namespace Ardalis.GuardClauses;
+
+            public static partial class GuardClauseExtensions
+            {
+                public static void Null(string value)
+                {
+                }
+            }
+            """),
+            ("GuardAgainstEmpty.cs",
+            """
+            namespace Ardalis.GuardClauses;
+
+            public static partial class GuardClauseExtensions
+            {
+                public static void Empty(string value)
+                {
+                }
+            }
+            """));
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Component component = Assert.Single(report.Components);
+        Assert.Equal("Ardalis.GuardClauses.GuardClauseExtensions", component.Id);
+        Assert.Equal("GuardClauseExtensions", component.Name);
+    }
+
+    [Fact]
     public void Analyze_GenericAndNonGenericTypesWithSameName_UsesDistinctComponents()
     {
         string directory = CreateFixture("""
@@ -468,6 +502,49 @@ public sealed class CSharpDependencyAnalyzerTests
         Assert.Contains(report.Components, component => component.Id == "CSharpx.Either`2");
         Assert.Contains(report.Components, component => component.Id == "CSharpx.Either");
         Assert.Equal(2, report.Components.Count);
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_GenericAndNonGenericTypesWithSameName_UsesDistinctComponents()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Either.Generic.cs",
+            """
+            namespace CSharpx;
+
+            internal abstract partial class Either<TLeft, TRight>
+            {
+            }
+            """),
+            ("Either.Generic.Partial.cs",
+            """
+            namespace CSharpx;
+
+            internal abstract partial class Either<TLeft, TRight>
+            {
+            }
+            """),
+            ("Either.cs",
+            """
+            namespace CSharpx;
+
+            internal static class Either
+            {
+                public static Either<string, int>? Create()
+                {
+                    return null;
+                }
+            }
+            """));
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(report.Components, component => component.Id == "CSharpx.Either`2");
+        Assert.Contains(report.Components, component => component.Id == "CSharpx.Either");
+        Assert.Equal(2, report.Components.Count);
+        Assert.Contains(report.Couplings, coupling =>
+            coupling.Source == "CSharpx.Either"
+            && coupling.Target == "CSharpx.Either`2");
     }
 
     private static string CreateFixture(string source)
