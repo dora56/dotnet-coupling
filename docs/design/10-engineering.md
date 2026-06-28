@@ -336,9 +336,10 @@ report を確認できるようにする。
 
 | Suite | Stryker 実行 | 理由 |
 |---|---|---|
-| PR gate | No | 実行に数分かかる。feedback loop を遅くしない |
-| Nightly | Yes | mutation score の regression を検知 |
-| Release gate | Yes + `break = 60` | リリース品質の最低ラインを強制 |
+| PR gate | Yes (`since`) | 変更差分だけを mutation して feedback loop を維持する |
+| Main branch | Yes (full) | merge 後の回帰を full scope で検知する |
+| Nightly | Optional | 長期 trend や heavy な構成に広げる場合に使う |
+| Release gate | No | 公開フローの責務を pack/publish/release に限定する |
 
 ### 30.7 テスト依存パッケージ
 
@@ -363,9 +364,14 @@ dotnet tool install --global dotnet-stryker
 
 | Suite | Trigger | 含むテスト | 目標時間 |
 |---|---|---|---|
-| PR gate | push / PR | Static + Unit (small) + Integration (medium) | < 3 min |
-| Nightly | schedule | All above + Stryker.NET mutation | < 15 min |
-| Release | tag push | All + E2E + Stryker `break = 60` | < 20 min |
+| PR gate | `pull_request` | Static + Unit (small) + Integration (medium) + diff-scoped mutation | < 5 min |
+| Main push | `main` への push | Static + Unit + Integration + full mutation | < 15 min |
+| Nightly | schedule | Optional: full mutation + extended diagnostics | < 20 min |
+| Release | tag push | All + E2E + pack/publish/release | < 10 min |
+
+PR の mutation job では Stryker.NET の `since` を使い、`pull_request.base.sha`
+以降の差分に限定して実行する。`main` への push では full mutation を実行し、
+公開前の最終 mutation gate は release workflow ではなく通常 CI に置く。
 
 ---
 

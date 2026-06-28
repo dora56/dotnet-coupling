@@ -49,21 +49,6 @@ jobs:
       - name: Format
         run: dotnet format dotnet-coupling.slnx --verify-no-changes --no-restore
 
-      - name: Restore tools
-        run: dotnet tool restore
-
-      - name: Mutation test
-        run: dotnet tool run dotnet-stryker -- --config-file stryker-config.json
-
-      - name: Upload mutation report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mutation-report
-          path: StrykerOutput/**
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Pack
         run: dotnet pack src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj --configuration Release --no-build
 
