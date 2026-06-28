@@ -21,7 +21,7 @@ semantic mode は遅くなるため、将来的に以下のモードを分ける
 
 ```bash
 dotnet coupling --mode syntax ./src
-dotnet coupling --mode semantic ./MyApp.slnx
+dotnet coupling --mode semantic ./MyApp.sln
 ```
 
 ### 28.3 キャッシュ
@@ -285,13 +285,35 @@ report を確認できるようにする。
     "thresholds": {
       "high": 80,
       "low": 60,
-      "break": 50
+      "break": 60
     },
     "reporters": ["html", "json", "progress"],
-    "concurrency": 4
+    "concurrency": 4,
+    "mutation-level": "Standard",
+    "ignore-mutations": [
+      "assignment",
+      "initializer",
+      "block",
+      "statement",
+      "unary",
+      "update",
+      "string",
+      "stringmethod",
+      "linq",
+      "math",
+      "checked",
+      "regex",
+      "bitwise"
+    ],
+    "test-runner": "mtp"
   }
 }
 ```
+
+`mtp` を使うのは、現在のテスト構成では coverage-based optimization が安定して効き、
+`vstest` より mutation 対象数と実行時間を抑えやすいためである。
+また Phase 3 時点では、score / grade / issue 境界を守る回帰検知を優先し、
+`arithmetic` / `logical` / `equality` / `boolean` を主対象として残す。
 
 #### 特に有効なミューテーション
 
@@ -308,15 +330,16 @@ report を確認できるようにする。
 |---|---|---|
 | `high` | 80% | この以上なら十分 |
 | `low` | 60% | この以下は要改善 |
-| `break` | 50% | CI を失敗させる最低ライン |
+| `break` | 60% | CI を失敗させる最低ライン |
 
 #### CI 配置
 
 | Suite | Stryker 実行 | 理由 |
 |---|---|---|
-| PR gate | No | 実行に数分かかる。feedback loop を遅くしない |
-| Nightly | Yes | mutation score の regression を検知 |
-| Release gate | Yes + `--break-at 50` | リリース品質の最低ラインを強制 |
+| PR gate | Yes (`since`) | 変更差分だけを mutation して feedback loop を維持する |
+| Main branch | Yes (full) | merge 後の回帰を full scope で検知する |
+| Nightly | Optional | 長期 trend や heavy な構成に広げる場合に使う |
+| Release gate | No | 公開フローの責務を pack/publish/release に限定する |
 
 ### 30.7 テスト依存パッケージ
 
@@ -341,9 +364,14 @@ dotnet tool install --global dotnet-stryker
 
 | Suite | Trigger | 含むテスト | 目標時間 |
 |---|---|---|---|
-| PR gate | push / PR | Static + Unit (small) + Integration (medium) | < 3 min |
-| Nightly | schedule | All above + Stryker.NET mutation | < 15 min |
-| Release | tag push | All + E2E + Stryker `--break-at 50` | < 20 min |
+| PR gate | `pull_request` | Static + Unit (small) + Integration (medium) + diff-scoped mutation | < 5 min |
+| Main push | `main` への push | Static + Unit + Integration + full mutation | < 15 min |
+| Nightly | schedule | Optional: full mutation + extended diagnostics | < 20 min |
+| Release | tag push | All + E2E + pack/publish/release | < 10 min |
+
+PR の mutation job では Stryker.NET の `since` を使い、`pull_request.base.sha`
+以降の差分に限定して実行する。`main` への push では full mutation を実行し、
+公開前の最終 mutation gate は release workflow ではなく通常 CI に置く。
 
 ---
 
@@ -427,7 +455,7 @@ jobs:
       - run: dotnet tool install --global dotnet-stryker
       - run: dotnet restore
       - run: dotnet stryker --config-file stryker-config.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: stryker-report
           path: StrykerOutput/**/reports/

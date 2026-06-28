@@ -216,6 +216,10 @@ v0.3 では semantic resolution の前に project model を固める。まず `.
 NuGet package 境界、workspace load diagnostics を得られるようにし、その上で
 `MSBuildWorkspace` による symbol resolution を追加する。
 
+syntax mode では workspace load failure を fatal error にしない。solution に含まれる
+missing project、invalid `.csproj`、解決できない `ProjectReference` は recoverable
+diagnostic として `manifest.diagnostics` に出し、読み込めた project だけで解析を継続する。
+
 追加で得られる情報:
 
 - 型名の完全修飾名

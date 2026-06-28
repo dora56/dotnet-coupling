@@ -24,7 +24,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Install dotnet-coupling
-        run: dotnet tool install --global dotnet-coupling --version 0.2.0-alpha.1
+        run: dotnet tool install --global dotnet-coupling --version 0.3.1
 
       - name: Coupling baseline gate
         run: dotnet-coupling --check --baseline origin/main --fail-on High ./src

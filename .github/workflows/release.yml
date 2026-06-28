@@ -13,6 +13,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     environment: release
+    timeout-minutes: 30
     permissions:
       contents: write
       id-token: write
@@ -48,28 +49,19 @@ jobs:
       - name: Format
         run: dotnet format dotnet-coupling.slnx --verify-no-changes --no-restore
 
-      - name: Restore tools
-        run: dotnet tool restore
-
-      - name: Mutation test
-        run: dotnet tool run dotnet-stryker -- --config-file stryker-config.json
-
-      - name: Upload mutation report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutation-report
-          path: StrykerOutput/**
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Pack
         run: dotnet pack src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj --configuration Release --no-build
+
+      - name: Read package version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n 1)"
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
 
       - name: Local tool install smoke
         run: |
           tool_path="$(mktemp -d)"
-          dotnet tool install dotnet-coupling --tool-path "$tool_path" --add-source src/DotnetCoupling.Cli/nupkg --version 0.2.0-alpha.1
+          dotnet tool install dotnet-coupling --tool-path "$tool_path" --add-source src/DotnetCoupling.Cli/nupkg --version "$PACKAGE_VERSION"
           "$tool_path/dotnet-coupling" --summary --no-git ./src
 
       - name: Upload package artifact
@@ -94,7 +86,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
-          body_path: docs/release-notes-0.2.0-alpha.1.md
+          body_path: docs/release-notes/release-notes-0.3.1.md
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: src/DotnetCoupling.Cli/nupkg/*.nupkg

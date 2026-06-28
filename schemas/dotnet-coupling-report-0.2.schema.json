@@ -47,6 +47,9 @@
         "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issue"
       }
     },
+    "projectModel": {
+      "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/projectModel"
+    },
     "baseline": {
       "type": "object",
       "required": [

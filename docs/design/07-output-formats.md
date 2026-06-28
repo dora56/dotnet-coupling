@@ -34,7 +34,10 @@ Top Issues
 Grade: B | Avg Score: 0.84 | Basis: issue-density
 Files: 128 | Types: 342 | Couplings: 891 internal / 143 external
 Issues: 0 Critical, 2 High, 8 Medium
+Mode: semantic-preview
 ```
+
+`Mode:` 行は `syntax-only` 以外の mode でのみ表示する。
 
 S grade の場合は必ず warning を出す。
 
@@ -52,10 +55,10 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
   "$schema": "https://raw.githubusercontent.com/YOUR_GITHUB/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
   "schemaVersion": "0.1",
   "tool": "dotnet-coupling",
-  "version": "0.2.0-alpha.1",
+  "version": "0.3.1",
   "analysis": {
     "path": "./src",
-    "mode": "syntax-only",
+    "mode": "semantic-preview",
     "files": 128,
     "components": 342,
     "couplings": {
@@ -97,9 +100,10 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
     }
   ],
   "manifest": {
-    "confidence": "syntax-only",
+    "confidence": "semantic-preview",
     "runNotes": [
-      "Semantic symbol resolution is not enabled."
+      "Semantic mode uses MSBuildWorkspace preview loading.",
+      "Semantic preview resolves many symbol-aware dependencies, but some flows remain syntax-equivalent."
     ],
     "blindSpots": [
       {
@@ -113,6 +117,14 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
       {
         "kind": "GeneratedCode",
         "description": "Generated code is excluded by default."
+      }
+    ],
+    "diagnostics": [
+      {
+        "code": "missing-project-reference",
+        "severity": "Warning",
+        "message": "Referenced project was not found: /repo/src/Missing/Missing.csproj",
+        "path": "/repo/src/App/App.csproj"
       }
     ]
   }
@@ -140,6 +152,7 @@ CI 利用者向けに、少なくとも以下は安定させる。
 - `issues[].target`
 - `issues[].location`
 - `manifest.blindSpots`
+- `manifest.diagnostics` は optional field として後方互換を保ちながら追加できる
 
 ### 19.5 出力モード優先順位
 

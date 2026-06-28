@@ -201,6 +201,24 @@ public sealed record AnalysisSummary(
     bool GitUsed,
     int GitMonths);
 
+public sealed record AnalysisDiagnostic(
+    string Code,
+    string Severity,
+    string Message,
+    string? Path);
+
+public sealed record ProjectMetadata(
+    int ProjectCount,
+    IReadOnlyList<ProjectMetadataEntry> Projects);
+
+public sealed record ProjectMetadataEntry(
+    string ProjectPath,
+    string ProjectName,
+    string AssemblyName,
+    int SourceFileCount,
+    IReadOnlyList<string> ProjectReferences,
+    IReadOnlyList<string> PackageReferences);
+
 public sealed record GradeResult(
     string Letter,
     string Display,
@@ -216,7 +234,9 @@ public sealed record AnalysisReport(
     IReadOnlyList<CouplingMetrics> Couplings,
     IReadOnlyList<CouplingIssue> Issues,
     IReadOnlyList<string> BlindSpots,
-    BaselineComparison? Baseline = null);
+    BaselineComparison? Baseline = null,
+    IReadOnlyList<AnalysisDiagnostic>? Diagnostics = null,
+    ProjectMetadata? ProjectMetadata = null);
 
 public sealed record BaselineComparison(
     string Ref,
@@ -229,4 +249,10 @@ public enum ReportFormat
     Text,
     Summary,
     Json,
+}
+
+public enum AnalysisMode
+{
+    Syntax,
+    Semantic,
 }

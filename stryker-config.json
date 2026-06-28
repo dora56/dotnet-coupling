@@ -10,6 +10,23 @@
       "html",
       "json"
     ],
+    "concurrency": 4,
+    "mutation-level": "Standard",
+    "ignore-mutations": [
+      "assignment",
+      "initializer",
+      "block",
+      "statement",
+      "unary",
+      "update",
+      "string",
+      "stringmethod",
+      "linq",
+      "math",
+      "checked",
+      "regex",
+      "bitwise"
+    ],
     "thresholds": {
       "high": 80,
       "low": 60,
