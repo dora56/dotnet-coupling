@@ -11,7 +11,8 @@ dotnet-coupling [path] [options]
 `path` は解析対象のディレクトリ、C# file、`.slnx`、`.sln`、`.csproj` のいずれかを想定する。
 
 Phase 3a では syntax mode のまま `.slnx` / `.sln` / `.csproj` を読み、project name と
-project boundary distance を補助する。semantic symbol resolution は後続の明示 mode で追加する。
+project boundary distance を補助する。Phase 3b では明示 `semantic` mode を追加し、
+まず `.csproj` / `.sln` を `MSBuildWorkspace` で読み込む preview から始める。
 
 ### 5.2 MVP オプション
 
@@ -32,8 +33,9 @@ project boundary distance を補助する。semantic symbol resolution は後続
 | `--help` | ヘルプ表示 | - |
 | `--version` | バージョン表示 | - |
 
-`semantic` は Phase 3b の明示入口として予約される。現時点では `--mode semantic`
-を指定した場合、CLI 引数エラーとして扱い、安定した error message を返す。
+`semantic` は Phase 3b の明示入口として提供する。現時点では preview として
+`.csproj` / `.sln` 入力のみを受け付け、summary / JSON には `semantic-preview`
+を出力する。その他の path では CLI 引数エラーとして安定した error message を返す。
 
 ### 5.3 v0.2 以降のオプション
 

@@ -66,6 +66,10 @@ public static class ReportRenderer
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade: {report.Grade.Letter} | Avg Score: {report.AverageBalanceScore:0.00} | Basis: {report.Grade.Basis}");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Files: {report.Summary.Files} | Types: {report.Summary.Components} | Couplings: {report.Summary.InternalCouplings} internal / {report.Summary.ExternalCouplings} external");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Issues: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
+        if (!string.Equals(report.Summary.Mode, "syntax-only", StringComparison.Ordinal))
+        {
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Mode: {report.Summary.Mode}");
+        }
         builder.AppendLine(DescribeGit(report));
         AppendDiagnosticsSummary(builder, report);
         AppendBaselineSummary(builder, report);
@@ -186,8 +190,8 @@ public static class ReportRenderer
     {
         Dictionary<string, object?> manifest = new(StringComparer.Ordinal)
         {
-            ["confidence"] = "syntax-only",
-            ["runNotes"] = new[] { "Semantic symbol resolution is not enabled." },
+            ["confidence"] = report.Summary.Mode,
+            ["runNotes"] = CreateRunNotes(report),
             ["blindSpots"] = report.BlindSpots.Select(blindSpot =>
             {
                 string kind = blindSpot.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Unknown";
@@ -205,6 +209,20 @@ public static class ReportRenderer
         }
 
         return manifest;
+    }
+
+    private static IReadOnlyList<string> CreateRunNotes(AnalysisReport report)
+    {
+        if (string.Equals(report.Summary.Mode, "semantic-preview", StringComparison.Ordinal))
+        {
+            return
+            [
+                "Semantic mode uses MSBuildWorkspace preview loading.",
+                "Some symbol resolution features are still syntax-equivalent.",
+            ];
+        }
+
+        return ["Semantic symbol resolution is not enabled."];
     }
 
     private static void AppendDiagnosticsSummary(StringBuilder builder, AnalysisReport report)

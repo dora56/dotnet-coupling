@@ -131,7 +131,38 @@ public sealed class CliApplicationTests
         CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
 
         Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Semantic mode is not implemented yet", result.Error);
+        Assert.Contains("Semantic mode requires a .csproj or .sln input", result.Error);
+    }
+
+    [Fact]
+    public async Task RunAsync_ModeSemanticCsproj_ReturnsSummaryOutput()
+    {
+        string directory = CreateDirectory();
+        string projectPath = Path.Combine(directory, "Sample.App.csproj");
+        WriteFile(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            Path.Combine(directory, "Sample.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+            }
+            """);
+
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", projectPath);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Files: 1 | Types: 1", result.Output);
+        Assert.Contains("Mode: semantic-preview", result.Output);
     }
 
     [Fact]

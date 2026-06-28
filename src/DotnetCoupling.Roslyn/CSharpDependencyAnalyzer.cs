@@ -31,23 +31,44 @@ public sealed class CSharpDependencyAnalyzer
         int gitMonths,
         AnalysisOptions? options = null)
     {
-        if (mode == AnalysisMode.Semantic)
-        {
-            throw new NotSupportedException("Semantic mode is not implemented yet.");
-        }
-
         options ??= AnalysisOptions.Default;
         string fullPath = Path.GetFullPath(targetPath);
-        ProjectModel projectModel = ProjectModel.Load(fullPath, options);
-        IReadOnlyList<ProjectFile> projectFiles = projectModel.Projects.Count == 0
-            ? FileDiscovery.DiscoverCSharpFiles(fullPath, options)
-                .Select(file => new ProjectFile(file, ProjectName: null))
-                .ToArray()
-            : projectModel.Projects
+        IReadOnlyList<ProjectFile> projectFiles;
+        IReadOnlyList<AnalysisDiagnostic> diagnostics;
+        string analysisModeLabel;
+
+        if (mode == AnalysisMode.Semantic)
+        {
+            SemanticWorkspaceLoadResult workspace = SemanticWorkspaceLoader.Load(fullPath, options);
+            projectFiles = workspace.Projects
                 .SelectMany(project => project.SourceFiles.Select(file => new ProjectFile(file, project.ProjectName)))
                 .DistinctBy(projectFile => projectFile.FilePath)
                 .OrderBy(projectFile => projectFile.FilePath, StringComparer.Ordinal)
                 .ToArray();
+            diagnostics = workspace.Diagnostics;
+            analysisModeLabel = "semantic-preview";
+        }
+        else
+        {
+            ProjectModel projectModel = ProjectModel.Load(fullPath, options);
+            projectFiles = projectModel.Projects.Count == 0
+                ? FileDiscovery.DiscoverCSharpFiles(fullPath, options)
+                    .Select(file => new ProjectFile(file, ProjectName: null))
+                    .ToArray()
+                : projectModel.Projects
+                    .SelectMany(project => project.SourceFiles.Select(file => new ProjectFile(file, project.ProjectName)))
+                    .DistinctBy(projectFile => projectFile.FilePath)
+                    .OrderBy(projectFile => projectFile.FilePath, StringComparer.Ordinal)
+                    .ToArray();
+            diagnostics = projectModel.Diagnostics
+                .Select(diagnostic => new AnalysisDiagnostic(
+                    diagnostic.Code,
+                    diagnostic.Severity,
+                    diagnostic.Message,
+                    diagnostic.Path))
+                .ToArray();
+            analysisModeLabel = "syntax-only";
+        }
         List<Component> components = [];
         List<DependencyObservation> observations = [];
         Dictionary<string, List<UsingNamespace>> usingNamespacesByFile = new(StringComparer.Ordinal);
@@ -80,7 +101,7 @@ public sealed class CSharpDependencyAnalyzer
         GradeResult grade = CouplingScoring.CalculateGrade(internalCouplingCount, issues);
         AnalysisSummary summary = new(
             fullPath,
-            "syntax-only",
+            analysisModeLabel,
             projectFiles.Count,
             components.Count,
             internalCouplingCount,
@@ -103,13 +124,7 @@ public sealed class CSharpDependencyAnalyzer
                 "Reflection and dynamic calls may be incomplete.",
                 "Generated code is excluded by default.",
             ],
-            Diagnostics: projectModel.Diagnostics
-                .Select(diagnostic => new AnalysisDiagnostic(
-                    diagnostic.Code,
-                    diagnostic.Severity,
-                    diagnostic.Message,
-                    diagnostic.Path))
-                .ToArray());
+            Diagnostics: diagnostics);
     }
 
     private sealed record ProjectFile(string FilePath, string? ProjectName);

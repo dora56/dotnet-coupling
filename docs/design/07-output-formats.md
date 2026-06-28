@@ -34,7 +34,10 @@ Top Issues
 Grade: B | Avg Score: 0.84 | Basis: issue-density
 Files: 128 | Types: 342 | Couplings: 891 internal / 143 external
 Issues: 0 Critical, 2 High, 8 Medium
+Mode: semantic-preview
 ```
+
+`Mode:` 行は `syntax-only` 以外の mode でのみ表示する。
 
 S grade の場合は必ず warning を出す。
 
@@ -55,7 +58,7 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
   "version": "0.2.0-alpha.1",
   "analysis": {
     "path": "./src",
-    "mode": "syntax-only",
+    "mode": "semantic-preview",
     "files": 128,
     "components": 342,
     "couplings": {
@@ -97,9 +100,10 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
     }
   ],
   "manifest": {
-    "confidence": "syntax-only",
+    "confidence": "semantic-preview",
     "runNotes": [
-      "Semantic symbol resolution is not enabled."
+      "Semantic mode uses MSBuildWorkspace preview loading.",
+      "Some symbol resolution features are still syntax-equivalent."
     ],
     "blindSpots": [
       {

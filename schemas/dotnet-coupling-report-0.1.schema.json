@@ -44,7 +44,10 @@
           "type": "string"
         },
         "mode": {
-          "const": "syntax-only"
+          "enum": [
+            "syntax-only",
+            "semantic-preview"
+          ]
         },
         "files": {
           "type": "integer",
@@ -130,7 +133,10 @@
       ],
       "properties": {
         "confidence": {
-          "const": "syntax-only"
+          "enum": [
+            "syntax-only",
+            "semantic-preview"
+          ]
         },
         "runNotes": {
           "type": "array",

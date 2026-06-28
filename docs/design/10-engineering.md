@@ -21,7 +21,7 @@ semantic mode は遅くなるため、将来的に以下のモードを分ける
 
 ```bash
 dotnet coupling --mode syntax ./src
-dotnet coupling --mode semantic ./MyApp.slnx
+dotnet coupling --mode semantic ./MyApp.sln
 ```
 
 ### 28.3 キャッシュ

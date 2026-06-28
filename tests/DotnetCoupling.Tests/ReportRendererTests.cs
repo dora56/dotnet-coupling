@@ -130,6 +130,45 @@ public sealed class ReportRendererTests
         Assert.Equal("Warning", diagnostic.GetProperty("severity").GetString());
     }
 
+    [Fact]
+    public void Render_SummaryOutput_IncludesModeLineForSemanticPreview()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample/App.csproj", "semantic-preview", 1, 1, 0, 0, false, false, 6),
+            new GradeResult("A", "Well-balanced", "issue-density", "Test"),
+            1.0,
+            [],
+            [],
+            [],
+            [],
+            []);
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Summary);
+
+        Assert.Contains("Mode: semantic-preview", rendered);
+    }
+
+    [Fact]
+    public void Render_JsonOutput_UsesSemanticPreviewRunNotesWhenModeIsSemanticPreview()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample/App.csproj", "semantic-preview", 1, 1, 0, 0, false, false, 6),
+            new GradeResult("A", "Well-balanced", "issue-density", "Test"),
+            1.0,
+            [],
+            [],
+            [],
+            [],
+            []);
+
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        JsonElement manifest = document.RootElement.GetProperty("manifest");
+        Assert.Equal("semantic-preview", manifest.GetProperty("confidence").GetString());
+        string[] runNotes = manifest.GetProperty("runNotes").EnumerateArray().Select(item => item.GetString()!).ToArray();
+        Assert.Contains("Semantic mode uses MSBuildWorkspace preview loading.", runNotes);
+    }
+
     private static JsonElement Parse(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);

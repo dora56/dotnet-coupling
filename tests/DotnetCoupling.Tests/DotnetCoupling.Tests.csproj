@@ -12,6 +12,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="FsCheck" Version="3.*" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="17.11.48">
+      <PrivateAssets>all</PrivateAssets>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.*" />
     <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" Version="0.13.3" />
     <PackageReference Include="xunit.v3" Version="3.*" />
