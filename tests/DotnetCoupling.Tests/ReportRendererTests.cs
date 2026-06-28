@@ -169,6 +169,23 @@ public sealed class ReportRendererTests
         Assert.Contains("Semantic mode uses MSBuildWorkspace preview loading.", runNotes);
     }
 
+    [Fact]
+    public void Render_SummaryOutput_SyntaxAndSemanticPreviewMatchGoldenDiff()
+    {
+        string projectPath = CreateSemanticDiffProjectFixture();
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        string syntaxActual = ReportRenderer.Render(syntaxReport, ReportFormat.Summary).TrimEnd();
+        string semanticActual = ReportRenderer.Render(semanticReport, ReportFormat.Summary).TrimEnd();
+        string syntaxExpected = File.ReadAllText(TestPaths.Golden("semantic-diff-syntax-summary.txt")).TrimEnd();
+        string semanticExpected = File.ReadAllText(TestPaths.Golden("semantic-diff-semantic-summary.txt")).TrimEnd();
+
+        Assert.Equal(syntaxExpected, syntaxActual);
+        Assert.Equal(semanticExpected, semanticActual);
+    }
+
     private static JsonElement Parse(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);
@@ -218,5 +235,49 @@ public sealed class ReportRendererTests
         {
             Assert.True(document.TryGetProperty(propertyName.GetString()!, out _), $"Missing required property '{propertyName.GetString()}'.");
         }
+    }
+
+    private static string CreateSemanticDiffProjectFixture()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "Sample.App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            Path.Combine(directory, "GlobalUsings.cs"),
+            """
+            global using InfraRepo = Sample.App.Infrastructure.Repository;
+            """);
+        File.WriteAllText(
+            Path.Combine(directory, "Handler.cs"),
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    _ = new InfraRepo();
+                }
+            }
+            """);
+        File.WriteAllText(
+            Path.Combine(directory, "Repository.cs"),
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """);
+
+        return Path.Combine(directory, "Sample.App.csproj");
     }
 }

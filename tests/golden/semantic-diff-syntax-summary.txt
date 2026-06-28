@@ -1,0 +1,4 @@
+Grade: B | Avg Score: 1.00 | Basis: issue-density
+Files: 3 | Types: 2 | Couplings: 0 internal / 0 external
+Issues: 0 Critical, 0 High, 0 Medium
+Git: disabled (--no-git)
