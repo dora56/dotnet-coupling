@@ -242,6 +242,77 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_InvalidCsprojInputInSyntaxMode_ContinuesAndReportsDiagnostic()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string projectPath = Path.Combine(root, "Sample.App.csproj");
+        File.WriteAllText(projectPath, "<Project><PropertyGroup>");
+        File.WriteAllText(
+            Path.Combine(root, "Handler.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+            }
+            """);
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(projectPath, useGit: false, gitMonths: 6);
+
+        Component component = Assert.Single(report.Components);
+        Assert.Equal("Handler", component.Name);
+        Assert.Null(component.ProjectName);
+        AnalysisDiagnostic diagnostic = Assert.Single(report.Diagnostics!);
+        Assert.Equal("invalid-project", diagnostic.Code);
+    }
+
+    [Fact]
+    public void Analyze_SlnInput_WithMissingListedProject_ContinuesAndReportsDiagnostic()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        string app = Path.Combine(root, "App");
+        Directory.CreateDirectory(app);
+        File.WriteAllText(
+            Path.Combine(root, "Sample.sln"),
+            """
+            Microsoft Visual Studio Solution File, Format Version 12.00
+            # Visual Studio Version 17
+            Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App", "App\App.csproj", "{11111111-1111-1111-1111-111111111111}"
+            EndProject
+            Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Missing", "Missing\Missing.csproj", "{22222222-2222-2222-2222-222222222222}"
+            EndProject
+            Global
+            EndGlobal
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "Handler.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+            }
+            """);
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(Path.Combine(root, "Sample.sln"), useGit: false, gitMonths: 6);
+
+        Component component = Assert.Single(report.Components);
+        Assert.Equal("App", component.ProjectName);
+        AnalysisDiagnostic diagnostic = Assert.Single(report.Diagnostics!);
+        Assert.Equal("missing-project", diagnostic.Code);
+    }
+
+    [Fact]
     public void Analyze_SemanticMode_SlnxInput_LoadsProjectsAndCouplings()
     {
         string root = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
@@ -1200,6 +1271,1446 @@ public sealed class CSharpDependencyAnalyzerTests
             && observation.TargetName == "Sample.App.Infrastructure.IRepository"
             && observation.Usage == UsageContext.InterfaceImplementation
             && observation.Kind == DependencyKind.InterfaceImplementation);
+    }
+
+    [Fact]
+    public void Analyze_TypeOfExpression_ReportsReflectionDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public System.Type Handle()
+                {
+                    return typeof(Repository);
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+    }
+
+    [Fact]
+    public void Analyze_NameOfExpression_ReportsReflectionDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public string Handle()
+                {
+                    return nameof(Repository.Save);
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+    }
+
+    [Fact]
+    public void Analyze_NameOfTypeExpression_ReportsReflectionDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public string Handle()
+                {
+                    return nameof(Repository);
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+    }
+
+    [Fact]
+    public void Analyze_ActivatorCreateInstanceGeneric_ReportsReflectionDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public object? Handle()
+                {
+                    return Activator.CreateInstance<Repository>();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+    }
+
+    [Fact]
+    public void Analyze_ActivatorCreateInstanceWithTypeOf_ReportsReflectionDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public object? Handle()
+                {
+                    return Activator.CreateInstance(typeof(Repository));
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.Reflection
+            && observation.Kind == DependencyKind.Reflection);
+    }
+
+    [Fact]
+    public void Analyze_ActivatorUtilitiesCreateInstanceGeneric_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public object Create(IServiceProvider provider)
+                {
+                    return ActivatorUtilities.CreateInstance<Repository>(provider);
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_ActivatorUtilitiesCreateInstanceWithTypeOf_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public object Create(IServiceProvider provider)
+                {
+                    return ActivatorUtilities.CreateInstance(provider, typeof(Repository));
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_GetRequiredKeyedServiceInvocation_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(IServiceProvider provider)
+                {
+                    _ = provider.GetRequiredKeyedService<Repository>("main");
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_ConditionalAccessGetRequiredKeyedServiceInvocation_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(IServiceProvider? provider)
+                {
+                    _ = provider?.GetRequiredKeyedService<Repository>("main");
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_GetKeyedServiceWithTypeOfInvocation_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(IServiceProvider provider)
+                {
+                    _ = provider.GetKeyedService(typeof(Repository), "main");
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_ConditionalAccessGetKeyedServiceWithTypeOfInvocation_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public object? Handle(IServiceProvider? provider)
+                {
+                    return provider?.GetKeyedService(typeof(Repository), "main");
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_GetKeyedServiceWithTypeVariable_DoesNotReportServiceLocatorDependencyWithoutConcreteSource()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public object? Handle(IServiceProvider provider, Type serviceType)
+                {
+                    return provider.GetKeyedService(serviceType, "main");
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.Usage == UsageContext.ServiceLocator
+            && observation.TargetName == "Repository");
+        Assert.DoesNotContain(semanticReport.Observations, observation =>
+            observation.Usage == UsageContext.ServiceLocator
+            && observation.TargetName == "Sample.App.Infrastructure.Repository");
+    }
+
+    [Fact]
+    public void Analyze_GetRequiredServiceInvocation_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(IServiceProvider provider)
+                {
+                    _ = provider.GetRequiredService<Repository>();
+                }
+            }
+            """),
+            ("ServiceProviderExtensions.cs",
+            """
+            using System;
+
+            namespace Sample.App.Infrastructure;
+
+            public static class ServiceProviderExtensions
+            {
+                public static T GetRequiredService<T>(this IServiceProvider provider)
+                    where T : class, new()
+                {
+                    return new T();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_ConditionalAccessGetRequiredServiceInvocation_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(IServiceProvider? provider)
+                {
+                    _ = provider?.GetRequiredService<Repository>();
+                }
+            }
+            """),
+            ("ServiceProviderExtensions.cs",
+            """
+            using System;
+
+            namespace Sample.App.Infrastructure;
+
+            public static class ServiceProviderExtensions
+            {
+                public static T? GetRequiredService<T>(this IServiceProvider provider)
+                    where T : class, new()
+                {
+                    return new T();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_GetServiceWithTypeOfInvocation_ReportsServiceLocatorDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(IServiceProvider provider)
+                {
+                    _ = provider.GetService(typeof(Repository));
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.ServiceLocator
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_GetServiceWithTypeVariable_DoesNotReportServiceLocatorDependencyWithoutConcreteSource()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using System;
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(IServiceProvider provider)
+                {
+                    Type repositoryType = typeof(Repository);
+                    _ = provider.GetService(repositoryType);
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.ServiceLocator);
+        Assert.DoesNotContain(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.ServiceLocator);
+    }
+
+    [Fact]
+    public void Analyze_ExplicitDynamicCastInvocation_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    ((dynamic)new Repository()).Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_ConditionalAccessExplicitDynamicCastInvocation_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    ((dynamic)new Repository())?.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_DynamicLocalInvocation_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    dynamic repository = new Repository();
+                    repository.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_ConditionalAccessDynamicLocalInvocation_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    dynamic repository = new Repository();
+                    repository?.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_DynamicLocalInitializedFromFactoryMethod_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    dynamic repository = CreateRepository();
+                    repository.Save();
+                }
+
+                private static Repository CreateRepository()
+                {
+                    return new Repository();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.DynamicDispatch);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_ConditionalAccessDynamicLocalInitializedFromFactoryMethod_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    dynamic repository = CreateRepository();
+                    repository?.Save();
+                }
+
+                private static Repository CreateRepository()
+                {
+                    return new Repository();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.DynamicDispatch);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_DynamicParameterInvocation_DoesNotReportDynamicDispatchWithoutConcreteSource()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(dynamic repository)
+                {
+                    repository.Save();
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.DynamicDispatch);
+        Assert.DoesNotContain(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.DynamicDispatch);
+    }
+
+    [Fact]
+    public void Analyze_ConditionalAccessDynamicParameterInvocation_DoesNotReportDynamicDispatchWithoutConcreteSource()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(dynamic repository)
+                {
+                    repository?.Save();
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.Usage == UsageContext.DynamicDispatch);
+        Assert.DoesNotContain(semanticReport.Observations, observation =>
+            observation.Usage == UsageContext.DynamicDispatch);
+    }
+
+    [Fact]
+    public void Analyze_DynamicFieldInvocation_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private dynamic _repository = new Repository();
+
+                public void Handle()
+                {
+                    _repository.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_ConditionalAccessDynamicFieldInvocation_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private readonly dynamic _repository = new Repository();
+
+                public void Handle()
+                {
+                    _repository?.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_DynamicFieldInitializedFromFactoryMethod_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private dynamic _repository = CreateRepository();
+
+                public void Handle()
+                {
+                    _repository.Save();
+                }
+
+                private static Repository CreateRepository()
+                {
+                    return new Repository();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.DynamicDispatch);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_ConditionalAccessDynamicFieldInitializedFromFactoryMethod_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private dynamic _repository = CreateRepository();
+
+                public void Handle()
+                {
+                    _repository?.Save();
+                }
+
+                private static Repository CreateRepository()
+                {
+                    return new Repository();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.DynamicDispatch);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_DynamicPropertyInvocation_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private dynamic Repository { get; } = new Repository();
+
+                public void Handle()
+                {
+                    Repository.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_ConditionalAccessDynamicPropertyInvocation_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private dynamic Repository { get; } = new Repository();
+
+                public void Handle()
+                {
+                    Repository?.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_DynamicPropertyInitializedFromFactoryMethod_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private dynamic Repository { get; } = CreateRepository();
+
+                public void Handle()
+                {
+                    Repository.Save();
+                }
+
+                private static Repository CreateRepository()
+                {
+                    return new Repository();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.DynamicDispatch);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_ConditionalAccessDynamicPropertyInitializedFromFactoryMethod_ReportsDynamicDispatchDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private dynamic Repository { get; } = CreateRepository();
+
+                public void Handle()
+                {
+                    Repository?.Save();
+                }
+
+                private static Repository CreateRepository()
+                {
+                    return new Repository();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.DynamicDispatch);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.DynamicDispatch
+            && observation.Kind == DependencyKind.Dynamic);
     }
 
     [Fact]
