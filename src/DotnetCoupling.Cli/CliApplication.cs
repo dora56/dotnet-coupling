@@ -111,7 +111,8 @@ public static class CliApplication
             try
             {
                 ConfigurationLoadResult configuration = ConfigurationLoader.Load(fullTargetPath, config);
-                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fullTargetPath, !noGit, gitMonths, configuration.Options);
+                IVolatilityProvider? volatilityProvider = noGit ? null : new GitVolatilityProvider();
+                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fullTargetPath, volatilityProvider, gitMonths, configuration.Options);
                 if (!string.IsNullOrWhiteSpace(baselineRef))
                 {
                     string? repositoryRoot = FindGitRepositoryRoot(fullTargetPath);
@@ -124,7 +125,7 @@ public static class CliApplication
                     using BaselineWorkspace baselineWorkspace = BaselineWorkspace.Create(repositoryRoot, fullTargetPath, baselineRef);
                     AnalysisReport baselineReport = CSharpDependencyAnalyzer.Analyze(
                         baselineWorkspace.TargetPath,
-                        useGit: false,
+                        volatilityProvider: null,
                         gitMonths,
                         configuration.Options);
                     report = BaselineComparer.WithBaseline(

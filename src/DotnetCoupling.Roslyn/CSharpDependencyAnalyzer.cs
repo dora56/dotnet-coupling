@@ -1,11 +1,25 @@
 using DotnetCoupling.Core;
-using DotnetCoupling.Git;
 
 namespace DotnetCoupling.Roslyn;
 
 public sealed class CSharpDependencyAnalyzer
 {
     public static AnalysisReport Analyze(string targetPath, bool useGit, int gitMonths, AnalysisOptions? options = null)
+    {
+        if (useGit)
+        {
+            throw new InvalidOperationException(
+                "Git-backed analysis requires an injected volatility provider. Use the overload that accepts IVolatilityProvider.");
+        }
+
+        return Analyze(targetPath, volatilityProvider: null, gitMonths, options);
+    }
+
+    public static AnalysisReport Analyze(
+        string targetPath,
+        IVolatilityProvider? volatilityProvider,
+        int gitMonths,
+        AnalysisOptions? options = null)
     {
         options ??= AnalysisOptions.Default;
         string fullPath = Path.GetFullPath(targetPath);
@@ -38,26 +52,16 @@ public sealed class CSharpDependencyAnalyzer
             .Where(namespaceName => !string.IsNullOrWhiteSpace(namespaceName))
             .ToHashSet(StringComparer.Ordinal);
         HashSet<string> analyzedFiles = projectFiles.Select(projectFile => projectFile.FilePath).ToHashSet(StringComparer.Ordinal);
+        VolatilityAnalysis volatilityAnalysis = volatilityProvider?.Analyze(fullPath, gitMonths, analyzedFiles, options)
+            ?? VolatilityAnalysis.Empty;
 
-        IReadOnlyDictionary<string, int> changeCounts = useGit
-            ? GitVolatility.GetChangeCounts(fullPath, gitMonths)
-            : new Dictionary<string, int>(StringComparer.Ordinal);
-        IReadOnlyList<TemporalCoupling> temporalCouplings = useGit
-            ? GitVolatility.GetTemporalCouplings(
-                fullPath,
-                gitMonths,
-                analyzedFiles,
-                options.Thresholds.MinTemporalCoupling,
-                options.Thresholds.MaxTemporalFilesPerCommit)
-            : [];
-
-        List<CouplingMetrics> couplings = CouplingResolver.Resolve(components, observations, changeCounts);
+        List<CouplingMetrics> couplings = CouplingResolver.Resolve(components, observations, volatilityAnalysis.ChangeCounts);
         ExternalCouplingDetector.AddExternalUsingCouplings(couplings, components, usingNamespacesByFile, internalNamespaces);
 
         List<BalanceScore> scores = couplings.Select(CouplingScoring.Calculate).ToList();
         int internalCouplingCount = couplings.Count(coupling => coupling.Distance != Distance.ExternalPackage);
         int externalCouplingCount = couplings.Count - internalCouplingCount;
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(scores, temporalCouplings, componentsById, options);
+        List<CouplingIssue> issues = IssueDetector.DetectIssues(scores, volatilityAnalysis.TemporalCouplings, componentsById, options);
         GradeResult grade = CouplingScoring.CalculateGrade(internalCouplingCount, issues);
         AnalysisSummary summary = new(
             fullPath,
@@ -66,8 +70,8 @@ public sealed class CSharpDependencyAnalyzer
             components.Count,
             internalCouplingCount,
             externalCouplingCount,
-            useGit,
-            useGit && changeCounts.Count > 0,
+            volatilityProvider is not null,
+            volatilityProvider is not null && volatilityAnalysis.ChangeCounts.Count > 0,
             gitMonths);
 
         return new AnalysisReport(
