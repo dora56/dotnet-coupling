@@ -31,4 +31,21 @@ public sealed class StructuralFitnessTests
         Assert.Contains(projectReferences, reference => reference.Contains("DotnetCoupling.Git", StringComparison.Ordinal));
         Assert.Contains(projectReferences, reference => reference.Contains("DotnetCoupling.Roslyn", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void RoslynProject_DoesNotDependOnGitProject()
+    {
+        string roslynProjectPath = Path.Combine(TestPaths.RepositoryRoot, "src", "DotnetCoupling.Roslyn", "DotnetCoupling.Roslyn.csproj");
+        XDocument document = XDocument.Load(roslynProjectPath);
+
+        string[] projectReferences = document
+            .Descendants()
+            .Where(element => element.Name.LocalName == "ProjectReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => value is not null)
+            .Select(value => value!)
+            .ToArray();
+
+        Assert.DoesNotContain(projectReferences, reference => reference.Contains("DotnetCoupling.Git", StringComparison.Ordinal));
+    }
 }

@@ -44,7 +44,10 @@
           "type": "string"
         },
         "mode": {
-          "const": "syntax-only"
+          "enum": [
+            "syntax-only",
+            "semantic-preview"
+          ]
         },
         "files": {
           "type": "integer",
@@ -121,6 +124,9 @@
         "$ref": "#/$defs/issue"
       }
     },
+    "projectModel": {
+      "$ref": "#/$defs/projectModel"
+    },
     "manifest": {
       "type": "object",
       "required": [
@@ -130,7 +136,10 @@
       ],
       "properties": {
         "confidence": {
-          "const": "syntax-only"
+          "enum": [
+            "syntax-only",
+            "semantic-preview"
+          ]
         },
         "runNotes": {
           "type": "array",
@@ -142,6 +151,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/blindSpot"
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
           }
         }
       },
@@ -284,6 +299,92 @@
         },
         "description": {
           "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "path"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "projectModel": {
+      "type": "object",
+      "required": [
+        "projectCount",
+        "projects"
+      ],
+      "properties": {
+        "projectCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/projectMetadataEntry"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "projectMetadataEntry": {
+      "type": "object",
+      "required": [
+        "projectPath",
+        "projectName",
+        "assemblyName",
+        "sourceFileCount",
+        "projectReferences",
+        "packageReferences"
+      ],
+      "properties": {
+        "projectPath": {
+          "type": "string"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "assemblyName": {
+          "type": "string"
+        },
+        "sourceFileCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projectReferences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "packageReferences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false

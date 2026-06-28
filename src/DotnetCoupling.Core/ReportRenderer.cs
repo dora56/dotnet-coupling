@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -7,10 +8,18 @@ namespace DotnetCoupling.Core;
 
 public static class ReportRenderer
 {
+    private static readonly string ToolVersion = typeof(ReportRenderer).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+        .InformationalVersion
+        .Split('+')[0]
+        ?? typeof(ReportRenderer).Assembly.GetName().Version?.ToString()
+        ?? "0.0.0";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
         Converters = { new JsonStringEnumConverter() },
     };
 
@@ -66,7 +75,12 @@ public static class ReportRenderer
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade: {report.Grade.Letter} | Avg Score: {report.AverageBalanceScore:0.00} | Basis: {report.Grade.Basis}");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Files: {report.Summary.Files} | Types: {report.Summary.Components} | Couplings: {report.Summary.InternalCouplings} internal / {report.Summary.ExternalCouplings} external");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Issues: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
+        if (!string.Equals(report.Summary.Mode, "syntax-only", StringComparison.Ordinal))
+        {
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Mode: {report.Summary.Mode}");
+        }
         builder.AppendLine(DescribeGit(report));
+        AppendDiagnosticsSummary(builder, report);
         AppendBaselineSummary(builder, report);
         if (report.Grade.Letter == "S")
         {
@@ -85,58 +99,65 @@ public static class ReportRenderer
         return json.Replace("\"schema\"", "\"$schema\"", StringComparison.Ordinal);
     }
 
-    private static object CreateJsonDocument(AnalysisReport report)
+    private static Dictionary<string, object?> CreateJsonDocument(AnalysisReport report)
     {
         IssueCounts counts = CountIssues(report);
-        return new
+        Dictionary<string, object?> document = new(StringComparer.Ordinal)
         {
-            Schema = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
-            SchemaVersion = "0.1",
-            Tool = "dotnet-coupling",
-            Version = "0.2.0-alpha.1",
-            Analysis = CreateAnalysisJson(report),
-            Grade = report.Grade,
-            Scores = new
+            ["Schema"] = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
+            ["SchemaVersion"] = "0.1",
+            ["Tool"] = "dotnet-coupling",
+            ["Version"] = ToolVersion,
+            ["Analysis"] = CreateAnalysisJson(report),
+            ["Grade"] = report.Grade,
+            ["Scores"] = new
             {
                 AverageBalanceScore = report.AverageBalanceScore,
             },
-            IssueCounts = new
+            ["IssueCounts"] = new
             {
                 counts.Critical,
                 counts.High,
                 counts.Medium,
                 counts.Low,
             },
-            Issues = report.Issues,
-            Manifest = CreateManifestJson(report),
+            ["Issues"] = report.Issues,
+            ["Manifest"] = CreateManifestJson(report),
         };
+
+        if (report.ProjectMetadata is not null)
+        {
+            document["ProjectModel"] = CreateProjectModelJson(report.ProjectMetadata);
+        }
+
+        return document;
     }
 
-    private static object CreateJsonDocumentWithBaseline(AnalysisReport report)
+    private static Dictionary<string, object?> CreateJsonDocumentWithBaseline(AnalysisReport report)
     {
         IssueCounts counts = CountIssues(report);
         BaselineComparison baseline = report.Baseline ?? throw new InvalidOperationException("Baseline comparison is required.");
-        return new
+        Dictionary<string, object?> document = new(StringComparer.Ordinal)
         {
-            Schema = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.2.schema.json",
-            SchemaVersion = "0.2",
-            Tool = "dotnet-coupling",
-            Version = "0.2.0-alpha.1",
-            Analysis = CreateAnalysisJson(report),
-            Grade = report.Grade,
-            Scores = new
+            ["Schema"] = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.2.schema.json",
+            ["SchemaVersion"] = "0.2",
+            ["Tool"] = "dotnet-coupling",
+            ["Version"] = ToolVersion,
+            ["Analysis"] = CreateAnalysisJson(report),
+            ["Grade"] = report.Grade,
+            ["Scores"] = new
             {
                 AverageBalanceScore = report.AverageBalanceScore,
             },
-            IssueCounts = new
+            ["IssueCounts"] = new
             {
                 counts.Critical,
                 counts.High,
                 counts.Medium,
                 counts.Low,
             },
-            Issues = report.Issues,
-            Baseline = new
+            ["Issues"] = report.Issues,
+            ["Baseline"] = new
             {
                 Ref = baseline.Ref,
                 New = CountIssues(baseline.NewIssues),
@@ -146,8 +167,15 @@ public static class ReportRenderer
                 ResolvedIssues = baseline.ResolvedIssues,
                 UnchangedIssues = baseline.UnchangedIssues,
             },
-            Manifest = CreateManifestJson(report),
+            ["Manifest"] = CreateManifestJson(report),
         };
+
+        if (report.ProjectMetadata is not null)
+        {
+            document["ProjectModel"] = CreateProjectModelJson(report.ProjectMetadata);
+        }
+
+        return document;
     }
 
     private static object CreateAnalysisJson(AnalysisReport report)
@@ -181,13 +209,13 @@ public static class ReportRenderer
             : "Git: unavailable or no matching history";
     }
 
-    private static object CreateManifestJson(AnalysisReport report)
+    private static Dictionary<string, object?> CreateManifestJson(AnalysisReport report)
     {
-        return new
+        Dictionary<string, object?> manifest = new(StringComparer.Ordinal)
         {
-            Confidence = "syntax-only",
-            RunNotes = new[] { "Semantic symbol resolution is not enabled." },
-            BlindSpots = report.BlindSpots.Select(blindSpot =>
+            ["confidence"] = report.Summary.Mode,
+            ["runNotes"] = CreateRunNotes(report),
+            ["blindSpots"] = report.BlindSpots.Select(blindSpot =>
             {
                 string kind = blindSpot.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Unknown";
                 return new
@@ -197,6 +225,54 @@ public static class ReportRenderer
                 };
             }),
         };
+
+        if (report.Diagnostics is { Count: > 0 })
+        {
+            manifest["diagnostics"] = report.Diagnostics;
+        }
+
+        return manifest;
+    }
+
+    private static object CreateProjectModelJson(ProjectMetadata projectMetadata)
+    {
+        return new
+        {
+            projectMetadata.ProjectCount,
+            Projects = projectMetadata.Projects.Select(project => new
+            {
+                project.ProjectPath,
+                project.ProjectName,
+                project.AssemblyName,
+                project.SourceFileCount,
+                project.ProjectReferences,
+                project.PackageReferences,
+            }),
+        };
+    }
+
+    private static IReadOnlyList<string> CreateRunNotes(AnalysisReport report)
+    {
+        if (string.Equals(report.Summary.Mode, "semantic-preview", StringComparison.Ordinal))
+        {
+            return
+            [
+                "Semantic mode uses MSBuildWorkspace preview loading.",
+                "Semantic preview resolves many symbol-aware dependencies, but some flows remain syntax-equivalent.",
+            ];
+        }
+
+        return ["Semantic symbol resolution is not enabled."];
+    }
+
+    private static void AppendDiagnosticsSummary(StringBuilder builder, AnalysisReport report)
+    {
+        if (report.Diagnostics is not { Count: > 0 })
+        {
+            return;
+        }
+
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Diagnostics: {report.Diagnostics.Count} recoverable warning(s)");
     }
 
     private static void AppendBaselineText(StringBuilder builder, AnalysisReport report)

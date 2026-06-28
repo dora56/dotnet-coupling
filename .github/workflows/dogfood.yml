@@ -42,11 +42,17 @@ jobs:
       - name: Pack
         run: dotnet pack src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj --configuration Release --no-build
 
+      - name: Read package version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n 1)"
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+
       - name: Install local tool
         run: |
           TOOL_PATH="$(mktemp -d)"
           echo "TOOL_PATH=$TOOL_PATH" >> "$GITHUB_ENV"
-          dotnet tool install dotnet-coupling --tool-path "$TOOL_PATH" --add-source src/DotnetCoupling.Cli/nupkg --version 0.2.0-alpha.1
+          dotnet tool install dotnet-coupling --tool-path "$TOOL_PATH" --add-source src/DotnetCoupling.Cli/nupkg --version "$PACKAGE_VERSION"
 
       - name: Dogfood summary
         run: |
@@ -60,6 +66,14 @@ jobs:
         run: |
           "$TOOL_PATH/dotnet-coupling" --json --no-git ./src > dogfood-report.json
 
+      - name: Dogfood syntax vs semantic compare
+        run: |
+          mkdir -p dogfood-compare
+          scripts/generate-semantic-compare-report.sh \
+            "$TOOL_PATH/dotnet-coupling" \
+            ./dotnet-coupling.slnx \
+            dogfood-compare
+
       - name: Upload dogfood reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -69,5 +83,6 @@ jobs:
             dogfood-summary.txt
             dogfood-no-git-summary.txt
             dogfood-report.json
+            dogfood-compare/**
           if-no-files-found: error
           retention-days: 14

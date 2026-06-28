@@ -150,10 +150,13 @@ jobs:
   mutation:
     runs-on: ubuntu-slim
     needs: build
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -176,8 +179,18 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
+      - name: Determine mutation scope
+        id: mutation-scope
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "args=--since:${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Mutation test
-        run: dotnet tool run dotnet-stryker -- --config-file stryker-config.json
+        run: dotnet tool run dotnet-stryker -- --config-file stryker-config.json ${{ steps.mutation-scope.outputs.args }}
 
       - name: Upload mutation report
         if: always()
@@ -187,3 +200,53 @@ jobs:
           path: StrykerOutput/**
           if-no-files-found: error
           retention-days: 14
+
+  self-benchmark:
+    runs-on: ubuntu-slim
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Cache .NET dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/toolResolverCache
+          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            dotnet-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore dotnet-coupling.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build dotnet-coupling.slnx --configuration Release --no-restore
+
+      - name: Pack
+        run: dotnet pack src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj --configuration Release --no-build
+
+      - name: Read package version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -n 1)"
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+
+      - name: Install local tool
+        run: |
+          TOOL_PATH="$(mktemp -d)"
+          echo "TOOL_PATH=$TOOL_PATH" >> "$GITHUB_ENV"
+          dotnet tool install dotnet-coupling --tool-path "$TOOL_PATH" --add-source src/DotnetCoupling.Cli/nupkg --version "$PACKAGE_VERSION"
+
+      - name: Self-benchmark
+        run: |
+          "$TOOL_PATH/dotnet-coupling" --check --min-grade A --no-git ./src

@@ -73,11 +73,16 @@ internal static class CouplingResolver
             return IntegrationStrength.Contract;
         }
 
+        if (observation.Usage == UsageContext.FieldAccess && target.Kind == ComponentKind.Enum)
+        {
+            return IntegrationStrength.Model;
+        }
+
         return observation.Usage switch
         {
             UsageContext.BaseType or UsageContext.InterfaceImplementation or UsageContext.GenericConstraint => IntegrationStrength.Contract,
             UsageContext.ObjectCreation or UsageContext.MethodCall or UsageContext.StaticCall => IntegrationStrength.Functional,
-            UsageContext.FieldAccess or UsageContext.Reflection or UsageContext.DynamicDispatch => IntegrationStrength.Intrusive,
+            UsageContext.FieldAccess or UsageContext.Reflection or UsageContext.DynamicDispatch or UsageContext.ServiceLocator => IntegrationStrength.Intrusive,
             _ => IntegrationStrength.Model,
         };
     }
