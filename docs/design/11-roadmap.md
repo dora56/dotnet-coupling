@@ -172,10 +172,13 @@ Current verified semantic precision in v0.3 includes:
 - extension method resolution, including alias-qualified call sites
 - generic-return chained invocation
 - inferred local variable type resolution
+- generic constraint resolution
+- semantic distinction between class inheritance and interface implementation
 
 Remaining `symbol resolution` work is narrower than the original Phase 3b wording:
-more indirect symbol flow, broader semantic/non-semantic diff characterization,
-and confidence/perf trade-offs on larger real-world repositories.
+more indirect symbol flow, currently unmodeled shapes such as reflection/dynamic
+resolution, broader semantic/non-semantic diff characterization, and
+confidence/perf trade-offs on larger real-world repositories.
 
 #### Phase 3c: Stability Gate
 
