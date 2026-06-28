@@ -77,3 +77,8 @@ Artifacts:
 The script records both timing and failure evidence. A semantic run that cannot
 load its workspace is still useful data; keep the generated failure excerpt and
 environment notes instead of discarding the run.
+
+When the semantic run fails specifically because the workspace could not be
+loaded, the report classifies it as `LOAD_BLOCKED(exit=4)` instead of a generic
+failure so it is easier to separate environment/setup problems from measured
+semantic performance.

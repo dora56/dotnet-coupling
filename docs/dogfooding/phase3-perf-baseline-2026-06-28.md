@@ -102,3 +102,7 @@ target now fails with a **stable single-line semantic workspace error** instead
 of an `Unexpected analysis error` banner followed by a stack trace. The
 loadability problem remains, but the failure mode is now fit for CI logs and
 perf artifacts.
+
+The perf baseline script now also classifies this state explicitly as
+`LOAD_BLOCKED(exit=4)`, which makes the difference between `measured semantic
+run` and `semantic workspace precondition failure` visible in a single table.

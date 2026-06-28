@@ -62,10 +62,17 @@ extract_wall_time() {
 }
 
 classify_result() {
-  local exit_code="$1"
+  local mode="$1"
+  local exit_code="$2"
+  local stderr_path="$3"
 
   if [[ "$exit_code" == "0" ]]; then
     echo "PASS"
+    return
+  fi
+
+  if [[ "$mode" == "semantic" ]] && grep -q "Semantic workspace could not be loaded" "$stderr_path"; then
+    echo "LOAD_BLOCKED(exit=$exit_code)"
     return
   fi
 
@@ -75,8 +82,8 @@ classify_result() {
 syntax_exit_code="$(run_mode syntax "$syntax_summary_path" "$syntax_stderr_path" "$syntax_time_path")"
 semantic_exit_code="$(run_mode semantic "$semantic_summary_path" "$semantic_stderr_path" "$semantic_time_path")"
 
-syntax_result="$(classify_result "$syntax_exit_code")"
-semantic_result="$(classify_result "$semantic_exit_code")"
+syntax_result="$(classify_result syntax "$syntax_exit_code" "$syntax_stderr_path")"
+semantic_result="$(classify_result semantic "$semantic_exit_code" "$semantic_stderr_path")"
 syntax_wall_time="$(extract_wall_time "$syntax_time_path")"
 semantic_wall_time="$(extract_wall_time "$semantic_time_path")"
 
