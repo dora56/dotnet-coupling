@@ -10,8 +10,50 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-slim
+    outputs:
+      docs_only: ${{ steps.changed-files.outputs.docs_only }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs-only changes
+        id: changed-files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch --no-tags --prune --depth=1 origin "${{ github.base_ref }}"
+            changed_files="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+          else
+            changed_files="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")"
+          fi
+
+          if [[ -z "$changed_files" ]]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          non_docs_files="$(
+            printf '%s\n' "$changed_files" |
+              grep -Ev '^(docs/|\.agents/|README\.md|AGENTS\.md|LICENSE$|[^/]+\.md$)' || true
+          )"
+
+          if [[ -z "$non_docs_files" ]]; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     runs-on: ubuntu-slim
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
 
     steps:
       - name: Checkout
