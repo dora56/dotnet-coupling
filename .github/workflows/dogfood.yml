@@ -60,6 +60,14 @@ jobs:
         run: |
           "$TOOL_PATH/dotnet-coupling" --json --no-git ./src > dogfood-report.json
 
+      - name: Dogfood syntax vs semantic compare
+        run: |
+          mkdir -p dogfood-compare
+          scripts/generate-semantic-compare-report.sh \
+            "$TOOL_PATH/dotnet-coupling" \
+            ./dotnet-coupling.slnx \
+            dogfood-compare
+
       - name: Upload dogfood reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,5 +77,6 @@ jobs:
             dogfood-summary.txt
             dogfood-no-git-summary.txt
             dogfood-report.json
+            dogfood-compare/**
           if-no-files-found: error
           retention-days: 14

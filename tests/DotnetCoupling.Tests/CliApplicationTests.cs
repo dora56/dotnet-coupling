@@ -131,7 +131,7 @@ public sealed class CliApplicationTests
         CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
 
         Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Semantic mode requires a .csproj or .sln input", result.Error);
+        Assert.Contains("Semantic mode requires a .csproj, .sln, or .slnx input", result.Error);
     }
 
     [Fact]

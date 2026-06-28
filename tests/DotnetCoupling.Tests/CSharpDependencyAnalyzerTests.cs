@@ -242,6 +242,73 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_SemanticMode_SlnxInput_LoadsProjectsAndCouplings()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        string app = Path.Combine(root, "App");
+        string domain = Path.Combine(root, "Domain");
+        Directory.CreateDirectory(app);
+        Directory.CreateDirectory(domain);
+        File.WriteAllText(
+            Path.Combine(root, "Sample.slnx"),
+            """
+            <Solution>
+              <Project Path="App/App.csproj" />
+              <Project Path="Domain/Domain.csproj" />
+            </Solution>
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="../Domain/Domain.csproj" />
+              </ItemGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            Path.Combine(domain, "Domain.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "Handler.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+                public Entity Entity { get; } = new();
+            }
+            """);
+        File.WriteAllText(
+            Path.Combine(domain, "Entity.cs"),
+            """
+            namespace Sample.Domain;
+
+            public sealed class Entity
+            {
+            }
+            """);
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(Path.Combine(root, "Sample.slnx"), AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Equal("semantic-preview", report.Summary.Mode);
+        Assert.Equal(2, report.Components.Count);
+        Assert.Contains(report.Couplings, coupling =>
+            coupling.Source == "Sample.App.Handler"
+            && coupling.Target == "Sample.Domain.Entity"
+            && coupling.Distance == Distance.DifferentProject);
+    }
+
+    [Fact]
     public void Analyze_ExternalUsingAcrossManyComponents_ReportsScatteredExternalCoupling()
     {
         string directory = CreateFixture(
