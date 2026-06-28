@@ -96,7 +96,7 @@ Release readiness:
 Dogfooding:
 
 - [x] `dotnet-coupling` 自身のリポジトリに対する dogfooding を定例化
-- [ ] 2-3 個の小規模 OSS / サンプルプロジェクトで dogfooding
+- [x] 2-3 個の小規模 OSS / サンプルプロジェクトで dogfooding
 - [ ] false positive / false negative を issue 化
 - [x] `--no-git` / Git なし環境の出力改善
 - [ ] System / Microsoft / internal namespace 除外ルールの実例検証
