@@ -171,6 +171,7 @@ Current verified semantic precision in v0.3 includes:
 - instance property / field access followed by invocation
 - extension method resolution, including alias-qualified call sites
 - generic-return chained invocation
+- inferred local variable type resolution
 
 Remaining `symbol resolution` work is narrower than the original Phase 3b wording:
 more indirect symbol flow, broader semantic/non-semantic diff characterization,
@@ -187,6 +188,14 @@ Goal: semantic 精度だけでなく、既存ユーザーが使う CLI / JSON �
 - [x] Grade / issue 差分レポートを記録
 - [x] JSON / CLI 後方互換テスト
 - [ ] 大規模 repo の perf baseline
+
+Current Phase 3c status:
+
+- syntax perf on a large SDK-style target has been measured
+- semantic large-target runs are now classified as `LOAD_BLOCKED(exit=4)` when
+  workspace prerequisites are unsatisfied
+- remaining work is a representative large-target semantic **measured** baseline,
+  not artifact collection or failure-message stabilization
 
 ### Phase 4: CI / team use
 
