@@ -180,6 +180,7 @@ public sealed class ReportRendererTests
         Assert.Equal("semantic-preview", manifest.GetProperty("confidence").GetString());
         string[] runNotes = manifest.GetProperty("runNotes").EnumerateArray().Select(item => item.GetString()!).ToArray();
         Assert.Contains("Semantic mode uses MSBuildWorkspace preview loading.", runNotes);
+        Assert.Contains("Semantic preview resolves many symbol-aware dependencies, but some flows remain syntax-equivalent.", runNotes);
     }
 
     [Fact]

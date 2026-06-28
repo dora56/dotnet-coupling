@@ -943,6 +943,51 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_SemanticMode_TreatsEnumMemberAccessAsModelCoupling()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public Status Handle()
+                {
+                    return Status.Ready;
+                }
+            }
+            """),
+            ("Status.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public enum Status
+            {
+                Ready,
+            }
+            """));
+
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Status"
+            && observation.Usage == UsageContext.FieldAccess
+            && observation.Kind == DependencyKind.FieldAccess);
+        Assert.Contains(semanticReport.Couplings, coupling =>
+            coupling.Source == "Sample.App.Api.Handler"
+            && coupling.Target == "Sample.App.Infrastructure.Status"
+            && coupling.Strength == IntegrationStrength.Model);
+        Assert.DoesNotContain(semanticReport.Issues, issue =>
+            issue.Source == "Sample.App.Api.Handler"
+            && issue.Target == "Sample.App.Infrastructure.Status"
+            && issue.Type == IssueType.InappropriateIntimacy);
+    }
+
+    [Fact]
     public void Analyze_SemanticMode_ResolvesExtensionMethodInvocationToExtensionType()
     {
         string projectPath = CreateProjectFixture(

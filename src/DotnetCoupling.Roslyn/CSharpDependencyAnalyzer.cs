@@ -160,7 +160,7 @@ public sealed class CSharpDependencyAnalyzer
         {
             return
             [
-                "Full semantic symbol resolution is not enabled yet.",
+                "Semantic preview resolves many symbol-aware dependencies, but some flows remain unresolved.",
                 "DI container runtime resolution is not analyzed.",
                 "Reflection and dynamic calls may be incomplete.",
                 "Generated code is excluded by default.",

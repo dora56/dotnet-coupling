@@ -8,7 +8,7 @@ Semantic Versioning を採用する。
 |---|---|
 | `0.1.0-alpha.1` | syntax-only MVP |
 | `0.2.0-alpha.1` | public alpha feedback / config / baseline |
-| `0.3.0-alpha.1` | project model / semantic mode foundation |
+| `0.3.0` | project model / semantic mode foundation |
 | `0.4.0` | SARIF / team CI integration / hotspots |
 | `0.5.0` | AI output / impact / trace |
 | `0.6.0` | complexity-assisted risk prioritization |
@@ -167,7 +167,7 @@ Goal: project model の上で symbol resolution を追加し、syntax-only の�
 減らす。既定動作は変えず、明示 semantic mode として導入する。
 
 - [x] `MSBuildWorkspace` 導入
-- [ ] symbol resolution
+- [x] symbol resolution
 - [x] semantic mode で partial / symbol identity が安定することを確認
 - [x] alias / global using 解決
 - [x] attribute / invocation / member access の精度向上
@@ -211,11 +211,16 @@ Current verified semantic precision in v0.3 includes:
   type do not fabricate target dependencies, including conditional-access
   invocation shapes
 
-Remaining `symbol resolution` work is narrower than the original Phase 3b wording:
-more indirect symbol flow, broader reflection / service locator / dynamic shape
-coverage such as runtime container APIs and unconstrained dynamic receivers,
-broader semantic/non-semantic diff characterization, and confidence/perf
-trade-offs on larger real-world repositories.
+Phase 3b closes when semantic mode can resolve a meaningful set of symbol-aware
+dependencies without changing the default syntax contract. Additional semantic
+precision work remains valuable, but it is now follow-on scope:
+
+- more indirect symbol flow
+- broader reflection / service locator / dynamic shape coverage such as runtime
+  container APIs and unconstrained dynamic receivers
+- broader semantic/non-semantic diff characterization on larger real-world
+  repositories
+- deeper confidence/perf trade-off tuning
 
 #### Phase 3c: Stability Gate
 
@@ -235,8 +240,20 @@ Current Phase 3c status:
 - semantic large-target runs are now classified as `LOAD_BLOCKED(exit=4)` when
   workspace prerequisites are unsatisfied
 - semantic measured baseline has been captured on a larger OSS solution target
-- remaining work is compatibility/loadability characterization, not baseline
-  instrumentation
+- semantic-only dynamic-dispatch deltas are now characterized across
+  analyzer / renderer JSON / CLI summary / CLI JSON using a small synthetic
+  compare target
+- self compare has been rerun after the latest semantic coverage additions and
+  the remaining delta is now explainable after eliminating enum-member
+  false-positive inflation
+- OSS compare artifacts classify semantic diagnostics as expected workspace
+  prerequisites versus genuine regressions
+- semantic compare artifacts now surface compact metric and diagnostic diffs so
+  large coupling-count increases are explained without changing the supported
+  CLI summary / JSON contract
+- self / OSS / synthetic compare evidence together explain both "no headline
+  delta" and "intentional semantic-only delta" cases, which is the required
+  stability gate for closing Phase 3
 
 ### Phase 4: CI / team use
 

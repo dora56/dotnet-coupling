@@ -46,7 +46,7 @@ jobs:
         run: |
           TOOL_PATH="$(mktemp -d)"
           echo "TOOL_PATH=$TOOL_PATH" >> "$GITHUB_ENV"
-          dotnet tool install dotnet-coupling --tool-path "$TOOL_PATH" --add-source src/DotnetCoupling.Cli/nupkg --version 0.2.0-alpha.1
+          dotnet tool install dotnet-coupling --tool-path "$TOOL_PATH" --add-source src/DotnetCoupling.Cli/nupkg --version 0.3.0
 
       - name: Dogfood summary
         run: |

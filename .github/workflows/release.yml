@@ -69,7 +69,7 @@ jobs:
       - name: Local tool install smoke
         run: |
           tool_path="$(mktemp -d)"
-          dotnet tool install dotnet-coupling --tool-path "$tool_path" --add-source src/DotnetCoupling.Cli/nupkg --version 0.2.0-alpha.1
+          dotnet tool install dotnet-coupling --tool-path "$tool_path" --add-source src/DotnetCoupling.Cli/nupkg --version 0.3.0
           "$tool_path/dotnet-coupling" --summary --no-git ./src
 
       - name: Upload package artifact
@@ -94,7 +94,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
-          body_path: docs/release-notes-0.2.0-alpha.1.md
+          body_path: docs/release-notes/release-notes-0.3.0.md
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: src/DotnetCoupling.Cli/nupkg/*.nupkg

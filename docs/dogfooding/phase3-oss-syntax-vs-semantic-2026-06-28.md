@@ -17,9 +17,9 @@ Observed pattern:
   recoverable diagnostics が `semantic-preview` に 6 件出た
 
 これは、現時点の `semantic-preview` が **headline result を壊さずに symbol-aware な
-coupling expansion を始められている** 一方で、Phase 3c の gate としては
-`coupling count increase の説明責務` と `workspace diagnostics の扱い` を
-もう少し整える必要があることを示している。
+coupling expansion を始められている** こと、そして Phase 3c で必要だった
+`coupling count increase の説明責務` と `workspace diagnostics の扱い` が
+compare artifact 側で整理対象であることを示している。
 
 ## Environment
 
@@ -83,23 +83,29 @@ Observed effect:
 - headline grade / issue counts remained stable
 - file count dropped from `69` to `68` under semantic preview
 
-This validates the recoverable-diagnostic path, but it also means Phase 3c
-should treat diagnostics as first-class compare output rather than incidental
-noise.
+This validates the recoverable-diagnostic path. For Phase 3c, these diagnostics
+are now classified as **expected environment prerequisites**, not product
+regressions:
+
+- missing .NET Framework targeting packs are workspace-environment prerequisites
+- resulting unresolved metadata reference warnings are downstream loadability
+  evidence, not analyzer correctness failures
+
+They should remain visible in compare artifacts, but they do not block Phase 3
+completion unless the same repository starts failing without the prerequisite
+gap.
 
 ## Implications for Phase 3c
 
-Completed by this run:
+Completed by this run and follow-up hardening:
 
 - compare `syntax` and `semantic-preview` on 3 Phase 2 OSS targets
 - record grade / issue deltas
-
-Still suggested before closing Phase 3:
-
-1. surface semantic diagnostics more prominently in compare artifacts
-2. decide whether large coupling-count increases need a dedicated explanation in
-   summary / JSON metadata
-3. add a perf note while running semantic compare on larger repositories
+- classify semantic diagnostics into expected workspace prerequisites versus
+  genuine regressions
+- keep large coupling-count increases explained in compare artifact metadata
+  instead of changing the supported CLI summary / JSON contract
+- pair OSS compare with the separate perf baseline note for larger repositories
 
 ## Artifact Locations
 

@@ -18,6 +18,14 @@ local tool, installs it from the generated package, and uploads:
 
 The compare artifact runs against `dotnet-coupling.slnx` so that `syntax` and
 `semantic-preview` can be inspected side by side on the same self-dogfood target.
+The generated markdown should capture both headline differences and a compact
+metric/diagnostic diff so that semantic-only workspace warnings are visible as
+compare evidence rather than hidden in stderr.
+
+For Phase 3 semantic characterization, keep one small synthetic compare target
+as well. Real repositories are useful for stability and compatibility checks,
+but a tiny synthetic target is better for explaining an intentional semantic
+delta when the large targets happen to show no headline result change.
 
 ## External Sample Dogfood
 

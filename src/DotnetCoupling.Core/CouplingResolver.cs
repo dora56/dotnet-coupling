@@ -73,6 +73,11 @@ internal static class CouplingResolver
             return IntegrationStrength.Contract;
         }
 
+        if (observation.Usage == UsageContext.FieldAccess && target.Kind == ComponentKind.Enum)
+        {
+            return IntegrationStrength.Model;
+        }
+
         return observation.Usage switch
         {
             UsageContext.BaseType or UsageContext.InterfaceImplementation or UsageContext.GenericConstraint => IntegrationStrength.Contract,

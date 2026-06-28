@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -7,6 +8,13 @@ namespace DotnetCoupling.Core;
 
 public static class ReportRenderer
 {
+    private static readonly string ToolVersion = typeof(ReportRenderer).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+        .InformationalVersion
+        .Split('+')[0]
+        ?? typeof(ReportRenderer).Assembly.GetName().Version?.ToString()
+        ?? "0.0.0";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -99,7 +107,7 @@ public static class ReportRenderer
             ["Schema"] = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
             ["SchemaVersion"] = "0.1",
             ["Tool"] = "dotnet-coupling",
-            ["Version"] = "0.2.0-alpha.1",
+            ["Version"] = ToolVersion,
             ["Analysis"] = CreateAnalysisJson(report),
             ["Grade"] = report.Grade,
             ["Scores"] = new
@@ -134,7 +142,7 @@ public static class ReportRenderer
             ["Schema"] = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.2.schema.json",
             ["SchemaVersion"] = "0.2",
             ["Tool"] = "dotnet-coupling",
-            ["Version"] = "0.2.0-alpha.1",
+            ["Version"] = ToolVersion,
             ["Analysis"] = CreateAnalysisJson(report),
             ["Grade"] = report.Grade,
             ["Scores"] = new
@@ -250,7 +258,7 @@ public static class ReportRenderer
             return
             [
                 "Semantic mode uses MSBuildWorkspace preview loading.",
-                "Some symbol resolution features are still syntax-equivalent.",
+                "Semantic preview resolves many symbol-aware dependencies, but some flows remain syntax-equivalent.",
             ];
         }
 

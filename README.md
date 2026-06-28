@@ -8,7 +8,10 @@ Experimental coupling balance analyzer for C#/.NET projects.
 - distance
 - volatility from Git history
 
-The MVP is intentionally syntax-only. It does not use semantic symbol resolution, MSBuild workspace loading, or DI container runtime analysis yet.
+By default, `dotnet-coupling` runs in `syntax` mode for broad compatibility.
+Phase 3 also adds an opt-in `semantic` preview for `.csproj`, `.sln`, and
+`.slnx` inputs so project boundaries and symbol-aware dependencies can be
+inspected without changing the default contract.
 
 ## Install
 
@@ -26,6 +29,7 @@ dotnet-coupling --check --min-grade B ./src
 dotnet-coupling --no-git ./src
 dotnet-coupling --config .coupling.json ./src
 dotnet-coupling --check --baseline main --fail-on High ./src
+dotnet-coupling --mode semantic --summary ./sample.sln
 ```
 
 ## Output
@@ -38,7 +42,8 @@ JSON output includes:
 - analysis metadata
 - issue-density grade
 - issue counts and issue details
-- syntax-only manifest and blind spots
+- manifest run notes and blind spots
+- optional project-model metadata for project / assembly / package boundaries
 
 The schema files live under `schemas/`.
 
@@ -74,9 +79,11 @@ CI enforces the mutation threshold through `stryker-config.json`; coverage is
 collected without a threshold.
 CI uploads `coverage-report` and `mutation-report` artifacts for inspection.
 
-## MVP Blind Spots
+## Current Blind Spots
 
-- Semantic symbol resolution is not enabled.
+- `syntax` mode does not use semantic symbol resolution.
+- `semantic-preview` resolves many symbol-aware dependencies, but some flows are
+  still syntax-equivalent or unresolved.
 - Runtime DI container dependencies are not analyzed.
 - Reflection and `dynamic` calls may be incomplete.
 - Generated code is excluded by default.
