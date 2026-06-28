@@ -1126,6 +1126,45 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_GenericConstraint_ReportsConstraintDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler<TRepository>
+                where TRepository : IRepository
+            {
+            }
+            """),
+            ("IRepository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public interface IRepository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler`1"
+            && observation.TargetName == "IRepository"
+            && observation.Usage == UsageContext.GenericConstraint
+            && observation.Kind == DependencyKind.GenericConstraint);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler`1"
+            && observation.TargetName == "Sample.App.Infrastructure.IRepository"
+            && observation.Usage == UsageContext.GenericConstraint
+            && observation.Kind == DependencyKind.GenericConstraint);
+    }
+
+    [Fact]
     public void Analyze_PartialTypeAcrossFiles_MergesLogicalComponent()
     {
         string directory = CreateFixture(

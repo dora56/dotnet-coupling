@@ -124,6 +124,16 @@ internal static class CSharpSyntaxDependencyCollector
             base.VisitBaseList(node);
         }
 
+        public override void VisitTypeParameterConstraintClause(TypeParameterConstraintClauseSyntax node)
+        {
+            foreach (TypeConstraintSyntax constraint in node.Constraints.OfType<TypeConstraintSyntax>())
+            {
+                AddObservation(constraint.Type, DependencyKind.GenericConstraint, UsageContext.GenericConstraint);
+            }
+
+            base.VisitTypeParameterConstraintClause(node);
+        }
+
         public override void VisitFieldDeclaration(FieldDeclarationSyntax node)
         {
             AddObservation(node.Declaration.Type, DependencyKind.TypeReference, UsageContext.FieldType);
