@@ -1,5 +1,6 @@
 using DotnetCoupling.Core;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -168,6 +169,24 @@ internal static class CSharpSyntaxDependencyCollector
             base.VisitObjectCreationExpression(node);
         }
 
+        public override void VisitAttribute(AttributeSyntax node)
+        {
+            AddAttributeObservation(node);
+            base.VisitAttribute(node);
+        }
+
+        public override void VisitInvocationExpression(InvocationExpressionSyntax node)
+        {
+            AddInvocationObservation(node);
+            base.VisitInvocationExpression(node);
+        }
+
+        public override void VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
+        {
+            AddMemberAccessObservation(node);
+            base.VisitMemberAccessExpression(node);
+        }
+
         private void VisitTypeDeclaration(TypeDeclarationSyntax node, ComponentKind kind, Action visitChildren)
         {
             Component component = CreateComponent(
@@ -210,6 +229,127 @@ internal static class CSharpSyntaxDependencyCollector
                 filePath,
                 span.StartLinePosition.Line + 1,
                 type.ToString()));
+        }
+
+        private void AddInvocationObservation(InvocationExpressionSyntax node)
+        {
+            if (!_componentStack.TryPeek(out Component? source) || semanticModel is null)
+            {
+                return;
+            }
+
+            IMethodSymbol? methodSymbol = (semanticModel.GetOperation(node) as IInvocationOperation)?.TargetMethod;
+            if (methodSymbol is null)
+            {
+                SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(node.Expression);
+                ISymbol? symbol = symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
+                methodSymbol = symbol as IMethodSymbol;
+                if (methodSymbol is null)
+                {
+                    return;
+                }
+            }
+
+            string? targetName = TryCreateSymbolIdentity(methodSymbol.ContainingType);
+            if (string.IsNullOrWhiteSpace(targetName))
+            {
+                return;
+            }
+
+            FileLinePositionSpan span = tree.GetLineSpan(node.Expression.Span);
+            Observations.Add(new DependencyObservation(
+                source.Id,
+                targetName,
+                methodSymbol.IsStatic ? DependencyKind.StaticCall : DependencyKind.MethodCall,
+                methodSymbol.IsStatic ? UsageContext.StaticCall : UsageContext.MethodCall,
+                filePath,
+                span.StartLinePosition.Line + 1,
+                node.Expression.ToString()));
+        }
+
+        private void AddAttributeObservation(AttributeSyntax node)
+        {
+            if (!_componentStack.TryPeek(out Component? source) || semanticModel is null)
+            {
+                return;
+            }
+
+            ISymbol? symbol = semanticModel.GetSymbolInfo(node).Symbol;
+            IMethodSymbol? methodSymbol = symbol as IMethodSymbol;
+            string? targetName = methodSymbol?.ContainingType is null
+                ? null
+                : TryCreateSymbolIdentity(methodSymbol.ContainingType);
+            if (string.IsNullOrWhiteSpace(targetName))
+            {
+                return;
+            }
+
+            FileLinePositionSpan span = tree.GetLineSpan(node.Span);
+            Observations.Add(new DependencyObservation(
+                source.Id,
+                targetName,
+                DependencyKind.Attribute,
+                UsageContext.Attribute,
+                filePath,
+                span.StartLinePosition.Line + 1,
+                node.Name.ToString()));
+        }
+
+        private void AddMemberAccessObservation(MemberAccessExpressionSyntax node)
+        {
+            if (!_componentStack.TryPeek(out Component? source) || semanticModel is null)
+            {
+                return;
+            }
+
+            if (node.Parent is InvocationExpressionSyntax invocation && invocation.Expression == node)
+            {
+                return;
+            }
+
+            IOperation? operation = semanticModel.GetOperation(node);
+            ISymbol? memberSymbol = operation switch
+            {
+                IPropertyReferenceOperation propertyReference => propertyReference.Property,
+                IFieldReferenceOperation fieldReference => fieldReference.Field,
+                _ => null,
+            };
+
+            if (memberSymbol is null)
+            {
+                SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(node);
+                memberSymbol = symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
+            }
+
+            if (memberSymbol is not IPropertySymbol and not IFieldSymbol)
+            {
+                return;
+            }
+
+            string? targetName = memberSymbol.ContainingType is null
+                ? null
+                : TryCreateSymbolIdentity(memberSymbol.ContainingType);
+            if (string.IsNullOrWhiteSpace(targetName))
+            {
+                return;
+            }
+
+            (DependencyKind kind, UsageContext usage) = memberSymbol switch
+            {
+                IPropertySymbol => (DependencyKind.PropertyAccess, UsageContext.PropertyAccess),
+                IFieldSymbol => (DependencyKind.FieldAccess, UsageContext.FieldAccess),
+                _ => throw new InvalidOperationException("Unsupported member access symbol."),
+            };
+
+            FileLinePositionSpan span = tree.GetLineSpan(node.Name.Span);
+            Observations.Add(new DependencyObservation(
+                source.Id,
+                targetName,
+                kind,
+                usage,
+                filePath,
+                span.StartLinePosition.Line + 1,
+                node.ToString()));
         }
 
         private static string ExtractTypeName(TypeSyntax type, SemanticModel? semanticModel)
