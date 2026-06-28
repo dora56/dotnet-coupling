@@ -142,6 +142,22 @@ public sealed class ProjectModelTests
     }
 
     [Fact]
+    public void Load_CsprojInput_InvalidProjectFile_EmitsRecoverableDiagnostic()
+    {
+        string root = CreateDirectory();
+        string projectPath = Path.Combine(root, "Broken.csproj");
+
+        File.WriteAllText(projectPath, "<Project><PropertyGroup>");
+
+        ProjectModel model = ProjectModel.Load(projectPath, AnalysisOptions.Default);
+
+        Assert.Empty(model.Projects);
+        ProjectModelDiagnostic diagnostic = Assert.Single(model.Diagnostics);
+        Assert.Equal("invalid-project", diagnostic.Code);
+        Assert.Contains("Broken.csproj", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_SlnxInput_MissingProjectReference_EmitsRecoverableDiagnostic()
     {
         string root = CreateDirectory();
@@ -172,6 +188,78 @@ public sealed class ProjectModelTests
 
         ProjectModelDiagnostic diagnostic = Assert.Single(model.Diagnostics);
         Assert.Equal("missing-project-reference", diagnostic.Code);
+        Assert.Contains("Missing.csproj", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_SlnxInput_MissingListedProject_EmitsRecoverableDiagnosticAndContinues()
+    {
+        string root = CreateDirectory();
+        string app = Path.Combine(root, "App");
+        Directory.CreateDirectory(app);
+
+        File.WriteAllText(
+            Path.Combine(root, "Sample.slnx"),
+            """
+            <Solution>
+              <Project Path="App/App.csproj" />
+              <Project Path="Missing/Missing.csproj" />
+            </Solution>
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        ProjectModel model = ProjectModel.Load(Path.Combine(root, "Sample.slnx"), AnalysisOptions.Default);
+
+        ProjectModelProject project = Assert.Single(model.Projects);
+        Assert.Equal("App", project.ProjectName);
+        ProjectModelDiagnostic diagnostic = Assert.Single(model.Diagnostics);
+        Assert.Equal("missing-project", diagnostic.Code);
+        Assert.Contains("Missing.csproj", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_SlnInput_MissingListedProject_EmitsRecoverableDiagnosticAndContinues()
+    {
+        string root = CreateDirectory();
+        string app = Path.Combine(root, "App");
+        Directory.CreateDirectory(app);
+
+        File.WriteAllText(
+            Path.Combine(root, "Sample.sln"),
+            """
+            Microsoft Visual Studio Solution File, Format Version 12.00
+            # Visual Studio Version 17
+            Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App", "App\App.csproj", "{11111111-1111-1111-1111-111111111111}"
+            EndProject
+            Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Missing", "Missing\Missing.csproj", "{22222222-2222-2222-2222-222222222222}"
+            EndProject
+            Global
+            EndGlobal
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        ProjectModel model = ProjectModel.Load(Path.Combine(root, "Sample.sln"), AnalysisOptions.Default);
+
+        ProjectModelProject project = Assert.Single(model.Projects);
+        Assert.Equal("App", project.ProjectName);
+        ProjectModelDiagnostic diagnostic = Assert.Single(model.Diagnostics);
+        Assert.Equal("missing-project", diagnostic.Code);
         Assert.Contains("Missing.csproj", diagnostic.Message, StringComparison.Ordinal);
     }
 

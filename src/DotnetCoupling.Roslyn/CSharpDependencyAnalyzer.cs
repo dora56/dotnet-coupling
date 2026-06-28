@@ -71,8 +71,11 @@ public sealed class CSharpDependencyAnalyzer
         else
         {
             ProjectModel projectModel = ProjectModel.Load(fullPath, options);
+            string syntaxFallbackPath = File.Exists(fullPath) && fullPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+                ? Path.GetDirectoryName(fullPath) ?? fullPath
+                : fullPath;
             projectFiles = projectModel.Projects.Count == 0
-                ? FileDiscovery.DiscoverCSharpFiles(fullPath, options)
+                ? FileDiscovery.DiscoverCSharpFiles(syntaxFallbackPath, options)
                     .Select(file => new ProjectFile(file, ProjectName: null))
                     .ToArray()
                 : projectModel.Projects

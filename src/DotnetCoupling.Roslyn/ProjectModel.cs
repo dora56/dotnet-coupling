@@ -12,7 +12,10 @@ internal sealed record ProjectModel(
     {
         if (File.Exists(fullPath) && fullPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
-            return new ProjectModel([LoadProject(fullPath, options)], []);
+            List<ProjectModelProject> projects = [];
+            List<ProjectModelDiagnostic> diagnostics = [];
+            TryLoadProject(fullPath, options, projects, diagnostics);
+            return BuildModel(projects, diagnostics);
         }
 
         if (File.Exists(fullPath) && fullPath.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))

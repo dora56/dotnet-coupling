@@ -35,6 +35,12 @@ internal static class SemanticWorkspaceLoader
             }
             else if (fullPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
             {
+                ProjectModel projectModel = ProjectModel.Load(fullPath, options);
+                diagnostics.AddRange(projectModel.Diagnostics.Select(diagnostic => new AnalysisDiagnostic(
+                    diagnostic.Code,
+                    diagnostic.Severity,
+                    diagnostic.Message,
+                    diagnostic.Path)));
                 solution = workspace.OpenSolutionAsync(fullPath).GetAwaiter().GetResult();
             }
             else
@@ -87,11 +93,14 @@ internal static class SemanticWorkspaceLoader
                 .Where(project => project.SourceFiles.Count > 0)
                 .ToArray();
 
-            diagnostics.AddRange(workspace.Diagnostics.Select(diagnostic => new AnalysisDiagnostic(
-                    $"workspace-{diagnostic.Kind.ToString().ToLowerInvariant()}",
-                    diagnostic.Kind == WorkspaceDiagnosticKind.Failure ? "Warning" : "Info",
-                    diagnostic.Message,
-                    fullPath)));
+            diagnostics.AddRange(
+                workspace.Diagnostics
+                    .Where(diagnostic => !IsDuplicateWorkspaceFailure(diagnostic, diagnostics))
+                    .Select(diagnostic => new AnalysisDiagnostic(
+                        $"workspace-{diagnostic.Kind.ToString().ToLowerInvariant()}",
+                        diagnostic.Kind == WorkspaceDiagnosticKind.Failure ? "Warning" : "Info",
+                        diagnostic.Message,
+                        fullPath)));
 
             return new SemanticWorkspaceSession(workspace, projects, diagnostics);
         }
@@ -122,6 +131,45 @@ internal static class SemanticWorkspaceLoader
         return !FileDiscovery.IsExcludedPath(filePath)
             && !FileDiscovery.IsGeneratedFile(filePath)
             && !PathPatternMatcher.IsMatch(filePath, options.ExcludePathPatterns);
+    }
+
+    private static bool IsDuplicateWorkspaceFailure(
+        WorkspaceDiagnostic workspaceDiagnostic,
+        IReadOnlyList<AnalysisDiagnostic> existingDiagnostics)
+    {
+        if (workspaceDiagnostic.Kind != WorkspaceDiagnosticKind.Failure)
+        {
+            return false;
+        }
+
+        return existingDiagnostics.Any(diagnostic =>
+        {
+            string? subjectPath = GetDiagnosticSubjectPath(diagnostic);
+            return subjectPath is not null
+                && (diagnostic.Code == "invalid-project" || diagnostic.Code == "missing-project")
+                && workspaceDiagnostic.Message.Contains(subjectPath, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    private static string? GetDiagnosticSubjectPath(AnalysisDiagnostic diagnostic)
+    {
+        if (diagnostic.Code == "invalid-project")
+        {
+            return diagnostic.Path;
+        }
+
+        if (diagnostic.Code != "missing-project")
+        {
+            return null;
+        }
+
+        int separatorIndex = diagnostic.Message.LastIndexOf(": ", StringComparison.Ordinal);
+        if (separatorIndex < 0 || separatorIndex + 2 >= diagnostic.Message.Length)
+        {
+            return null;
+        }
+
+        return diagnostic.Message[(separatorIndex + 2)..].Trim();
     }
 }
 
