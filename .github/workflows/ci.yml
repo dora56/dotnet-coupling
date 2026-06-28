@@ -118,12 +118,28 @@ jobs:
       - name: Test
         run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --no-build --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
 
+      - name: Stage coverage report
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/coverage
+          mapfile -t coverage_reports < <(find TestResults/Coverage -type f -name 'coverage.cobertura.xml' | sort)
+
+          if [[ "${#coverage_reports[@]}" -eq 0 ]]; then
+            echo "No coverage report was generated." >&2
+            exit 1
+          fi
+
+          for report in "${coverage_reports[@]}"; do
+            cp "$report" "artifacts/coverage/$(basename "$(dirname "$report")").coverage.cobertura.xml"
+          done
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: TestResults/Coverage/**/*.xml
+          path: artifacts/coverage
           if-no-files-found: error
           retention-days: 14
 
