@@ -128,6 +128,11 @@ jobs:
           name: build-artifacts
           path: .
 
+      - name: Restore executable bits
+        shell: bash
+        run: |
+          find tests -type f -path '*/bin/Release/*' -exec chmod +x {} +
+
       - name: Test
         run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --no-build --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
 
