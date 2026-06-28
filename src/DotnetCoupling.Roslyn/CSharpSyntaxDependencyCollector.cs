@@ -136,6 +136,24 @@ internal static class CSharpSyntaxDependencyCollector
             base.VisitPropertyDeclaration(node);
         }
 
+        public override void VisitVariableDeclaration(VariableDeclarationSyntax node)
+        {
+            if (node.Parent is LocalDeclarationStatementSyntax or ForStatementSyntax or UsingStatementSyntax)
+            {
+                if (semanticModel is null
+                    && node.Type is IdentifierNameSyntax identifierName
+                    && string.Equals(identifierName.Identifier.ValueText, "var", StringComparison.Ordinal))
+                {
+                    base.VisitVariableDeclaration(node);
+                    return;
+                }
+
+                AddObservation(node.Type, DependencyKind.TypeReference, UsageContext.LocalVariableType);
+            }
+
+            base.VisitVariableDeclaration(node);
+        }
+
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
             AddObservation(node.ReturnType, DependencyKind.TypeReference, UsageContext.ReturnType);

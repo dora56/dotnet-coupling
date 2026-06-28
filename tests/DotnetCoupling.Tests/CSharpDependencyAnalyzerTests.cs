@@ -1082,6 +1082,50 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_SemanticMode_ResolvesInferredLocalVariableType()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    var repository = new Repository();
+                    repository.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.DoesNotContain(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.Usage == UsageContext.LocalVariableType);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.Repository"
+            && observation.Usage == UsageContext.LocalVariableType
+            && observation.Kind == DependencyKind.TypeReference);
+    }
+
+    [Fact]
     public void Analyze_PartialTypeAcrossFiles_MergesLogicalComponent()
     {
         string directory = CreateFixture(
