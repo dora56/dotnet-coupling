@@ -123,7 +123,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts/coverage
-          mapfile -t coverage_reports < <(find TestResults/Coverage -type f -name 'coverage.cobertura.xml' | sort)
+          mapfile -t coverage_reports < <(find . -type f -name 'coverage.cobertura.xml' \
+            -not -path './artifacts/coverage/*' | sort)
 
           if [[ "${#coverage_reports[@]}" -eq 0 ]]; then
             echo "No coverage report was generated." >&2
