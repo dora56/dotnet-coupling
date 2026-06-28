@@ -24,74 +24,82 @@ internal static class SemanticWorkspaceLoader
         EnsureMsBuildRegistered();
 
         MSBuildWorkspace workspace = MSBuildWorkspace.Create();
-        List<AnalysisDiagnostic> diagnostics = [];
-        Solution solution;
+        try
+        {
+            List<AnalysisDiagnostic> diagnostics = [];
+            Solution solution;
 
-        if (fullPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
-        {
-            solution = workspace.OpenProjectAsync(fullPath).GetAwaiter().GetResult().Solution;
-        }
-        else if (fullPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
-        {
-            solution = workspace.OpenSolutionAsync(fullPath).GetAwaiter().GetResult();
-        }
-        else
-        {
-            ProjectModel projectModel = ProjectModel.Load(fullPath, options);
-            diagnostics.AddRange(projectModel.Diagnostics.Select(diagnostic => new AnalysisDiagnostic(
-                diagnostic.Code,
-                diagnostic.Severity,
-                diagnostic.Message,
-                diagnostic.Path)));
-
-            HashSet<string> loadedProjectPaths = new(StringComparer.OrdinalIgnoreCase);
-            foreach (ProjectModelProject project in projectModel.Projects)
+            if (fullPath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
             {
-                if (!loadedProjectPaths.Add(project.ProjectPath))
-                {
-                    continue;
-                }
+                solution = workspace.OpenProjectAsync(fullPath).GetAwaiter().GetResult().Solution;
+            }
+            else if (fullPath.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
+            {
+                solution = workspace.OpenSolutionAsync(fullPath).GetAwaiter().GetResult();
+            }
+            else
+            {
+                ProjectModel projectModel = ProjectModel.Load(fullPath, options);
+                diagnostics.AddRange(projectModel.Diagnostics.Select(diagnostic => new AnalysisDiagnostic(
+                    diagnostic.Code,
+                    diagnostic.Severity,
+                    diagnostic.Message,
+                    diagnostic.Path)));
 
-                Project loadedProject = workspace.OpenProjectAsync(project.ProjectPath).GetAwaiter().GetResult();
-                foreach (Project solutionProject in loadedProject.Solution.Projects)
+                HashSet<string> loadedProjectPaths = new(StringComparer.OrdinalIgnoreCase);
+                foreach (ProjectModelProject project in projectModel.Projects)
                 {
-                    if (solutionProject.FilePath is not null)
+                    if (!loadedProjectPaths.Add(project.ProjectPath))
                     {
-                        loadedProjectPaths.Add(solutionProject.FilePath);
+                        continue;
+                    }
+
+                    Project loadedProject = workspace.OpenProjectAsync(project.ProjectPath).GetAwaiter().GetResult();
+                    foreach (Project solutionProject in loadedProject.Solution.Projects)
+                    {
+                        if (solutionProject.FilePath is not null)
+                        {
+                            loadedProjectPaths.Add(solutionProject.FilePath);
+                        }
                     }
                 }
+
+                solution = workspace.CurrentSolution;
             }
 
-            solution = workspace.CurrentSolution;
+            SemanticWorkspaceProject[] projects = solution.Projects
+                .Select(project =>
+                {
+                    string projectName = project.AssemblyName ?? project.Name;
+                    return new SemanticWorkspaceProject(
+                    project,
+                    project.FilePath ?? project.Name,
+                    projectName,
+                    project.AssemblyName ?? project.Name,
+                    project.Documents
+                        .Where(document => document.SourceCodeKind == SourceCodeKind.Regular && document.FilePath is not null)
+                        .Select(document => document.FilePath!)
+                        .Where(filePath => IsAnalyzableSource(filePath, options))
+                        .Where(filePath => filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(filePath => filePath, StringComparer.Ordinal)
+                        .ToArray());
+                })
+                .Where(project => project.SourceFiles.Count > 0)
+                .ToArray();
+
+            diagnostics.AddRange(workspace.Diagnostics.Select(diagnostic => new AnalysisDiagnostic(
+                    $"workspace-{diagnostic.Kind.ToString().ToLowerInvariant()}",
+                    diagnostic.Kind == WorkspaceDiagnosticKind.Failure ? "Warning" : "Info",
+                    diagnostic.Message,
+                    fullPath)));
+
+            return new SemanticWorkspaceSession(workspace, projects, diagnostics);
         }
-
-        SemanticWorkspaceProject[] projects = solution.Projects
-            .Select(project =>
-            {
-                string projectName = project.AssemblyName ?? project.Name;
-                return new SemanticWorkspaceProject(
-                project,
-                project.FilePath ?? project.Name,
-                projectName,
-                project.AssemblyName ?? project.Name,
-                project.Documents
-                    .Where(document => document.SourceCodeKind == SourceCodeKind.Regular && document.FilePath is not null)
-                    .Select(document => document.FilePath!)
-                    .Where(filePath => IsAnalyzableSource(filePath, options))
-                    .Where(filePath => filePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(filePath => filePath, StringComparer.Ordinal)
-                    .ToArray());
-            })
-            .Where(project => project.SourceFiles.Count > 0)
-            .ToArray();
-
-        diagnostics.AddRange(workspace.Diagnostics.Select(diagnostic => new AnalysisDiagnostic(
-                $"workspace-{diagnostic.Kind.ToString().ToLowerInvariant()}",
-                diagnostic.Kind == WorkspaceDiagnosticKind.Failure ? "Warning" : "Info",
-                diagnostic.Message,
-                fullPath)));
-
-        return new SemanticWorkspaceSession(workspace, projects, diagnostics);
+        catch (Exception ex) when (ex is not NotSupportedException and not SemanticWorkspaceLoadException)
+        {
+            workspace.Dispose();
+            throw new SemanticWorkspaceLoadException(fullPath, ex);
+        }
     }
 
     private static void EnsureMsBuildRegistered()
@@ -138,3 +146,20 @@ internal sealed record SemanticWorkspaceProject(
     string ProjectName,
     string AssemblyName,
     IReadOnlyList<string> SourceFiles);
+
+public sealed class SemanticWorkspaceLoadException : Exception
+{
+    public SemanticWorkspaceLoadException(string targetPath, Exception innerException)
+        : base(CreateMessage(targetPath, innerException), innerException)
+    {
+    }
+
+    private static string CreateMessage(string targetPath, Exception innerException)
+    {
+        string reason = innerException.GetBaseException().Message
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault()
+            ?? innerException.Message;
+        return $"Semantic workspace could not be loaded for '{targetPath}': {reason}";
+    }
+}

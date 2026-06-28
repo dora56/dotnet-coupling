@@ -207,6 +207,11 @@ public static class CliApplication
                 Console.Error.WriteLine(ex.Message);
                 return 2;
             }
+            catch (SemanticWorkspaceLoadException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 4;
+            }
             catch (BaselineException ex)
             {
                 Console.Error.WriteLine(ex.Message);

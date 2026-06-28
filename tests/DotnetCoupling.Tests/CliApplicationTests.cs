@@ -177,6 +177,47 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_ModeSemanticLoadFailure_ReturnsStableWorkspaceError()
+    {
+        string directory = CreateDirectory();
+        string projectPath = Path.Combine(directory, "Sample.App.csproj");
+        WriteFile(
+            Path.Combine(directory, "global.json"),
+            """
+            {
+              "sdk": {
+                "version": "0.0.1"
+              }
+            }
+            """);
+        WriteFile(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            Path.Combine(directory, "Sample.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+            }
+            """);
+
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", projectPath);
+
+        Assert.Equal(4, result.ExitCode);
+        Assert.Contains("Semantic workspace could not be loaded", result.Error);
+        Assert.DoesNotContain("Unexpected analysis error", result.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("Details:", result.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RunAsync_BaselineCheckFailsWhenNewIssueMeetsFailOnThreshold()
     {
         string repository = CreateGitRepository();
