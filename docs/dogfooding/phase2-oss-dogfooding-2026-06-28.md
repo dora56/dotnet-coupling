@@ -14,6 +14,11 @@ common C# patterns such as partial types and generic/non-generic same-name types
 
 Tracked issue: https://github.com/dora56/dotnet-coupling/issues/8
 
+Follow-up fixes and findings:
+
+- https://github.com/dora56/dotnet-coupling/issues/10
+- https://github.com/dora56/dotnet-coupling/issues/11
+
 ## Charter
 
 ```text
@@ -97,3 +102,53 @@ Blocked by the crash:
 4. Only after reports are generated, classify false positives / false negatives and
    create targeted issues for rule or threshold problems.
 
+## Follow-up Session
+
+After fixing the duplicate type-key crash locally, the same three repositories were
+re-run with a locally packed tool from the Phase 2 branch.
+
+| Repository | Scope | Result |
+| --- | --- | --- |
+| `ardalis/GuardClauses` | `src/GuardClauses` | PASS, Grade C after Git path fix |
+| `altmann/FluentResults` | `src/FluentResults` | PASS, Grade C after Git path fix |
+| `commandlineparser/commandline` | `src/CommandLine` | PASS, Grade D after Git path fix |
+
+### False Positive / False Negative Findings
+
+| Issue | Type | Finding | Status |
+| --- | --- | --- | --- |
+| #10 | False negative | Hidden Coupling was missed when analyzing a Git subdirectory because git log paths were resolved against the target path instead of the repository root. | Fixed in branch |
+| #11 | False positive / noise | Duplicate issue rows were emitted for the same issue type, source, and target. | Fixed in branch |
+
+### External Namespace Exclusion
+
+The OSS sample included 178 `System.*` / `Microsoft.*` using directives and
+multiple internal namespace using directives such as `CommandLine.Core` and
+`CommandLine.Infrastructure`.
+
+Observed result:
+
+- External coupling count stayed `0` for the sampled source scopes.
+- No `ScatteredExternalCoupling` issue was emitted for `System.*`, `Microsoft.*`,
+  or internal project namespaces.
+
+This validates the Phase 2 external namespace exclusion behavior on real source.
+
+### Hidden Coupling Threshold Validation
+
+The OSS targets were re-run with `--git-months 120`.
+
+Observed result after fixing Git root path resolution:
+
+- `ardalis/GuardClauses`: 34 Hidden Coupling issues.
+- `altmann/FluentResults`: 5 Hidden Coupling issues.
+- `commandlineparser/commandline`: 35 Hidden Coupling issues at the default
+  `minTemporalCoupling = 3`.
+- `commandlineparser/commandline`: 288 Hidden Coupling issues at exploratory
+  `minTemporalCoupling = 1`.
+- Commits above `maxTemporalFilesPerCommit = 50` remain excluded by existing
+  threshold tests.
+
+The threshold behavior is visible and sensitive enough for dogfooding, but the
+large jump at threshold `1` confirms that default Phase 2 settings should remain
+conservative.

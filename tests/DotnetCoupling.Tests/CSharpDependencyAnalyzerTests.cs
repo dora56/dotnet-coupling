@@ -282,6 +282,66 @@ public sealed class CSharpDependencyAnalyzerTests
             && issue.Target == "Newtonsoft.Json");
     }
 
+    [Fact]
+    public void Analyze_PartialTypeAcrossFiles_MergesLogicalComponent()
+    {
+        string directory = CreateFixture(
+            "GuardAgainstNull.cs",
+            """
+            namespace Ardalis.GuardClauses;
+
+            public static partial class GuardClauseExtensions
+            {
+                public static void Null(string value)
+                {
+                }
+            }
+            """,
+            "GuardAgainstEmpty.cs",
+            """
+            namespace Ardalis.GuardClauses;
+
+            public static partial class GuardClauseExtensions
+            {
+                public static void Empty(string value)
+                {
+                }
+            }
+            """);
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6);
+
+        Component component = Assert.Single(report.Components);
+        Assert.Equal("Ardalis.GuardClauses.GuardClauseExtensions", component.Id);
+        Assert.Equal("GuardClauseExtensions", component.Name);
+    }
+
+    [Fact]
+    public void Analyze_GenericAndNonGenericTypesWithSameName_UsesDistinctComponents()
+    {
+        string directory = CreateFixture("""
+            namespace CSharpx;
+
+            internal abstract class Either<TLeft, TRight>
+            {
+            }
+
+            internal static class Either
+            {
+                public static Either<string, int>? Create()
+                {
+                    return null;
+                }
+            }
+            """);
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6);
+
+        Assert.Contains(report.Components, component => component.Id == "CSharpx.Either`2");
+        Assert.Contains(report.Components, component => component.Id == "CSharpx.Either");
+        Assert.Equal(2, report.Components.Count);
+    }
+
     private static string CreateFixture(string source)
     {
         return CreateFixture("Sample.cs", source);
