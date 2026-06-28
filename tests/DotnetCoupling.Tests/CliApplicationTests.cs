@@ -108,6 +108,33 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_ModeSyntax_ReturnsSummaryOutput()
+    {
+        CommandResult result = await RunCliAsync("--mode", "syntax", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Grade: C", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_InvalidMode_ReturnsCliArgumentError()
+    {
+        CommandResult result = await RunCliAsync("--mode", "future", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Invalid value for --mode", result.Error);
+    }
+
+    [Fact]
+    public async Task RunAsync_ModeSemantic_ReturnsCliArgumentErrorUntilImplemented()
+    {
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Semantic mode is not implemented yet", result.Error);
+    }
+
+    [Fact]
     public async Task RunAsync_BaselineCheckFailsWhenNewIssueMeetsFailOnThreshold()
     {
         string repository = CreateGitRepository();

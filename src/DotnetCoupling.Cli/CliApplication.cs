@@ -53,6 +53,12 @@ public static class CliApplication
             Description = "Skip Git volatility analysis.",
         };
 
+        Option<string> modeOption = new("--mode")
+        {
+            Description = "Analysis mode: syntax or semantic.",
+            DefaultValueFactory = _ => "syntax",
+        };
+
         Option<int> gitMonthsOption = new("--git-months")
         {
             Description = "Number of months of Git history to inspect.",
@@ -76,6 +82,7 @@ public static class CliApplication
         rootCommand.Options.Add(checkOption);
         rootCommand.Options.Add(minGradeOption);
         rootCommand.Options.Add(failOnOption);
+        rootCommand.Options.Add(modeOption);
         rootCommand.Options.Add(noGitOption);
         rootCommand.Options.Add(gitMonthsOption);
         rootCommand.Options.Add(configOption);
@@ -90,6 +97,7 @@ public static class CliApplication
             bool check = parseResult.GetValue(checkOption);
             string minGrade = parseResult.GetValue(minGradeOption) ?? "C";
             string? failOn = parseResult.GetValue(failOnOption);
+            string mode = parseResult.GetValue(modeOption) ?? "syntax";
             bool noGit = parseResult.GetValue(noGitOption);
             int gitMonths = parseResult.GetValue(gitMonthsOption);
             FileInfo? config = parseResult.GetValue(configOption);
@@ -98,6 +106,12 @@ public static class CliApplication
             if (!string.IsNullOrWhiteSpace(failOn) && !TryParseSeverity(failOn, out _))
             {
                 Console.Error.WriteLine($"Invalid severity for --fail-on: {failOn}");
+                return 2;
+            }
+
+            if (!TryParseMode(mode, out AnalysisMode analysisMode))
+            {
+                Console.Error.WriteLine($"Invalid value for --mode: {mode}");
                 return 2;
             }
 
@@ -112,7 +126,7 @@ public static class CliApplication
             {
                 ConfigurationLoadResult configuration = ConfigurationLoader.Load(fullTargetPath, config);
                 IVolatilityProvider? volatilityProvider = noGit ? null : new GitVolatilityProvider();
-                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fullTargetPath, volatilityProvider, gitMonths, configuration.Options);
+                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fullTargetPath, analysisMode, volatilityProvider, gitMonths, configuration.Options);
                 if (!string.IsNullOrWhiteSpace(baselineRef))
                 {
                     string? repositoryRoot = FindGitRepositoryRoot(fullTargetPath);
@@ -125,6 +139,7 @@ public static class CliApplication
                     using BaselineWorkspace baselineWorkspace = BaselineWorkspace.Create(repositoryRoot, fullTargetPath, baselineRef);
                     AnalysisReport baselineReport = CSharpDependencyAnalyzer.Analyze(
                         baselineWorkspace.TargetPath,
+                        analysisMode,
                         volatilityProvider: null,
                         gitMonths,
                         configuration.Options);
@@ -187,6 +202,11 @@ public static class CliApplication
                 Console.Error.WriteLine(ex.Message);
                 return 2;
             }
+            catch (NotSupportedException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 2;
+            }
             catch (BaselineException ex)
             {
                 Console.Error.WriteLine(ex.Message);
@@ -229,6 +249,11 @@ public static class CliApplication
     public static bool TryParseSeverity(string value, out Severity severity)
     {
         return Enum.TryParse(value, ignoreCase: true, out severity);
+    }
+
+    public static bool TryParseMode(string value, out AnalysisMode mode)
+    {
+        return Enum.TryParse(value, ignoreCase: true, out mode);
     }
 
     public static int SeverityRank(Severity severity)

@@ -12,7 +12,7 @@ public sealed class CSharpDependencyAnalyzer
                 "Git-backed analysis requires an injected volatility provider. Use the overload that accepts IVolatilityProvider.");
         }
 
-        return Analyze(targetPath, volatilityProvider: null, gitMonths, options);
+        return Analyze(targetPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths, options);
     }
 
     public static AnalysisReport Analyze(
@@ -21,6 +21,21 @@ public sealed class CSharpDependencyAnalyzer
         int gitMonths,
         AnalysisOptions? options = null)
     {
+        return Analyze(targetPath, AnalysisMode.Syntax, volatilityProvider, gitMonths, options);
+    }
+
+    public static AnalysisReport Analyze(
+        string targetPath,
+        AnalysisMode mode,
+        IVolatilityProvider? volatilityProvider,
+        int gitMonths,
+        AnalysisOptions? options = null)
+    {
+        if (mode == AnalysisMode.Semantic)
+        {
+            throw new NotSupportedException("Semantic mode is not implemented yet.");
+        }
+
         options ??= AnalysisOptions.Default;
         string fullPath = Path.GetFullPath(targetPath);
         ProjectModel projectModel = ProjectModel.Load(fullPath, options);

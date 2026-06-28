@@ -237,3 +237,9 @@ public enum ReportFormat
     Summary,
     Json,
 }
+
+public enum AnalysisMode
+{
+    Syntax,
+    Semantic,
+}
