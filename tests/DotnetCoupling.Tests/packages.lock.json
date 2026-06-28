@@ -213,8 +213,27 @@
       "dotnet-coupling": {
         "type": "Project",
         "dependencies": {
-          "Microsoft.CodeAnalysis.CSharp": "[5.*, )",
+          "DotnetCoupling.Core": "[1.0.0, )",
+          "DotnetCoupling.Git": "[1.0.0, )",
+          "DotnetCoupling.Roslyn": "[1.0.0, )",
           "System.CommandLine": "[2.*, )"
+        }
+      },
+      "dotnetcoupling.core": {
+        "type": "Project"
+      },
+      "dotnetcoupling.git": {
+        "type": "Project",
+        "dependencies": {
+          "DotnetCoupling.Core": "[1.0.0, )"
+        }
+      },
+      "dotnetcoupling.roslyn": {
+        "type": "Project",
+        "dependencies": {
+          "DotnetCoupling.Core": "[1.0.0, )",
+          "DotnetCoupling.Git": "[1.0.0, )",
+          "Microsoft.CodeAnalysis.CSharp": "[5.*, )"
         }
       }
     }

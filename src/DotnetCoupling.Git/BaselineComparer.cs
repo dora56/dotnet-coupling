@@ -1,4 +1,6 @@
-namespace DotnetCoupling.Cli.Analysis;
+using DotnetCoupling.Core;
+
+namespace DotnetCoupling.Git;
 
 public static class BaselineComparer
 {

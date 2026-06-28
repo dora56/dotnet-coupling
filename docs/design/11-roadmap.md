@@ -134,22 +134,22 @@ Non-goals and compatibility:
 
 Architecture:
 
-- [ ] `DotnetCoupling.Core` / `DotnetCoupling.Roslyn` / `DotnetCoupling.Git` への分割判断
-- [ ] structural fitness test: CLI から Roslyn / issue policy への依存方向を固定
-- [ ] `Models` の public API 境界整理
+- [x] `DotnetCoupling.Core` / `DotnetCoupling.Roslyn` / `DotnetCoupling.Git` / `DotnetCoupling.Cli` への物理分割
+- [x] structural fitness test: CLI から Roslyn / issue policy への依存方向を固定
+- [x] `Models` の public API 境界初期整理
 
 #### Phase 3a: Project Model
 
 Goal: `.slnx` / `.sln` / `.csproj` 入力から、project / assembly / package 境界を
 syntax mode と semantic mode の共通土台として扱えるようにする。
 
-- [ ] `.slnx` / `.sln` / `.csproj` 入力対応
+- [x] `.slnx` / `.sln` / `.csproj` 入力対応
 - [ ] project graph 抽出
-- [ ] project boundary distance の表現追加
+- [x] project boundary distance の表現追加
 - [ ] assembly / NuGet package 判定
 - [ ] workspace load diagnostics
 - [ ] workspace load failure を recoverable diagnostic として出力
-- [ ] syntax mode の CLI / JSON / exit code 契約を維持する regression tests
+- [x] syntax mode の CLI / JSON / exit code 契約を維持する regression tests
 
 #### Phase 3b: Semantic Resolution
 

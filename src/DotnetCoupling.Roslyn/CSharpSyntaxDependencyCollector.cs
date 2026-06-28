@@ -1,17 +1,18 @@
+using DotnetCoupling.Core;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace DotnetCoupling.Cli.Analysis;
+namespace DotnetCoupling.Roslyn;
 
 internal static class CSharpSyntaxDependencyCollector
 {
-    internal static SyntaxFileAnalysis AnalyzeFile(string filePath)
+    internal static SyntaxFileAnalysis AnalyzeFile(string filePath, string? projectName = null)
     {
         SyntaxTree tree = CSharpSyntaxTree.ParseText(File.ReadAllText(filePath), path: filePath);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
         string namespaceName = FindNamespace(root);
-        ComponentWalker walker = new(tree, namespaceName, filePath);
+        ComponentWalker walker = new(tree, namespaceName, filePath, projectName);
         walker.Visit(root);
 
         return new SyntaxFileAnalysis(
@@ -51,7 +52,7 @@ internal static class CSharpSyntaxDependencyCollector
         return usingNamespaces;
     }
 
-    private sealed class ComponentWalker(SyntaxTree tree, string namespaceName, string filePath) : CSharpSyntaxWalker
+    private sealed class ComponentWalker(SyntaxTree tree, string namespaceName, string filePath, string? projectName) : CSharpSyntaxWalker
     {
         private readonly Stack<Component> _componentStack = new();
 
@@ -157,7 +158,7 @@ internal static class CSharpSyntaxDependencyCollector
         {
             string typeName = CreateTypeIdentity(name, arity);
             string id = string.IsNullOrWhiteSpace(namespaceName) ? typeName : $"{namespaceName}.{typeName}";
-            return new Component(id, name, namespaceName, null, filePath, kind, ResolveVisibility(modifiers));
+            return new Component(id, name, namespaceName, projectName, filePath, kind, ResolveVisibility(modifiers));
         }
 
         private void AddObservation(TypeSyntax type, DependencyKind kind, UsageContext usage)

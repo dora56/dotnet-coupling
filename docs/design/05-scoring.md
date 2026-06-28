@@ -99,8 +99,8 @@ MVP では **SameType を Distance として扱わない**。同一型内の sel
 | ExternalPackage | `1.00` | NuGet package / 外部 assembly |
 
 MVP の syntax-only では project 境界が曖昧なため、主に namespace と file path で近似する。
-
-v0.3 の semantic mode では `.slnx` / `.sln` / `.csproj` を読み込み、project / assembly 境界を正確に判定する。
+Phase 3a では `.slnx` / `.sln` / `.csproj` 入力時に project name を読み、project が異なる内部型は
+`DifferentProject` として扱う。assembly / NuGet package 境界の厳密化は semantic mode で行う。
 
 ### 13.1 SameType を除外する理由
 
@@ -115,17 +115,19 @@ v0.3 の semantic mode では `.slnx` / `.sln` / `.csproj` を読み込み、pro
 
 ### 13.2 syntax-only での Distance 推定ルール
 
-MVP の syntax-only では `.slnx` / `.sln` / `.csproj` を正式には読まないため、project 境界は namespace と file path から近似する。
+Phase 3a の syntax mode では `.slnx` / `.sln` / `.csproj` 入力時のみ project 境界を使い、
+それ以外の directory / file 入力では namespace と file path から近似する。
 
 判定順序:
 
 | 順序 | 条件 | Distance |
 |---:|---|---|
 | 1 | `source` と `target` が同一型 | 除外 |
-| 2 | `source.Namespace == target.Namespace` | `SameNamespace = 0.25` |
-| 3 | namespace が異なり、共通 prefix が2 segment 以上 | `DifferentNamespace = 0.50` |
-| 4 | Component Index に存在する内部型だが、共通 prefix が2 segment 未満 | `DifferentProject = 0.75` の近似 |
-| 5 | Component Index に存在しない namespace / 型 | `ExternalPackage = 1.00` |
+| 2 | `source.ProjectName` と `target.ProjectName` が存在し、異なる | `DifferentProject = 0.75` |
+| 3 | `source.Namespace == target.Namespace` | `SameNamespace = 0.25` |
+| 4 | namespace が異なり、共通 prefix が2 segment 以上 | `DifferentNamespace = 0.50` |
+| 5 | Component Index に存在する内部型だが、共通 prefix が2 segment 未満 | `DifferentProject = 0.75` の近似 |
+| 6 | Component Index に存在しない namespace / 型 | `ExternalPackage = 1.00` |
 
 共通 prefix の例:
 
@@ -139,7 +141,7 @@ MyCompany.MyApp.Api -> MyCompany.MyApp.Application
 => 2 segment なので DifferentNamespace
 ```
 
-このヒューリスティックは保守的に倒す。つまり、内部型であることは分かるが近さを確信できない場合は、近いと仮定せず `DifferentProject` へ寄せる。v0.3 の semantic mode では `.slnx` / `.sln` / `.csproj` / assembly symbol から project 境界を正確に判定する。
+このヒューリスティックは保守的に倒す。つまり、内部型であることは分かるが近さを確信できない場合は、近いと仮定せず `DifferentProject` へ寄せる。semantic mode では assembly symbol と package metadata から境界をさらに正確に判定する。
 
 ### 13.3 外部依存のスコア計算
 
