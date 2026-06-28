@@ -74,3 +74,25 @@ Perf baseline collection is now scriptable through
 `scripts/generate-perf-baseline-report.sh`, so future large-repo runs can
 capture timing, stdout/stderr, and load-blocked semantic failures in a uniform
 artifact shape.
+
+## Scripted Rerun
+
+The scripted baseline was rerun against the same target after the reporting
+script landed:
+
+```bash
+scripts/generate-perf-baseline-report.sh \
+  src/DotnetCoupling.Cli/bin/Release/net10.0/publish/DotnetCoupling.Cli \
+  /private/tmp/dotnet-coupling-phase3-oss-compare/efcore/src/EFCore/EFCore.csproj \
+  /private/tmp/dotnet-coupling-phase3-oss-compare/efcore-perf-baseline
+```
+
+Observed result:
+
+- `syntax` mode: PASS in `1.58s`
+- `semantic-preview`: FAIL(exit=`4`) in `0.26s`
+- failure class remains `hostfxr_resolve_sdk2` / missing required SDK
+
+This confirms that the remaining Phase 3c gap is no longer artifact collection.
+It is specifically **semantic workspace loadability on representative large
+repositories**.
