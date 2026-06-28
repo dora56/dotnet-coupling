@@ -114,6 +114,14 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
         "kind": "GeneratedCode",
         "description": "Generated code is excluded by default."
       }
+    ],
+    "diagnostics": [
+      {
+        "code": "missing-project-reference",
+        "severity": "Warning",
+        "message": "Referenced project was not found: /repo/src/Missing/Missing.csproj",
+        "path": "/repo/src/App/App.csproj"
+      }
     ]
   }
 }
@@ -140,6 +148,7 @@ CI 利用者向けに、少なくとも以下は安定させる。
 - `issues[].target`
 - `issues[].location`
 - `manifest.blindSpots`
+- `manifest.diagnostics` は optional field として後方互換を保ちながら追加できる
 
 ### 19.5 出力モード優先順位
 

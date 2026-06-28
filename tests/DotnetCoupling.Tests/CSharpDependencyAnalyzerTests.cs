@@ -155,6 +155,93 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_SlnxInput_WithMissingReferencedProject_ContinuesAndReportsDiagnostic()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        string app = Path.Combine(root, "App");
+        Directory.CreateDirectory(app);
+        File.WriteAllText(
+            Path.Combine(root, "Sample.slnx"),
+            """
+            <Solution>
+              <Project Path="App/App.csproj" />
+            </Solution>
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="../Missing/Missing.csproj" />
+              </ItemGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "Handler.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+            }
+            """);
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(Path.Combine(root, "Sample.slnx"), useGit: false, gitMonths: 6);
+
+        Component component = Assert.Single(report.Components);
+        Assert.Equal("App", component.ProjectName);
+        AnalysisDiagnostic diagnostic = Assert.Single(report.Diagnostics!);
+        Assert.Equal("missing-project-reference", diagnostic.Code);
+    }
+
+    [Fact]
+    public void Analyze_SlnxInput_WithInvalidProject_ContinuesAndReportsDiagnostic()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        string app = Path.Combine(root, "App");
+        string broken = Path.Combine(root, "Broken");
+        Directory.CreateDirectory(app);
+        Directory.CreateDirectory(broken);
+        File.WriteAllText(
+            Path.Combine(root, "Sample.slnx"),
+            """
+            <Solution>
+              <Project Path="App/App.csproj" />
+              <Project Path="Broken/Broken.csproj" />
+            </Solution>
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            Path.Combine(app, "Handler.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+            }
+            """);
+        File.WriteAllText(Path.Combine(broken, "Broken.csproj"), "<Project><PropertyGroup>");
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(Path.Combine(root, "Sample.slnx"), useGit: false, gitMonths: 6);
+
+        Component component = Assert.Single(report.Components);
+        Assert.Equal("App", component.ProjectName);
+        AnalysisDiagnostic diagnostic = Assert.Single(report.Diagnostics!);
+        Assert.Equal("invalid-project", diagnostic.Code);
+    }
+
+    [Fact]
     public void Analyze_ExternalUsingAcrossManyComponents_ReportsScatteredExternalCoupling()
     {
         string directory = CreateFixture(

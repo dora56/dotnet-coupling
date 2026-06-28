@@ -99,6 +99,37 @@ public sealed class ReportRendererTests
         Assert.Contains("This is not a trophy.", rendered);
     }
 
+    [Fact]
+    public void Render_JsonOutput_IncludesRecoverableDiagnosticsInManifest()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 1, 1, 0, 0, false, false, 6),
+            new GradeResult("A", "Well-balanced", "issue-density", "Test"),
+            1.0,
+            [],
+            [],
+            [],
+            [],
+            [],
+            Diagnostics:
+            [
+                new AnalysisDiagnostic(
+                    "missing-project-reference",
+                    "Warning",
+                    "Referenced project was not found: /tmp/missing/Missing.csproj",
+                    "/tmp/sample/App.csproj"),
+            ]);
+
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestPaths.RepositoryRoot, "schemas", "dotnet-coupling-report-0.1.schema.json")));
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        AssertRequiredProperties(schema.RootElement, document.RootElement);
+        JsonElement diagnostics = document.RootElement.GetProperty("manifest").GetProperty("diagnostics");
+        JsonElement diagnostic = Assert.Single(diagnostics.EnumerateArray());
+        Assert.Equal("missing-project-reference", diagnostic.GetProperty("code").GetString());
+        Assert.Equal("Warning", diagnostic.GetProperty("severity").GetString());
+    }
+
     private static JsonElement Parse(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);

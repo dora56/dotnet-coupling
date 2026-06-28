@@ -201,6 +201,12 @@ public sealed record AnalysisSummary(
     bool GitUsed,
     int GitMonths);
 
+public sealed record AnalysisDiagnostic(
+    string Code,
+    string Severity,
+    string Message,
+    string? Path);
+
 public sealed record GradeResult(
     string Letter,
     string Display,
@@ -216,7 +222,8 @@ public sealed record AnalysisReport(
     IReadOnlyList<CouplingMetrics> Couplings,
     IReadOnlyList<CouplingIssue> Issues,
     IReadOnlyList<string> BlindSpots,
-    BaselineComparison? Baseline = null);
+    BaselineComparison? Baseline = null,
+    IReadOnlyList<AnalysisDiagnostic>? Diagnostics = null);
 
 public sealed record BaselineComparison(
     string Ref,

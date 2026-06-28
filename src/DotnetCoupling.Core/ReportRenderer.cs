@@ -67,6 +67,7 @@ public static class ReportRenderer
         builder.AppendLine(CultureInfo.InvariantCulture, $"Files: {report.Summary.Files} | Types: {report.Summary.Components} | Couplings: {report.Summary.InternalCouplings} internal / {report.Summary.ExternalCouplings} external");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Issues: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
         builder.AppendLine(DescribeGit(report));
+        AppendDiagnosticsSummary(builder, report);
         AppendBaselineSummary(builder, report);
         if (report.Grade.Letter == "S")
         {
@@ -181,13 +182,13 @@ public static class ReportRenderer
             : "Git: unavailable or no matching history";
     }
 
-    private static object CreateManifestJson(AnalysisReport report)
+    private static Dictionary<string, object?> CreateManifestJson(AnalysisReport report)
     {
-        return new
+        Dictionary<string, object?> manifest = new(StringComparer.Ordinal)
         {
-            Confidence = "syntax-only",
-            RunNotes = new[] { "Semantic symbol resolution is not enabled." },
-            BlindSpots = report.BlindSpots.Select(blindSpot =>
+            ["confidence"] = "syntax-only",
+            ["runNotes"] = new[] { "Semantic symbol resolution is not enabled." },
+            ["blindSpots"] = report.BlindSpots.Select(blindSpot =>
             {
                 string kind = blindSpot.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Unknown";
                 return new
@@ -197,6 +198,23 @@ public static class ReportRenderer
                 };
             }),
         };
+
+        if (report.Diagnostics is { Count: > 0 })
+        {
+            manifest["diagnostics"] = report.Diagnostics;
+        }
+
+        return manifest;
+    }
+
+    private static void AppendDiagnosticsSummary(StringBuilder builder, AnalysisReport report)
+    {
+        if (report.Diagnostics is not { Count: > 0 })
+        {
+            return;
+        }
+
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Diagnostics: {report.Diagnostics.Count} recoverable warning(s)");
     }
 
     private static void AppendBaselineText(StringBuilder builder, AnalysisReport report)

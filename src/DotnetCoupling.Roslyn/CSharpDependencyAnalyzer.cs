@@ -87,7 +87,14 @@ public sealed class CSharpDependencyAnalyzer
                 "DI container runtime resolution is not analyzed in syntax-only mode.",
                 "Reflection and dynamic calls may be incomplete.",
                 "Generated code is excluded by default.",
-            ]);
+            ],
+            Diagnostics: projectModel.Diagnostics
+                .Select(diagnostic => new AnalysisDiagnostic(
+                    diagnostic.Code,
+                    diagnostic.Severity,
+                    diagnostic.Message,
+                    diagnostic.Path))
+                .ToArray());
     }
 
     private sealed record ProjectFile(string FilePath, string? ProjectName);
