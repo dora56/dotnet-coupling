@@ -49,3 +49,31 @@ Record for each target:
 - confusing output or missing context
 
 Use the GitHub issue templates for false positives and false negatives.
+
+## Perf Baseline
+
+Use the perf baseline script when comparing `syntax` and `semantic-preview` on
+larger SDK-style targets.
+
+Command:
+
+```bash
+scripts/generate-perf-baseline-report.sh \
+  /path/to/dotnet-coupling \
+  /path/to/target.csproj \
+  /path/to/output-directory
+```
+
+Artifacts:
+
+- `perf-baseline.md`
+- `syntax-summary.txt`
+- `semantic-summary.txt`
+- `syntax.stderr.txt`
+- `semantic.stderr.txt`
+- `syntax.time.txt`
+- `semantic.time.txt`
+
+The script records both timing and failure evidence. A semantic run that cannot
+load its workspace is still useful data; keep the generated failure excerpt and
+environment notes instead of discarding the run.

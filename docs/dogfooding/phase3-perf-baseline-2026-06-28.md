@@ -67,3 +67,10 @@ of these:
 
 This run is useful evidence, but it is **not yet sufficient** to mark the
 Phase 3c perf baseline item complete.
+
+## Follow-up
+
+Perf baseline collection is now scriptable through
+`scripts/generate-perf-baseline-report.sh`, so future large-repo runs can
+capture timing, stdout/stderr, and load-blocked semantic failures in a uniform
+artifact shape.
