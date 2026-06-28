@@ -1,4 +1,7 @@
 <Solution>
+  <Project Path="src/DotnetCoupling.Core/DotnetCoupling.Core.csproj" />
+  <Project Path="src/DotnetCoupling.Git/DotnetCoupling.Git.csproj" />
+  <Project Path="src/DotnetCoupling.Roslyn/DotnetCoupling.Roslyn.csproj" />
   <Project Path="src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj" />
   <Project Path="tests/DotnetCoupling.Tests/DotnetCoupling.Tests.csproj" />
 </Solution>

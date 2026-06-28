@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace DotnetCoupling.Cli.Analysis;
+namespace DotnetCoupling.Core;
 
 public static class ConfigurationLoader
 {

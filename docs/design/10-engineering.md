@@ -253,8 +253,8 @@ dotnet test --configuration Release \
 ```
 
 Phase 1 の coverage 設定は `coverage.runsettings` に置き、Cobertura XML を出力する。
-対象は `DotnetCoupling.Cli` assembly に絞り、CLI entrypoint の `Program.cs` と
-test assembly は除外する。
+対象は `DotnetCoupling.Core` assembly の scoring / issue detection に絞り、
+CLI entrypoint の `Program.cs` と test assembly は除外する。
 
 CI では mutation testing を独立した必須 job として実行し、`stryker-config.json`
 の `break` threshold で失敗させる。Coverage は同じ CI 内で収集するが、Phase 1
@@ -266,7 +266,7 @@ report を確認できるようにする。
 
 | 対象（mutate する） | 除外（mutate しない） |
 |---|---|
-| `Analysis/` 配下の scoring / classifier / issue detection | `Program.cs`（CLI entrypoint） |
+| `DotnetCoupling.Core` の scoring / classifier / issue detection | `Program.cs`（CLI entrypoint） |
 | Balance Score 計算 | `ReportRenderer.cs`（出力フォーマット） |
 | Grade 判定ロジック | Git プロセス起動部分 |
 | Circular dependency 検出 | テストコード自体 |
@@ -276,11 +276,11 @@ report を確認できるようにする。
 ```json
 {
   "stryker-config": {
-    "project": "src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj",
+    "project": "src/DotnetCoupling.Core/DotnetCoupling.Core.csproj",
     "test-projects": ["tests/DotnetCoupling.Tests/DotnetCoupling.Tests.csproj"],
     "mutate": [
-      "src/DotnetCoupling.Cli/Analysis/**/*.cs",
-      "!src/DotnetCoupling.Cli/Analysis/ReportRenderer.cs"
+      "CouplingScoring.cs",
+      "IssueDetector.cs"
     ],
     "thresholds": {
       "high": 80,

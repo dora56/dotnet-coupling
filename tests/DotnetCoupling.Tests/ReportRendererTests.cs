@@ -1,4 +1,6 @@
-using DotnetCoupling.Cli.Analysis;
+using DotnetCoupling.Core;
+using DotnetCoupling.Git;
+using DotnetCoupling.Roslyn;
 using System.Text.Json;
 using Xunit;
 

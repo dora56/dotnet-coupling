@@ -78,6 +78,36 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_CsprojInput_ReturnsSummaryOutput()
+    {
+        string directory = CreateDirectory();
+        string projectPath = Path.Combine(directory, "Sample.App.csproj");
+        WriteFile(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            Path.Combine(directory, "Sample.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+            }
+            """);
+
+        CommandResult result = await RunCliAsync("--summary", "--no-git", projectPath);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Files: 1 | Types: 1", result.Output);
+    }
+
+    [Fact]
     public async Task RunAsync_BaselineCheckFailsWhenNewIssueMeetsFailOnThreshold()
     {
         string repository = CreateGitRepository();

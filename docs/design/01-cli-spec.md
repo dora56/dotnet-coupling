@@ -8,9 +8,10 @@
 dotnet-coupling [path] [options]
 ```
 
-`path` は解析対象のディレクトリ、`.slnx`、`.sln`、`.csproj` のいずれかを想定する。
+`path` は解析対象のディレクトリ、C# file、`.slnx`、`.sln`、`.csproj` のいずれかを想定する。
 
-MVP ではディレクトリ解析を主対象とし、`.slnx` / `.sln` / `.csproj` は v0.3 の semantic analysis で正式対応する。
+Phase 3a では syntax mode のまま `.slnx` / `.sln` / `.csproj` を読み、project name と
+project boundary distance を補助する。semantic symbol resolution は後続の明示 mode で追加する。
 
 ### 5.2 MVP オプション
 

@@ -1,6 +1,6 @@
 {
   "stryker-config": {
-    "project": "src/DotnetCoupling.Cli/DotnetCoupling.Cli.csproj",
+    "project": "src/DotnetCoupling.Core/DotnetCoupling.Core.csproj",
     "test-projects": [
       "tests/DotnetCoupling.Tests/DotnetCoupling.Tests.csproj"
     ],
@@ -17,8 +17,8 @@
     },
     "test-runner": "mtp",
     "mutate": [
-      "Analysis/CouplingScoring.cs",
-      "Analysis/IssueDetector.cs"
+      "CouplingScoring.cs",
+      "IssueDetector.cs"
     ]
   }
 }

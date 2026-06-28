@@ -1,4 +1,4 @@
-namespace DotnetCoupling.Cli.Analysis;
+namespace DotnetCoupling.Core;
 
 internal static class CouplingResolver
 {
@@ -84,6 +84,13 @@ internal static class CouplingResolver
 
     internal static Distance ResolveDistance(Component source, Component target)
     {
+        if (!string.IsNullOrWhiteSpace(source.ProjectName)
+            && !string.IsNullOrWhiteSpace(target.ProjectName)
+            && !string.Equals(source.ProjectName, target.ProjectName, StringComparison.Ordinal))
+        {
+            return Distance.DifferentProject;
+        }
+
         if (source.Namespace == target.Namespace)
         {
             return Distance.SameNamespace;

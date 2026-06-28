@@ -19,5 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DotnetCoupling.Cli\DotnetCoupling.Cli.csproj" />
+    <ProjectReference Include="..\..\src\DotnetCoupling.Core\DotnetCoupling.Core.csproj" />
+    <ProjectReference Include="..\..\src\DotnetCoupling.Git\DotnetCoupling.Git.csproj" />
+    <ProjectReference Include="..\..\src\DotnetCoupling.Roslyn\DotnetCoupling.Roslyn.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-namespace DotnetCoupling.Cli.Analysis;
+namespace DotnetCoupling.Core;
 
 internal static class ExternalCouplingDetector
 {

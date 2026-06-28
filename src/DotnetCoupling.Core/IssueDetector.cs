@@ -1,4 +1,4 @@
-namespace DotnetCoupling.Cli.Analysis;
+namespace DotnetCoupling.Core;
 
 internal static class IssueDetector
 {
@@ -264,7 +264,7 @@ internal static class IssueDetector
 
     private static bool MatchesAnyPath(string value, IReadOnlyList<string> patterns)
     {
-        return !string.IsNullOrWhiteSpace(value) && FileDiscovery.IsIgnoredByPattern(value, patterns);
+        return !string.IsNullOrWhiteSpace(value) && PathPatternMatcher.IsMatch(value, patterns);
     }
 
     private static List<IReadOnlyCollection<string>> FindStronglyConnectedComponents(Dictionary<string, HashSet<string>> graph)

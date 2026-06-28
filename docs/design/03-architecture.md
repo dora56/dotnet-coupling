@@ -26,7 +26,7 @@ dotnet-coupling/
   DESIGN.md
 ```
 
-### 7.2 v0.2 以降の推奨分割
+### 7.2 Phase 3 以降の物理分割
 
 ```text
 dotnet-coupling/
@@ -53,7 +53,9 @@ dotnet-coupling/
     DotnetCoupling.IntegrationTests/
 ```
 
-MVP は1プロジェクトでよいが、`Core` と `Roslyn` の境界は意識しておく。あとで分割できる形にしておくと、未来の自分に優しい。未来の自分はだいたい疲れている。
+Phase 3 では、semantic mode の土台として物理 project を分割する。`Cli` は
+orchestration に集中し、`Core` は公開 data contract / scoring / reporting、
+`Roslyn` は syntax / semantic 解析、`Git` は volatility / baseline を担当する。
 
 ### 7.3 Phase 1 内部モジュール境界
 

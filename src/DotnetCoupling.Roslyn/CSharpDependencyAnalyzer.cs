@@ -1,4 +1,7 @@
-namespace DotnetCoupling.Cli.Analysis;
+using DotnetCoupling.Core;
+using DotnetCoupling.Git;
+
+namespace DotnetCoupling.Roslyn;
 
 public sealed class CSharpDependencyAnalyzer
 {
@@ -6,15 +9,24 @@ public sealed class CSharpDependencyAnalyzer
     {
         options ??= AnalysisOptions.Default;
         string fullPath = Path.GetFullPath(targetPath);
-        string[] files = FileDiscovery.DiscoverCSharpFiles(fullPath, options);
+        ProjectModel projectModel = ProjectModel.Load(fullPath, options);
+        IReadOnlyList<ProjectFile> projectFiles = projectModel.Projects.Count == 0
+            ? FileDiscovery.DiscoverCSharpFiles(fullPath, options)
+                .Select(file => new ProjectFile(file, ProjectName: null))
+                .ToArray()
+            : projectModel.Projects
+                .SelectMany(project => project.SourceFiles.Select(file => new ProjectFile(file, project.ProjectName)))
+                .DistinctBy(projectFile => projectFile.FilePath)
+                .OrderBy(projectFile => projectFile.FilePath, StringComparer.Ordinal)
+                .ToArray();
         List<Component> components = [];
         List<DependencyObservation> observations = [];
         Dictionary<string, List<UsingNamespace>> usingNamespacesByFile = new(StringComparer.Ordinal);
 
-        foreach (string file in files)
+        foreach (ProjectFile projectFile in projectFiles)
         {
-            SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeFile(file);
-            usingNamespacesByFile[file] = syntaxFile.UsingNamespaces.ToList();
+            SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeFile(projectFile.FilePath, projectFile.ProjectName);
+            usingNamespacesByFile[projectFile.FilePath] = syntaxFile.UsingNamespaces.ToList();
             components.AddRange(syntaxFile.Components);
             observations.AddRange(syntaxFile.Observations);
         }
@@ -25,7 +37,7 @@ public sealed class CSharpDependencyAnalyzer
             .Select(component => component.Namespace)
             .Where(namespaceName => !string.IsNullOrWhiteSpace(namespaceName))
             .ToHashSet(StringComparer.Ordinal);
-        HashSet<string> analyzedFiles = files.ToHashSet(StringComparer.Ordinal);
+        HashSet<string> analyzedFiles = projectFiles.Select(projectFile => projectFile.FilePath).ToHashSet(StringComparer.Ordinal);
 
         IReadOnlyDictionary<string, int> changeCounts = useGit
             ? GitVolatility.GetChangeCounts(fullPath, gitMonths)
@@ -50,7 +62,7 @@ public sealed class CSharpDependencyAnalyzer
         AnalysisSummary summary = new(
             fullPath,
             "syntax-only",
-            files.Length,
+            projectFiles.Count,
             components.Count,
             internalCouplingCount,
             externalCouplingCount,
@@ -73,6 +85,8 @@ public sealed class CSharpDependencyAnalyzer
                 "Generated code is excluded by default.",
             ]);
     }
+
+    private sealed record ProjectFile(string FilePath, string? ProjectName);
 
     private static List<Component> CoalesceComponents(IEnumerable<Component> components)
     {
