@@ -86,7 +86,7 @@ public sealed class CSharpSyntaxDependencyCollectorTests
             && observation.Usage == UsageContext.ParameterType);
         Assert.Contains(analysis.Observations, observation =>
             observation.SourceComponentId == "Sample.Syntax.Value"
-            && observation.TargetName == "List"
+            && observation.TargetName == "List`1"
             && observation.Usage == UsageContext.ObjectCreation);
     }
 

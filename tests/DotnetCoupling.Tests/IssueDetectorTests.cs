@@ -32,6 +32,23 @@ public sealed class IssueDetectorTests
     }
 
     [Fact]
+    public void DetectIssues_DuplicateIssueKeys_ReturnsSingleIssue()
+    {
+        CouplingMetrics first = Coupling("A.Api.Source", "A.Infrastructure.Target", IntegrationStrength.Functional, Distance.DifferentNamespace);
+        CouplingMetrics second = first with { Location = new SourceLocation("/repo/Source.cs", 2) };
+
+        List<CouplingIssue> issues = IssueDetector.DetectIssues(
+            [CouplingScoring.Calculate(first), CouplingScoring.Calculate(second)],
+            [],
+            new Dictionary<string, Component>(StringComparer.Ordinal));
+
+        Assert.Single(issues, issue =>
+            issue.Type == IssueType.GlobalComplexity
+            && issue.Source == "A.Api.Source"
+            && issue.Target == "A.Infrastructure.Target");
+    }
+
+    [Fact]
     public void AddFanInFanOutIssues_ThresholdBoundaries_AreExclusive()
     {
         List<CouplingIssue> issues = [];

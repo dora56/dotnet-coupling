@@ -26,6 +26,21 @@ public sealed class GitVolatilityTests
     }
 
     [Fact]
+    public void GetChangeCounts_SubdirectoryTarget_UsesRepositoryRootRelativePaths()
+    {
+        string repositoryPath = CreateGitRepository();
+        string sourcePath = Path.Combine(repositoryPath, "src");
+        string first = Path.GetFullPath(Path.Combine(sourcePath, "First.cs"));
+
+        WriteFile(first, "public sealed class First { }");
+        Commit(repositoryPath, "initial");
+
+        IReadOnlyDictionary<string, int> counts = GitVolatility.GetChangeCounts(sourcePath, months: 120);
+
+        Assert.Equal(1, counts[first]);
+    }
+
+    [Fact]
     public void GetTemporalCouplings_GitRepository_ReturnsRepeatedCSharpCoChanges()
     {
         string repositoryPath = CreateGitRepository();
@@ -50,6 +65,31 @@ public sealed class GitVolatilityTests
         Assert.Equal(first, coupling.FileA);
         Assert.Equal(second, coupling.FileB);
         Assert.Equal(3, coupling.CoChangeCount);
+    }
+
+    [Fact]
+    public void GetTemporalCouplings_SubdirectoryTarget_UsesRepositoryRootRelativePaths()
+    {
+        string repositoryPath = CreateGitRepository();
+        string sourcePath = Path.Combine(repositoryPath, "src");
+        string first = Path.GetFullPath(Path.Combine(sourcePath, "First.cs"));
+        string second = Path.GetFullPath(Path.Combine(sourcePath, "Second.cs"));
+        HashSet<string> analyzedFiles = [first, second];
+
+        WriteFile(first, "public sealed class First { }");
+        WriteFile(second, "public sealed class Second { }");
+        Commit(repositoryPath, "initial");
+
+        IReadOnlyList<TemporalCoupling> couplings = GitVolatility.GetTemporalCouplings(
+            sourcePath,
+            months: 120,
+            analyzedFiles,
+            minTemporalCoupling: 1);
+
+        TemporalCoupling coupling = Assert.Single(couplings);
+        Assert.Equal(first, coupling.FileA);
+        Assert.Equal(second, coupling.FileB);
+        Assert.Equal(1, coupling.CoChangeCount);
     }
 
     [Fact]

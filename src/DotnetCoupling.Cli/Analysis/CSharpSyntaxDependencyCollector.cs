@@ -81,7 +81,7 @@ internal static class CSharpSyntaxDependencyCollector
 
         public override void VisitEnumDeclaration(EnumDeclarationSyntax node)
         {
-            Component component = CreateComponent(node.Identifier.ValueText, ComponentKind.Enum, node.Modifiers);
+            Component component = CreateComponent(node.Identifier.ValueText, arity: 0, ComponentKind.Enum, node.Modifiers);
             Components.Add(component);
         }
 
@@ -142,16 +142,21 @@ internal static class CSharpSyntaxDependencyCollector
 
         private void VisitTypeDeclaration(TypeDeclarationSyntax node, ComponentKind kind, Action visitChildren)
         {
-            Component component = CreateComponent(node.Identifier.ValueText, kind, node.Modifiers);
+            Component component = CreateComponent(
+                node.Identifier.ValueText,
+                node.TypeParameterList?.Parameters.Count ?? 0,
+                kind,
+                node.Modifiers);
             Components.Add(component);
             _componentStack.Push(component);
             visitChildren();
             _componentStack.Pop();
         }
 
-        private Component CreateComponent(string name, ComponentKind kind, SyntaxTokenList modifiers)
+        private Component CreateComponent(string name, int arity, ComponentKind kind, SyntaxTokenList modifiers)
         {
-            string id = string.IsNullOrWhiteSpace(namespaceName) ? name : $"{namespaceName}.{name}";
+            string typeName = CreateTypeIdentity(name, arity);
+            string id = string.IsNullOrWhiteSpace(namespaceName) ? typeName : $"{namespaceName}.{typeName}";
             return new Component(id, name, namespaceName, null, filePath, kind, ResolveVisibility(modifiers));
         }
 
@@ -184,13 +189,29 @@ internal static class CSharpSyntaxDependencyCollector
             return type switch
             {
                 IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
-                QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
-                GenericNameSyntax generic => generic.Identifier.ValueText,
+                QualifiedNameSyntax qualified => ExtractSimpleName(qualified.Right),
+                AliasQualifiedNameSyntax aliasQualified => ExtractSimpleName(aliasQualified.Name),
+                GenericNameSyntax generic => CreateTypeIdentity(generic.Identifier.ValueText, generic.TypeArgumentList.Arguments.Count),
                 NullableTypeSyntax nullable => ExtractTypeName(nullable.ElementType),
                 ArrayTypeSyntax array => ExtractTypeName(array.ElementType),
                 PredefinedTypeSyntax => "",
                 _ => type.ToString().Split('.').Last().Split('<').First(),
             };
+        }
+
+        private static string ExtractSimpleName(SimpleNameSyntax name)
+        {
+            return name switch
+            {
+                GenericNameSyntax generic => CreateTypeIdentity(generic.Identifier.ValueText, generic.TypeArgumentList.Arguments.Count),
+                IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+                _ => name.Identifier.ValueText,
+            };
+        }
+
+        private static string CreateTypeIdentity(string name, int arity)
+        {
+            return arity == 0 ? name : $"{name}`{arity}";
         }
 
         private static Visibility ResolveVisibility(SyntaxTokenList modifiers)

@@ -7,15 +7,13 @@ internal static class CouplingResolver
         IReadOnlyList<DependencyObservation> observations,
         IReadOnlyDictionary<string, int> changeCounts)
     {
-        Dictionary<string, Component> componentsByName = components
-            .GroupBy(component => component.Name)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         Dictionary<string, Component> componentsById = components.ToDictionary(component => component.Id, StringComparer.Ordinal);
+        Dictionary<string, Component> componentsByReferenceName = CreateReferenceNameIndex(components);
         List<CouplingMetrics> couplings = [];
 
         foreach (DependencyObservation observation in observations)
         {
-            if (!componentsByName.TryGetValue(observation.TargetName, out Component? target))
+            if (!componentsByReferenceName.TryGetValue(observation.TargetName, out Component? target))
             {
                 continue;
             }
@@ -43,6 +41,29 @@ internal static class CouplingResolver
         }
 
         return couplings;
+    }
+
+    private static Dictionary<string, Component> CreateReferenceNameIndex(IReadOnlyList<Component> components)
+    {
+        Dictionary<string, Component> index = new(StringComparer.Ordinal);
+        foreach (Component component in components)
+        {
+            index.TryAdd(component.Id, component);
+            index.TryAdd(GetSimpleTypeIdentity(component.Id), component);
+
+            if (!component.Id.Contains('`', StringComparison.Ordinal))
+            {
+                index.TryAdd(component.Name, component);
+            }
+        }
+
+        return index;
+    }
+
+    private static string GetSimpleTypeIdentity(string componentId)
+    {
+        int namespaceSeparator = componentId.LastIndexOf('.');
+        return namespaceSeparator < 0 ? componentId : componentId[(namespaceSeparator + 1)..];
     }
 
     internal static IntegrationStrength ResolveStrength(DependencyObservation observation, Component target)

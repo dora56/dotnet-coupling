@@ -10,6 +10,7 @@ public static class GitVolatility
     {
         try
         {
+            string repositoryRoot = GetRepositoryRoot(repositoryPath);
             ProcessStartInfo startInfo = new()
             {
                 FileName = "git",
@@ -36,7 +37,7 @@ public static class GitVolatility
                 return new Dictionary<string, int>(StringComparer.Ordinal);
             }
 
-            return AnalyzeChangeCountsFromLog(repositoryPath, output);
+            return AnalyzeChangeCountsFromLog(repositoryRoot, output);
         }
         catch
         {
@@ -66,6 +67,7 @@ public static class GitVolatility
     {
         try
         {
+            string repositoryRoot = GetRepositoryRoot(repositoryPath);
             ProcessStartInfo startInfo = new()
             {
                 FileName = "git",
@@ -94,7 +96,7 @@ public static class GitVolatility
             }
 
             return AnalyzeTemporalCouplingsFromLog(
-                repositoryPath,
+                repositoryRoot,
                 output,
                 analyzedFiles,
                 minTemporalCoupling,
@@ -164,5 +166,47 @@ public static class GitVolatility
                 }
             }
         }
+    }
+
+    private static string GetRepositoryRoot(string repositoryPath)
+    {
+        ProcessStartInfo startInfo = new()
+        {
+            FileName = "git",
+            WorkingDirectory = repositoryPath,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        startInfo.ArgumentList.Add("rev-parse");
+        startInfo.ArgumentList.Add("--show-prefix");
+
+        using Process process = Process.Start(startInfo)!;
+        string output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            return repositoryPath;
+        }
+
+        string prefix = output.Trim().TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(prefix))
+        {
+            return Path.GetFullPath(repositoryPath);
+        }
+
+        DirectoryInfo? directory = new(Path.GetFullPath(repositoryPath));
+        foreach (string _ in prefix.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            directory = directory.Parent;
+            if (directory is null)
+            {
+                return repositoryPath;
+            }
+        }
+
+        return directory.FullName;
     }
 }

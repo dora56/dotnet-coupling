@@ -63,7 +63,13 @@ internal static class IssueDetector
         AddCircularDependencyIssues(scores.Select(score => score.Coupling), issues);
         AddHiddenCouplingIssues(temporalCouplings, scores.Select(score => score.Coupling), componentsById, issues);
         AddScatteredExternalCouplingIssues(scores.Select(score => score.Coupling), issues, options.Thresholds);
-        return ApplyIgnores(issues, options).ToList();
+        return ApplyIgnores(issues, options)
+            .GroupBy(issue => new IssueIdentity(issue.Type, issue.Source, issue.Target))
+            .Select(group => group
+                .OrderBy(issue => issue.Location?.File ?? "", StringComparer.Ordinal)
+                .ThenBy(issue => issue.Location?.Line ?? 0)
+                .First())
+            .ToList();
     }
 
     internal static void AddFanInFanOutIssues(
@@ -319,4 +325,6 @@ internal static class IssueDetector
             components.Add(component);
         }
     }
+
+    private sealed record IssueIdentity(IssueType Type, string Source, string Target);
 }

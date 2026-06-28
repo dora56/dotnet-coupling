@@ -19,6 +19,7 @@ public sealed class CSharpDependencyAnalyzer
             observations.AddRange(syntaxFile.Observations);
         }
 
+        components = CoalesceComponents(components);
         Dictionary<string, Component> componentsById = components.ToDictionary(component => component.Id, StringComparer.Ordinal);
         HashSet<string> internalNamespaces = components
             .Select(component => component.Namespace)
@@ -71,5 +72,13 @@ public sealed class CSharpDependencyAnalyzer
                 "Reflection and dynamic calls may be incomplete.",
                 "Generated code is excluded by default.",
             ]);
+    }
+
+    private static List<Component> CoalesceComponents(IEnumerable<Component> components)
+    {
+        return components
+            .GroupBy(component => component.Id, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
     }
 }
