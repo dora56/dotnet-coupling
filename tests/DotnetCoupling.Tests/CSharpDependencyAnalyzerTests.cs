@@ -1165,6 +1165,44 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_InterfaceImplementation_ReportsInterfaceImplementationDependency()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler : IRepository
+            {
+            }
+            """),
+            ("IRepository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public interface IRepository
+            {
+            }
+            """));
+
+        AnalysisReport syntaxReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Syntax, volatilityProvider: null, gitMonths: 6);
+        AnalysisReport semanticReport = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider: null, gitMonths: 6);
+
+        Assert.Contains(syntaxReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "IRepository"
+            && observation.Usage == UsageContext.BaseType
+            && observation.Kind == DependencyKind.Inheritance);
+        Assert.Contains(semanticReport.Observations, observation =>
+            observation.SourceComponentId == "Sample.App.Api.Handler"
+            && observation.TargetName == "Sample.App.Infrastructure.IRepository"
+            && observation.Usage == UsageContext.InterfaceImplementation
+            && observation.Kind == DependencyKind.InterfaceImplementation);
+    }
+
+    [Fact]
     public void Analyze_PartialTypeAcrossFiles_MergesLogicalComponent()
     {
         string directory = CreateFixture(

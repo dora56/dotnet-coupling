@@ -118,7 +118,7 @@ internal static class CSharpSyntaxDependencyCollector
         {
             foreach (BaseTypeSyntax baseType in node.Types)
             {
-                AddObservation(baseType.Type, DependencyKind.Inheritance, UsageContext.BaseType);
+                AddBaseTypeObservation(baseType.Type);
             }
 
             base.VisitBaseList(node);
@@ -257,6 +257,21 @@ internal static class CSharpSyntaxDependencyCollector
                 filePath,
                 span.StartLinePosition.Line + 1,
                 type.ToString()));
+        }
+
+        private void AddBaseTypeObservation(TypeSyntax type)
+        {
+            if (semanticModel is not null)
+            {
+                ITypeSymbol? typeSymbol = semanticModel.GetTypeInfo(type).Type;
+                if (typeSymbol?.TypeKind == TypeKind.Interface)
+                {
+                    AddObservation(type, DependencyKind.InterfaceImplementation, UsageContext.InterfaceImplementation);
+                    return;
+                }
+            }
+
+            AddObservation(type, DependencyKind.Inheritance, UsageContext.BaseType);
         }
 
         private void AddInvocationObservation(InvocationExpressionSyntax node)
