@@ -95,6 +95,13 @@ public enum Volatility
     High,
 }
 
+public enum SubdomainCategory
+{
+    Core,
+    Supporting,
+    Generic,
+}
+
 public enum IssueType
 {
     GlobalComplexity,
@@ -122,7 +129,8 @@ public sealed record AnalysisOptions(
     IReadOnlyList<string> IgnoreNamespaces,
     IReadOnlySet<IssueType> IgnoreIssueTypes,
     IReadOnlyList<IssueSuppression> IssueSuppressions,
-    AnalysisThresholds Thresholds)
+    AnalysisThresholds Thresholds,
+    DomainContext DomainContext)
 {
     public static AnalysisOptions Default { get; } = new(
         [],
@@ -130,7 +138,8 @@ public sealed record AnalysisOptions(
         [],
         new HashSet<IssueType>(),
         [],
-        AnalysisThresholds.Default);
+        AnalysisThresholds.Default,
+        DomainContext.Empty);
 }
 
 public sealed record AnalysisThresholds(
@@ -147,6 +156,17 @@ public sealed record AnalysisThresholds(
         50,
         5);
 }
+
+public sealed record DomainContext(IReadOnlyList<DomainSubdomain> Subdomains)
+{
+    public static DomainContext Empty { get; } = new([]);
+}
+
+public sealed record DomainSubdomain(
+    string Name,
+    SubdomainCategory Category,
+    IReadOnlyList<string> PathPatterns,
+    Volatility ExpectedVolatility);
 
 public sealed record SourceLocation(string File, int Line);
 

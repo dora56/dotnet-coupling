@@ -121,6 +121,62 @@
         }
       },
       "additionalProperties": false
+    },
+    "domain": {
+      "type": "object",
+      "properties": {
+        "subdomains": {
+          "type": "array",
+          "description": "Subdomain entries are evaluated in order; the first matching path pattern wins. Names must be unique, case-insensitively.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "category",
+              "paths",
+              "expectedVolatility"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Unique subdomain name. Case-only duplicates are rejected.",
+                "minLength": 1
+              },
+              "category": {
+                "enum": [
+                  "core",
+                  "supporting",
+                  "generic",
+                  "Core",
+                  "Supporting",
+                  "Generic"
+                ]
+              },
+              "paths": {
+                "type": "array",
+                "description": "Repository/workspace-relative path patterns. The config file location and --config path do not change their meaning.",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "expectedVolatility": {
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "Low",
+                  "Medium",
+                  "High"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

@@ -115,6 +115,270 @@ public sealed class ConfigurationLoaderTests
     }
 
     [Fact]
+    public void Load_ExplicitConfig_ReadsDomainContext()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "domain": {
+                "subdomains": [
+                  {
+                    "name": "Billing",
+                    "category": "core",
+                    "paths": ["src/Billing/**"],
+                    "expectedVolatility": "high"
+                  },
+                  {
+                    "name": "Reporting",
+                    "category": "supporting",
+                    "paths": ["src/Reporting/**"],
+                    "expectedVolatility": "low"
+                  },
+                  {
+                    "name": "IdentityProvider",
+                    "category": "generic",
+                    "paths": ["src/IdentityProvider/**"],
+                    "expectedVolatility": "low"
+                  }
+                ]
+              }
+            }
+            """);
+
+        ConfigurationLoadResult result = ConfigurationLoader.Load(directory, new FileInfo(configPath));
+
+        DomainSubdomain billing = Assert.Single(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
+        Assert.Equal(SubdomainCategory.Core, billing.Category);
+        Assert.Equal(Volatility.High, billing.ExpectedVolatility);
+        Assert.Contains("src/Billing/**", billing.PathPatterns);
+        DomainSubdomain reporting = Assert.Single(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Reporting");
+        Assert.Equal(SubdomainCategory.Supporting, reporting.Category);
+        Assert.Equal(Volatility.Low, reporting.ExpectedVolatility);
+        DomainSubdomain identityProvider = Assert.Single(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "IdentityProvider");
+        Assert.Equal(SubdomainCategory.Generic, identityProvider.Category);
+        Assert.Equal(Volatility.Low, identityProvider.ExpectedVolatility);
+    }
+
+    [Fact]
+    public void Load_ExplicitTomlConfig_ReadsDomainContext()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [[domain.subdomains]]
+            name = "Billing"
+            category = "core"
+            paths = ["src/Billing/**"]
+            expected_volatility = "high"
+
+            [[domain.subdomains]]
+            name = "Reporting"
+            category = "supporting"
+            paths = ["src/Reporting/**"]
+            expected_volatility = "low"
+
+            [[domain.subdomains]]
+            name = "IdentityProvider"
+            category = "generic"
+            paths = ["src/IdentityProvider/**"]
+            expected_volatility = "low"
+            """);
+
+        ConfigurationLoadResult result = ConfigurationLoader.Load(directory, new FileInfo(configPath));
+
+        DomainSubdomain billing = Assert.Single(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
+        Assert.Equal(SubdomainCategory.Core, billing.Category);
+        Assert.Equal(Volatility.High, billing.ExpectedVolatility);
+        Assert.Contains("src/Billing/**", billing.PathPatterns);
+        DomainSubdomain reporting = Assert.Single(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Reporting");
+        Assert.Equal(SubdomainCategory.Supporting, reporting.Category);
+        Assert.Equal(Volatility.Low, reporting.ExpectedVolatility);
+        DomainSubdomain identityProvider = Assert.Single(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "IdentityProvider");
+        Assert.Equal(SubdomainCategory.Generic, identityProvider.Category);
+        Assert.Equal(Volatility.Low, identityProvider.ExpectedVolatility);
+    }
+
+    [Fact]
+    public void Load_InvalidDomainCategory_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "domain": {
+                "subdomains": [
+                  {
+                    "name": "Billing",
+                    "category": "strategic",
+                    "paths": ["src/Billing/**"],
+                    "expectedVolatility": "high"
+                  }
+                ]
+              }
+            }
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("Invalid subdomain category", exception.Message);
+        Assert.Contains("domain.subdomains[0].category", exception.Message);
+    }
+
+    [Fact]
+    public void Load_DuplicateDomainSubdomainName_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "domain": {
+                "subdomains": [
+                  {
+                    "name": "Reporting",
+                    "category": "supporting",
+                    "paths": ["src/Reporting/**"],
+                    "expectedVolatility": "low"
+                  },
+                  {
+                    "name": "reporting",
+                    "category": "generic",
+                    "paths": ["src/SharedReporting/**"],
+                    "expectedVolatility": "low"
+                  }
+                ]
+              }
+            }
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("Duplicate domain subdomain name", exception.Message);
+        Assert.Contains("domain.subdomains[1].name", exception.Message);
+        Assert.Contains("reporting", exception.Message);
+    }
+
+    [Fact]
+    public void Load_DomainSubdomainWithoutPaths_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [[domain.subdomains]]
+            name = "Reporting"
+            category = "supporting"
+            paths = []
+            expected_volatility = "low"
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("domain.subdomains[0].paths", exception.Message);
+    }
+
+    [Fact]
+    public void Load_InvalidDomainExpectedVolatility_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "domain": {
+                "subdomains": [
+                  {
+                    "name": "Reporting",
+                    "category": "supporting",
+                    "paths": ["src/Reporting/**"],
+                    "expectedVolatility": "veryHigh"
+                  }
+                ]
+              }
+            }
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("Invalid volatility", exception.Message);
+        Assert.Contains("domain.subdomains[0].expectedVolatility", exception.Message);
+    }
+
+    [Fact]
+    public void Load_DomainSubdomainWithoutExpectedVolatility_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [[domain.subdomains]]
+            name = "Reporting"
+            category = "supporting"
+            paths = ["src/Reporting/**"]
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("domain.subdomains[0].expected_volatility", exception.Message);
+    }
+
+    [Fact]
+    public void Load_DomainSubdomainsWrongShape_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "domain": {
+                "subdomains": {
+                  "name": "Reporting"
+                }
+              }
+            }
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("domain.subdomains must be an array", exception.Message);
+    }
+
+    [Fact]
+    public void Load_DomainWrongShape_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            domain = true
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("domain must be an object", exception.Message);
+    }
+
+    [Fact]
     public void Load_AutoDiscovery_UsesTomlWhenJsonDoesNotExist()
     {
         string directory = CreateDirectory();
@@ -224,6 +488,7 @@ public sealed class ConfigurationLoaderTests
 
         Assert.Equal(20, result.Options.Thresholds.MaxDependencies);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
+        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
     }
 
     [Fact]
@@ -235,6 +500,7 @@ public sealed class ConfigurationLoaderTests
 
         Assert.Equal(20, result.Options.Thresholds.MaxDependencies);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
+        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
     }
 
     private static string CreateDirectory()

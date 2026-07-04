@@ -3,7 +3,8 @@ namespace DotnetCoupling.Core;
 internal sealed record RawConfiguration(
     RawAnalysis? Analysis,
     RawThresholds? Thresholds,
-    RawIgnore? Ignore);
+    RawIgnore? Ignore,
+    RawDomain? Domain);
 
 internal sealed record RawAnalysis(IReadOnlyList<string>? ExcludePathPatterns);
 
@@ -25,3 +26,11 @@ internal sealed record RawIssueSuppression(
     string Source,
     string Target,
     string Reason);
+
+internal sealed record RawDomain(IReadOnlyList<RawDomainSubdomain>? Subdomains);
+
+internal sealed record RawDomainSubdomain(
+    string Name,
+    string Category,
+    IReadOnlyList<string> PathPatterns,
+    string ExpectedVolatility);

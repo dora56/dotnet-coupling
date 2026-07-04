@@ -110,13 +110,17 @@ Generic の分類は組織戦略、競争優位、時期によって変わるた
 - `essentialVolatility`: core subdomain などで、product model の進化として説明できる高い揮発性
 - `accidentalChurn`: supporting / generic など本来安定してほしい領域で観測される高 churn
 
-初期契約:
+0.5.0 初期契約:
 
 - Balance Score の主計算を急に変えない。
 - core の high churn は、それ自体を issue にしない。ただし core に遠く強く依存している component は、core の本質的な揮発性により引き続き risk が高い。
-- supporting / generic の high observed churn は `AccidentalVolatility` issue、または Hotspots / Markdown / AI output の reason として表示する。
-- JSON schema には optional fields として `domainContext`, `observedChurn`, `expectedVolatility`, `volatilityKind` を追加する。
+- supporting / generic の high observed churn は `AccidentalVolatility` issue として表示する。
 - `.coupling.json` に設定がない場合は従来どおり Git 履歴ベースの volatility のみで動作する。
+
+後続拡張:
+
+- Hotspots / Markdown / AI output に `essentialVolatility` / `accidentalChurn` の reason を追加する。
+- JSON schema には optional fields として `domainContext`, `observedChurn`, `expectedVolatility`, `volatilityKind` を追加する。
 
 ### 25.2 Hotspots
 

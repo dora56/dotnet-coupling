@@ -212,7 +212,7 @@ low = ["src/MyApp.Infrastructure/Shared/**"]
 
 ### 14.5 DDD subdomain による補正
 
-Phase 5 の次スライスでは、ユーザー設定から subdomain category と expected volatility を読み込む。
+Phase 5 では、ユーザー設定から subdomain category と expected volatility を読み込む。
 tool は subdomain を自動分類しない。
 
 ```toml
@@ -229,7 +229,7 @@ generic = ["src/MyApp.Infrastructure/**"]
 - core subdomain の high churn は、product model の進化として説明できる場合があるため、それ自体を issue にしない
 - core に遠く強く依存している component は、core の本質的な揮発性により引き続き risk が高い
 - supporting / generic が頻繁に変化している場合は、設計摩擦や実装摩擦による `AccidentalVolatility` の疑いがある
-- `AccidentalVolatility` は Phase 5 では issue または hotspot reason として表示し、Balance Score の主計算は急に変えない
+- `AccidentalVolatility` は issue として表示し、Balance Score の主計算は急に変えない
 
 ---
 

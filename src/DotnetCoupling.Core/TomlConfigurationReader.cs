@@ -9,11 +9,12 @@ internal static class TomlConfigurationReader
     {
         using StreamReader reader = configFile.OpenText();
         TomlTable root = TomlSerializer.Deserialize<TomlTable>(reader) ?? new TomlTable();
-        ConfigurationValueReader.AssertKnownProperties(root, "", ["analysis", "thresholds", "ignore"]);
+        ConfigurationValueReader.AssertKnownProperties(root, "", ["analysis", "thresholds", "ignore", "domain"]);
 
         RawAnalysis? analysis = null;
         RawThresholds? thresholds = null;
         RawIgnore? ignore = null;
+        RawDomain? domain = null;
 
         if (root.TryGetValue("analysis", out object? analysisValue))
         {
@@ -51,6 +52,43 @@ internal static class TomlConfigurationReader
                 ConfigurationValueReader.ReadIssueSuppressions(ignoreTable, "issues"));
         }
 
-        return new RawConfiguration(analysis, thresholds, ignore);
+        if (root.TryGetValue("domain", out object? domainValue))
+        {
+            TomlTable domainTable = ConfigurationValueReader.ReadTable(domainValue, "domain");
+            ConfigurationValueReader.AssertKnownProperties(domainTable, "domain", ["subdomains"]);
+            domain = new RawDomain(ReadDomainSubdomains(domainTable, "subdomains"));
+        }
+
+        return new RawConfiguration(analysis, thresholds, ignore, domain);
+    }
+
+    private static List<RawDomainSubdomain>? ReadDomainSubdomains(TomlTable table, string propertyName)
+    {
+        if (!table.TryGetValue(propertyName, out object? value))
+        {
+            return null;
+        }
+
+        if (value is not TomlTableArray array)
+        {
+            throw new ConfigurationException("domain.subdomains must be an array.");
+        }
+
+        List<RawDomainSubdomain> subdomains = [];
+        int index = 0;
+        foreach (TomlTable item in array)
+        {
+            string path = $"domain.subdomains[{index}]";
+            ConfigurationValueReader.AssertKnownProperties(item, path, ["name", "category", "paths", "expected_volatility"]);
+            subdomains.Add(new RawDomainSubdomain(
+                ConfigurationValueReader.ReadRequiredString(item, path, "name"),
+                ConfigurationValueReader.ReadRequiredString(item, path, "category"),
+                ConfigurationValueReader.ReadStringArray(item, "paths", $"{path}.paths")
+                    ?? throw new ConfigurationException($"{path}.paths must be an array."),
+                ConfigurationValueReader.ReadRequiredString(item, path, "expected_volatility")));
+            index++;
+        }
+
+        return subdomains;
     }
 }

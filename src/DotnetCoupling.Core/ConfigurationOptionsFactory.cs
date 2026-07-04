@@ -21,7 +21,8 @@ internal static class ConfigurationOptionsFactory
             rawIgnore?.Namespaces ?? defaults.IgnoreNamespaces,
             rawIgnore?.IssueTypes is null ? defaults.IgnoreIssueTypes : ReadIssueTypes(rawIgnore.IssueTypes),
             rawIgnore?.Issues is null ? defaults.IssueSuppressions : ReadIssueSuppressions(rawIgnore.Issues),
-            thresholds);
+            thresholds,
+            configuration.Domain is null ? defaults.DomainContext : ReadDomainContext(configuration.Domain));
     }
 
     private static HashSet<IssueType> ReadIssueTypes(IReadOnlyList<string> rawValues)
@@ -57,5 +58,49 @@ internal static class ConfigurationOptionsFactory
         }
 
         return suppressions;
+    }
+
+    private static DomainContext ReadDomainContext(RawDomain rawDomain)
+    {
+        if (rawDomain.Subdomains is null)
+        {
+            return DomainContext.Empty;
+        }
+
+        List<DomainSubdomain> subdomains = [];
+        HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
+        int index = 0;
+        foreach (RawDomainSubdomain rawSubdomain in rawDomain.Subdomains)
+        {
+            string path = $"domain.subdomains[{index}]";
+            if (!Enum.TryParse(rawSubdomain.Category, ignoreCase: true, out SubdomainCategory category))
+            {
+                throw new ConfigurationException($"Invalid subdomain category in {path}.category: {rawSubdomain.Category}");
+            }
+
+            if (!Enum.TryParse(rawSubdomain.ExpectedVolatility, ignoreCase: true, out Volatility expectedVolatility))
+            {
+                throw new ConfigurationException($"Invalid volatility in {path}.expectedVolatility: {rawSubdomain.ExpectedVolatility}");
+            }
+
+            if (rawSubdomain.PathPatterns.Count == 0)
+            {
+                throw new ConfigurationException($"{path}.paths must contain at least one path pattern.");
+            }
+
+            if (!names.Add(rawSubdomain.Name))
+            {
+                throw new ConfigurationException($"Duplicate domain subdomain name in {path}.name: {rawSubdomain.Name}");
+            }
+
+            subdomains.Add(new DomainSubdomain(
+                rawSubdomain.Name,
+                category,
+                rawSubdomain.PathPatterns,
+                expectedVolatility));
+            index++;
+        }
+
+        return new DomainContext(subdomains);
     }
 }

@@ -52,6 +52,22 @@ TOML を使いたい場合は `--config .coupling.toml` で明示指定できる
         "reason": "Accepted legacy adapter until the replacement service ships."
       }
     ]
+  },
+  "domain": {
+    "subdomains": [
+      {
+        "name": "Billing",
+        "category": "core",
+        "paths": ["src/MyApp.Billing/**"],
+        "expectedVolatility": "high"
+      },
+      {
+        "name": "Reporting",
+        "category": "supporting",
+        "paths": ["src/MyApp.Reporting/**"],
+        "expectedVolatility": "low"
+      }
+    ]
   }
 }
 ```
@@ -101,13 +117,25 @@ type = "GlobalComplexity"
 source = "MyApp.Legacy.LegacyFacade"
 target = "MyApp.Infrastructure.LegacyRepository"
 reason = "Accepted legacy adapter until the replacement service ships."
+
+[[domain.subdomains]]
+name = "Billing"
+category = "core"
+paths = ["src/MyApp.Billing/**"]
+expected_volatility = "high"
+
+[[domain.subdomains]]
+name = "Reporting"
+category = "supporting"
+paths = ["src/MyApp.Reporting/**"]
+expected_volatility = "low"
 ```
 
-### 21.5 Domain Context Config (Phase 5 planned)
+### 21.5 Domain Context Config
 
-Phase 5 の次スライスでは config file に domain context を追加する。これは
-subdomain classification を tool が推論するものではなく、ユーザーが判断した分類を
-読み込んで volatility の解釈に使うための設定である。
+Phase 5 では config file に domain context を追加した。これは subdomain
+classification を tool が推論するものではなく、ユーザーが判断した分類を読み込んで
+volatility の解釈に使うための設定である。
 
 ```json
 {
@@ -134,9 +162,17 @@ Semantics:
 
 - `category`: `core` / `supporting` / `generic`
 - `expectedVolatility`: `low` / `medium` / `high`
-- `paths`: config file location からの relative glob
+- `name`: 同一 config 内で一意。大文字小文字だけが異なる名前も重複として扱う
+- `paths`: repository / workspace root から見た glob。`--config` の場所や config file
+  の保存場所では意味を変えない
+- 複数 subdomain の `paths` が同じ component に一致した場合は、設定順で最初に一致した
+  subdomain を使う
 - `core` の high churn は essential business volatility として説明できる
-- `supporting` / `generic` の high observed churn は accidental churn として報告候補にする
+- `core` は `expectedVolatility` が `low` / `medium` でも
+  `AccidentalVolatility` としては報告しない
+- `supporting` / `generic` の high observed churn は、`expectedVolatility` が
+  `low` / `medium` の場合に `AccidentalVolatility` として報告する
+- Balance Score / Grade の主計算式は変えない。domain context は追加 issue と説明に使う
 - 設定がない repository では従来の Git 履歴ベース volatility のみで解析する
 
 ### 21.6 Generated code の既定除外

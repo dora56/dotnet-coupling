@@ -32,5 +32,25 @@
         "reason": "Accepted legacy dependency tracked in ARCH-42"
       }
     ]
+  },
+  "domain": {
+    "subdomains": [
+      {
+        "name": "Billing",
+        "category": "core",
+        "paths": [
+          "src/Sample.App.Billing/**"
+        ],
+        "expectedVolatility": "high"
+      },
+      {
+        "name": "Reporting",
+        "category": "supporting",
+        "paths": [
+          "src/Sample.App.Reporting/**"
+        ],
+        "expectedVolatility": "low"
+      }
+    ]
   }
 }

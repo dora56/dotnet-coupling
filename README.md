@@ -153,8 +153,17 @@ Current supported settings include:
 - scattered external breadth thresholds
 - ignore rules for paths, namespaces, issue types, and precise issue
   suppressions
+- domain context for user-supplied core/supporting/generic subdomain categories
+  and expected volatility
 
 TOML keys use `snake_case`; JSON keeps the existing `camelCase` schema shape.
+Domain context does not infer subdomain categories; it uses only the paths and
+categories provided in config. Supporting or generic subdomains with high
+observed Git churn and lower expected volatility are reported as
+`AccidentalVolatility`. Subdomain names must be unique. If multiple path
+patterns match the same component, the first matching subdomain in the config
+is used. Domain paths are repository/workspace-relative, so moving the config
+file or passing it with `--config` does not change their meaning.
 
 See [`.coupling.example.json`](.coupling.example.json),
 [`.coupling.example.toml`](.coupling.example.toml),

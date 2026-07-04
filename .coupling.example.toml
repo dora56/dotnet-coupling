@@ -28,3 +28,15 @@ type = "GlobalComplexity"
 source = "Sample.App.Api.LegacyHandler"
 target = "Sample.App.Infrastructure.LegacyRepository"
 reason = "Accepted legacy dependency tracked in ARCH-42"
+
+[[domain.subdomains]]
+name = "Billing"
+category = "core"
+paths = ["src/Sample.App.Billing/**"]
+expected_volatility = "high"
+
+[[domain.subdomains]]
+name = "Reporting"
+category = "supporting"
+paths = ["src/Sample.App.Reporting/**"]
+expected_volatility = "low"

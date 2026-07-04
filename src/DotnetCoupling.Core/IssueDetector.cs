@@ -72,6 +72,7 @@ internal static class IssueDetector
         AddCircularDependencyIssues(scores.Select(score => score.Coupling), issues);
         AddHiddenCouplingIssues(temporalCouplings, scores.Select(score => score.Coupling), componentsById, issues);
         AddScatteredExternalCouplingIssues(scores.Select(score => score.Coupling), issues, options.Thresholds);
+        AddAccidentalVolatilityIssues(scores.Select(score => score.Coupling), componentsById, issues, options.DomainContext);
         List<CouplingIssue> deduplicatedIssues = ApplyIgnores(issues, options)
             .GroupBy(issue => new IssueIdentity(issue.Type, issue.Source, issue.Target))
             .Select(group => group
@@ -237,6 +238,46 @@ internal static class IssueDetector
         }
     }
 
+    internal static void AddAccidentalVolatilityIssues(
+        IEnumerable<CouplingMetrics> couplings,
+        IReadOnlyDictionary<string, Component> componentsById,
+        List<CouplingIssue> issues,
+        DomainContext domainContext)
+    {
+        if (domainContext.Subdomains.Count == 0)
+        {
+            return;
+        }
+
+        foreach (CouplingMetrics coupling in couplings
+            .Where(coupling => coupling.Volatility == Volatility.High)
+            .DistinctBy(coupling => coupling.Target))
+        {
+            if (!componentsById.TryGetValue(coupling.Target, out Component? target))
+            {
+                continue;
+            }
+
+            DomainSubdomain? subdomain = FindSubdomain(target.FilePath, domainContext);
+            if (subdomain is null
+                || subdomain.Category == SubdomainCategory.Core
+                || subdomain.ExpectedVolatility == Volatility.High)
+            {
+                continue;
+            }
+
+            issues.Add(new CouplingIssue(
+                IssueType.AccidentalVolatility,
+                Severity.Medium,
+                target.Id,
+                subdomain.Name,
+                0.50,
+                $"{subdomain.Category} subdomain '{subdomain.Name}' has High observed churn but expected {subdomain.ExpectedVolatility} volatility.",
+                "Review whether the churn is business-driven; if not, stabilize the boundary or remove design and implementation friction.",
+                new SourceLocation(target.FilePath, 1)));
+        }
+    }
+
     internal static (string FileA, string FileB) OrderPair(string first, string second)
     {
         return string.CompareOrdinal(first, second) <= 0 ? (first, second) : (second, first);
@@ -246,6 +287,19 @@ internal static class IssueDetector
     {
         int lastDot = componentId.LastIndexOf('.');
         return lastDot < 0 ? "" : componentId[..lastDot];
+    }
+
+    private static DomainSubdomain? FindSubdomain(string filePath, DomainContext domainContext)
+    {
+        foreach (DomainSubdomain subdomain in domainContext.Subdomains)
+        {
+            if (PathPatternMatcher.IsMatch(filePath, subdomain.PathPatterns))
+            {
+                return subdomain;
+            }
+        }
+
+        return null;
     }
 
     private static IEnumerable<CouplingIssue> ApplyIgnores(IEnumerable<CouplingIssue> issues, AnalysisOptions options)

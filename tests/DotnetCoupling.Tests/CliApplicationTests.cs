@@ -281,6 +281,82 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_DomainContextConfigWithExplicitConfigAndTargetPath_UsesWorkspaceRelativeDomainPaths()
+    {
+        string repository = CreateGitRepository();
+        string apiPath = Path.Combine(repository, "src", "Api", "Handler.cs");
+        string reportingPath = Path.Combine(repository, "src", "Reporting", "ReportBuilder.cs");
+        string configPath = Path.Combine(repository, "config", "coupling.toml");
+        WriteFile(
+            apiPath,
+            """
+            using Sample.App.Reporting;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public ReportBuilder? Report { get; init; }
+            }
+            """);
+        WriteFile(
+            reportingPath,
+            """
+            namespace Sample.App.Reporting;
+
+            public sealed class ReportBuilder
+            {
+                public int Version => 0;
+            }
+            """);
+        WriteFile(
+            configPath,
+            """
+            [[domain.subdomains]]
+            name = "Reporting"
+            category = "supporting"
+            paths = ["src/Reporting/**"]
+            expected_volatility = "low"
+            """);
+        Commit(repository, "initial");
+
+        for (int version = 1; version <= 10; version++)
+        {
+            WriteFile(
+                reportingPath,
+                $$"""
+                namespace Sample.App.Reporting;
+
+                public sealed class ReportBuilder
+                {
+                    public int Version => {{version}};
+                }
+                """);
+            Commit(repository, $"change reporting {version}");
+        }
+
+        CommandResult noGitResult = await RunCliAsync("--json", "--config", configPath, "--no-git", Path.Combine(repository, "src"));
+        CommandResult checkResult = await RunCliAsync("--json", "--check", "--fail-on", "Medium", "--config", configPath, Path.Combine(repository, "src"));
+
+        Assert.Equal(0, noGitResult.ExitCode);
+        using JsonDocument noGitDocument = JsonDocument.Parse(noGitResult.Output);
+        Assert.False(noGitDocument.RootElement.GetProperty("analysis").GetProperty("gitUsed").GetBoolean());
+        Assert.DoesNotContain(
+            noGitDocument.RootElement.GetProperty("issues").EnumerateArray(),
+            issue => issue.GetProperty("type").GetString() == "AccidentalVolatility");
+
+        Assert.Equal(1, checkResult.ExitCode);
+        using JsonDocument checkDocument = JsonDocument.Parse(checkResult.Output);
+        Assert.True(checkDocument.RootElement.GetProperty("analysis").GetProperty("gitUsed").GetBoolean());
+        Assert.Equal(1, checkDocument.RootElement.GetProperty("issueCounts").GetProperty("medium").GetInt32());
+        Assert.Contains(
+            checkDocument.RootElement.GetProperty("issues").EnumerateArray(),
+            issue =>
+                issue.GetProperty("type").GetString() == "AccidentalVolatility"
+                && issue.GetProperty("target").GetString() == "Reporting");
+    }
+
+    [Fact]
     public async Task RunAsync_CsprojInput_ReturnsSummaryOutput()
     {
         string directory = CreateDirectory();
