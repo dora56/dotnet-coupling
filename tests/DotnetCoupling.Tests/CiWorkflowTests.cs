@@ -68,6 +68,39 @@ public sealed class CiWorkflowTests
         Assert.Contains("path: StrykerOutput/**", workflow);
     }
 
+    [Fact]
+    public void DogfoodWorkflow_UsesSelfTomlConfigForReportsAndModeCompare()
+    {
+        string workflowPath = Path.Combine(TestPaths.RepositoryRoot, ".github", "workflows", "dogfood.yml");
+        string workflow = File.ReadAllText(workflowPath);
+
+        Assert.Contains("\"$TOOL_PATH/dotnet-coupling\" --config .coupling.toml --summary ./src", workflow);
+        Assert.Contains("\"$TOOL_PATH/dotnet-coupling\" --config .coupling.toml --summary --no-git ./src", workflow);
+        Assert.Contains("\"$TOOL_PATH/dotnet-coupling\" --config .coupling.toml --json --no-git ./src", workflow);
+        Assert.Contains("\"$TOOL_PATH/dotnet-coupling\" --config .coupling.toml --sarif --output dogfood-report.sarif --no-git ./src", workflow);
+        Assert.Contains("scripts/generate-semantic-compare-report.sh", workflow);
+        Assert.Contains("./dotnet-coupling.slnx", workflow);
+        Assert.Contains(".coupling.toml", workflow);
+    }
+
+    [Fact]
+    public void SemanticCompareScript_AcceptsOptionalConfigPathAndHighlightsSemanticDeltas()
+    {
+        string scriptPath = Path.Combine(TestPaths.RepositoryRoot, "scripts", "generate-semantic-compare-report.sh");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("[config-path]", script);
+        Assert.Contains("config_args=(--config \"$config_path\")", script);
+        Assert.Contains("\"${config_args[@]}\" \"$target_path\"", script);
+        Assert.Contains("- Config: \\`", script);
+        Assert.Contains("build_issue_type_delta_markdown()", script);
+        Assert.Contains("## Issue Type Delta", script);
+        Assert.Contains("build_semantic_only_high_issues_markdown()", script);
+        Assert.Contains("issue_key(issue) not in syntax_keys", script);
+        Assert.Contains("issue.get(\"severity\") in {\"Critical\", \"High\"}", script);
+        Assert.Contains("## Semantic-Only High Issues Top 10", script);
+    }
+
     private static string ReadCiWorkflow()
     {
         string workflowPath = Path.Combine(TestPaths.RepositoryRoot, ".github", "workflows", "ci.yml");

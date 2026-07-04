@@ -503,6 +503,19 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
     }
 
+    [Fact]
+    public void Load_SelfTomlConfig_IsAccepted()
+    {
+        string configPath = Path.Combine(TestPaths.RepositoryRoot, ".coupling.toml");
+
+        ConfigurationLoadResult result = ConfigurationLoader.Load(TestPaths.RepositoryRoot, new FileInfo(configPath));
+
+        Assert.Equal(20, result.Options.Thresholds.MaxDependencies);
+        Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
+        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Core");
+        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Roslyn");
+    }
+
     private static string CreateDirectory()
     {
         string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));

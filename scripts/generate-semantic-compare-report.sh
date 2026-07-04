@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <dotnet-coupling-tool-path> <target-path> <output-directory>" >&2
+if [[ $# -lt 3 || $# -gt 4 ]]; then
+  echo "Usage: $0 <dotnet-coupling-tool-path> <target-path> <output-directory> [config-path]" >&2
   exit 1
 fi
 
 tool_path="$1"
 target_path="$2"
 output_directory="$3"
+config_path="${4:-}"
+config_args=()
+
+if [[ -n "$config_path" ]]; then
+  config_args=(--config "$config_path")
+fi
 
 mkdir -p "$output_directory"
 
@@ -39,10 +45,101 @@ count_json_property() {
   (grep -o "\"$property_name\"" "$file_path" || true) | wc -l | tr -d ' '
 }
 
-"$tool_path" --mode syntax --summary --no-git "$target_path" > "$syntax_summary_path"
-"$tool_path" --mode semantic --summary --no-git "$target_path" > "$semantic_summary_path"
-"$tool_path" --mode syntax --json --no-git "$target_path" > "$syntax_json_path"
-"$tool_path" --mode semantic --json --no-git "$target_path" > "$semantic_json_path"
+build_issue_type_delta_markdown() {
+  local syntax_report_path="$1"
+  local semantic_report_path="$2"
+
+  python3 - "$syntax_report_path" "$semantic_report_path" <<'PY'
+import json
+import sys
+
+
+def load_counts(path):
+    with open(path, encoding="utf-8") as stream:
+        report = json.load(stream)
+
+    counts = {}
+    for issue in report.get("issues", []):
+        issue_type = issue.get("type") or "Unknown"
+        counts[issue_type] = counts.get(issue_type, 0) + 1
+    return counts
+
+
+syntax_counts = load_counts(sys.argv[1])
+semantic_counts = load_counts(sys.argv[2])
+issue_types = sorted(set(syntax_counts) | set(semantic_counts))
+
+print("| Issue Type | syntax | semantic-preview | delta |")
+print("| --- | ---: | ---: | ---: |")
+
+if not issue_types:
+    print("| _none_ | `0` | `0` | `0` |")
+else:
+    for issue_type in issue_types:
+        syntax_count = syntax_counts.get(issue_type, 0)
+        semantic_count = semantic_counts.get(issue_type, 0)
+        delta = semantic_count - syntax_count
+        signed_delta = f"+{delta}" if delta > 0 else str(delta)
+        print(f"| `{issue_type}` | `{syntax_count}` | `{semantic_count}` | `{signed_delta}` |")
+PY
+}
+
+build_semantic_only_high_issues_markdown() {
+  local syntax_report_path="$1"
+  local semantic_report_path="$2"
+
+  python3 - "$syntax_report_path" "$semantic_report_path" <<'PY'
+import json
+import sys
+
+
+def load_issues(path):
+    with open(path, encoding="utf-8") as stream:
+        report = json.load(stream)
+    return report.get("issues", [])
+
+
+def issue_key(issue):
+    return (
+        issue.get("type") or "",
+        issue.get("source") or "",
+        issue.get("target") or "",
+    )
+
+
+def escape_cell(value):
+    return str(value or "n/a").replace("\\", "\\\\").replace("|", "\\|").replace("`", "\\`")
+
+
+syntax_issues = load_issues(sys.argv[1])
+semantic_issues = load_issues(sys.argv[2])
+syntax_keys = {issue_key(issue) for issue in syntax_issues}
+semantic_only_issues = [
+    issue
+    for issue in semantic_issues
+    if issue_key(issue) not in syntax_keys and issue.get("severity") in {"Critical", "High"}
+]
+
+print("| Severity | Issue Type | Source | Target | Problem |")
+print("| --- | --- | --- | --- | --- |")
+
+if not semantic_only_issues:
+    print("| _none_ |  |  |  |  |")
+else:
+    for issue in semantic_only_issues[:10]:
+        severity = escape_cell(issue.get("severity"))
+        issue_type = escape_cell(issue.get("type"))
+        source = escape_cell(issue.get("source"))
+        target = escape_cell(issue.get("target"))
+        problem = escape_cell(issue.get("problem"))
+        print(f"| `{severity}` | `{issue_type}` | `{source}` | `{target}` | {problem} |")
+PY
+}
+
+"$tool_path" --mode syntax --summary --no-git "${config_args[@]}" "$target_path" > "$syntax_summary_path"
+"$tool_path" --mode semantic --summary --no-git "${config_args[@]}" "$target_path" > "$semantic_summary_path"
+"$tool_path" --mode syntax --json --no-git "${config_args[@]}" "$target_path" > "$syntax_json_path"
+"$tool_path" --mode semantic --json --no-git "${config_args[@]}" "$target_path" > "$semantic_json_path"
 
 syntax_grade_line="$(sed -n '1p' "$syntax_summary_path")"
 syntax_files_line="$(sed -n '2p' "$syntax_summary_path")"
@@ -62,6 +159,8 @@ syntax_medium_issues="$(extract_json_number "$syntax_json_path" "medium")"
 semantic_medium_issues="$(extract_json_number "$semantic_json_path" "medium")"
 syntax_diagnostics_count="$(count_json_property "$syntax_json_path" "code")"
 semantic_diagnostics_count="$(count_json_property "$semantic_json_path" "code")"
+issue_type_delta_markdown="$(build_issue_type_delta_markdown "$syntax_json_path" "$semantic_json_path")"
+semantic_only_high_issues_markdown="$(build_semantic_only_high_issues_markdown "$syntax_json_path" "$semantic_json_path")"
 
 comparison_note=""
 
@@ -85,6 +184,7 @@ cat > "$markdown_path" <<EOF
 - Target: \`$target_path\`
 - Generated: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`
 - Tool: \`$tool_path\`
+- Config: \`${config_path:-none}\`
 
 ## Comparison Note
 
@@ -105,6 +205,14 @@ $comparison_note
 | High issues | \`$syntax_high_issues\` | \`$semantic_high_issues\` |
 | Medium issues | \`$syntax_medium_issues\` | \`$semantic_medium_issues\` |
 | Recoverable diagnostics | \`$syntax_diagnostics_count\` | \`$semantic_diagnostics_count\` |
+
+## Issue Type Delta
+
+$issue_type_delta_markdown
+
+## Semantic-Only High Issues Top 10
+
+$semantic_only_high_issues_markdown
 
 ## Syntax Summary
 
