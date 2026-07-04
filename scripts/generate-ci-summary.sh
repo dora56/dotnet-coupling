@@ -59,8 +59,6 @@ mutation_files = sorted(mutation_dir.rglob("mutation-report.json"))
 
 if not coverage_files:
     raise SystemExit(f"No Cobertura reports found under {coverage_dir}")
-if not mutation_files:
-    raise SystemExit(f"No mutation report found under {mutation_dir}")
 
 covered_lines = 0
 valid_lines = 0
@@ -76,11 +74,13 @@ for path in coverage_files:
 line_rate = (covered_lines / valid_lines) if valid_lines else 0.0
 branch_rate = (covered_branches / valid_branches) if valid_branches else 0.0
 
-mutation_report = json.loads(mutation_files[0].read_text())
+mutation_report = None
 statuses = collections.Counter()
-for file_report in mutation_report["files"].values():
-    for mutant in file_report["mutants"]:
-        statuses[mutant["status"]] += 1
+if mutation_files:
+    mutation_report = json.loads(mutation_files[0].read_text())
+    for file_report in mutation_report["files"].values():
+        for mutant in file_report["mutants"]:
+            statuses[mutant["status"]] += 1
 
 ignored = statuses.get("Ignored", 0)
 killed = statuses.get("Killed", 0)
@@ -90,17 +90,23 @@ runtime_error = statuses.get("RuntimeError", 0)
 no_coverage = statuses.get("NoCoverage", 0)
 compile_error = statuses.get("CompileError", 0)
 tracked = killed + survived + timeout + runtime_error + no_coverage
-tracked_score = (killed / tracked * 100.0) if tracked else 0.0
+tracked_score = (killed / tracked * 100.0) if tracked else None
 
 def pct(value: float) -> str:
     return f"{value * 100:.1f}%"
+
+mutation_result = (
+    f"{tracked_score:.1f}% kill ratio across tracked mutants"
+    if tracked_score is not None
+    else "not available for this run"
+)
 
 print("## CI Report")
 print()
 print("| Area | Result |")
 print("| --- | --- |")
 print(f"| Coverage | {pct(line_rate)} line / {pct(branch_rate)} branch |")
-print(f"| Mutation | {tracked_score:.1f}% kill ratio across tracked mutants |")
+print(f"| Mutation | {mutation_result} |")
 print()
 print("### Coverage")
 print()
@@ -110,18 +116,25 @@ print(f"- Branches: {covered_branches}/{valid_branches} ({pct(branch_rate)})")
 print()
 print("### Mutation")
 print()
-print(f"- Reports: {len(mutation_files)}")
-print(f"- Killed: {killed}")
-print(f"- Survived: {survived}")
-print(f"- Timeout: {timeout}")
-print(f"- Runtime error: {runtime_error}")
-print(f"- No coverage: {no_coverage}")
-print(f"- Compile error: {compile_error}")
-print(f"- Ignored: {ignored}")
-print(f"- Thresholds: low {mutation_report['thresholds']['low']} / high {mutation_report['thresholds']['high']}")
+if mutation_report is None:
+    print("- Reports: 0")
+    print("- Status: not available for this run")
+else:
+    print(f"- Reports: {len(mutation_files)}")
+    print(f"- Killed: {killed}")
+    print(f"- Survived: {survived}")
+    print(f"- Timeout: {timeout}")
+    print(f"- Runtime error: {runtime_error}")
+    print(f"- No coverage: {no_coverage}")
+    print(f"- Compile error: {compile_error}")
+    print(f"- Ignored: {ignored}")
+    print(f"- Thresholds: low {mutation_report['thresholds']['low']} / high {mutation_report['thresholds']['high']}")
 print()
 print("### Notes")
 print()
 print("- The summary is written from the generated test and mutation artifacts, so it reflects the actual CI run.")
-print("- The mutation ratio above is a simple killed / tracked-mutants ratio for the report; Stryker still enforces the official gate in the mutation job.")
+if mutation_report is None:
+    print("- Mutation reporting is skipped when the workflow does not produce a Stryker report.")
+else:
+    print("- The mutation ratio above is a simple killed / tracked-mutants ratio for the report; Stryker still enforces the official gate in the mutation job.")
 PY
