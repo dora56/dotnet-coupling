@@ -17,12 +17,20 @@ public sealed class IssueDetectorTests
     }
 
     [Fact]
-    public void DetectIssues_StrongHighVolatility_AddsCascadingChangeRisk()
+    public void DetectIssues_StrongFarHighVolatility_AddsCascadingChangeRisk()
     {
-        List<CouplingIssue> issues = Detect(Coupling("A.Source", "A.Target", IntegrationStrength.Functional, Distance.SameNamespace, Volatility.High));
+        List<CouplingIssue> issues = Detect(Coupling("A.Api.Source", "A.Domain.Target", IntegrationStrength.Functional, Distance.DifferentNamespace, Volatility.High));
 
         CouplingIssue issue = Assert.Single(issues, issue => issue.Type == IssueType.CascadingChangeRisk);
         Assert.Equal(Severity.High, issue.Severity);
+    }
+
+    [Fact]
+    public void DetectIssues_StrongCloseHighVolatility_DoesNotAddCascadingChangeRisk()
+    {
+        List<CouplingIssue> issues = Detect(Coupling("A.Domain.Source", "A.Domain.Target", IntegrationStrength.Functional, Distance.SameNamespace, Volatility.High));
+
+        Assert.DoesNotContain(issues, issue => issue.Type == IssueType.CascadingChangeRisk);
     }
 
     [Fact]

@@ -701,6 +701,7 @@ public sealed class ConfigurationLoaderTests
         ConfigurationLoadResult result = ConfigurationLoader.Load(TestPaths.RepositoryRoot, new FileInfo(configPath));
 
         Assert.Equal(20, result.Options.Thresholds.MaxDependencies);
+        Assert.Contains("tests/fixtures/**", result.Options.ExcludePathPatterns);
         Assert.Contains("**/tests/DotnetCoupling.Tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Core");

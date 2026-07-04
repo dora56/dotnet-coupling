@@ -112,7 +112,8 @@ Generic の分類は組織戦略、競争優位、時期によって変わるた
 
 0.5.0 初期契約:
 
-- Balance Score の主計算を急に変えない。
+- Domain Context がある場合、Balance Score は target subdomain の
+  `expectedVolatility` を優先する。
 - core の high churn は、それ自体を issue にしない。ただし core に遠く強く依存している component は、core の本質的な揮発性により引き続き risk が高い。
 - supporting / generic の high observed churn は `AccidentalVolatility` issue として表示する。
 - `.coupling.json` に設定がない場合は従来どおり Git 履歴ベースの volatility のみで動作する。

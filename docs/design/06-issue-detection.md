@@ -76,12 +76,13 @@ strength >= 0.75 && distance >= 0.50
 
 #### Cascading Change Risk
 
-変更頻度の高い対象に強く依存している。
+変更頻度の高い遠方の対象に強く依存している。強い結合でも同一 namespace
+内に閉じている場合は高凝集として扱い、この issue では報告しない。
 
 条件例:
 
 ```text
-strength >= 0.75 && volatility >= 0.75
+strength >= 0.75 && distance >= DifferentNamespace && volatility >= 0.75
 ```
 
 推奨:

@@ -194,19 +194,24 @@ Semantics:
   の保存場所では意味を変えない
 - 複数 subdomain の `paths` が同じ component に一致した場合は、設定順で最初に一致した
   subdomain を使う
-- `domain.areas` は code role の advisory context を表す。`technicalRole` /
+- `domain.areas` は code role context を表す。`technicalRole` /
   `technical_role` は `domainModel` / `domain_model`, `applicationService` /
   `application_service`, `adapter`, `compositionRoot` / `composition_root`,
   `contract`, `testSupport` / `test_support`
 - 複数 area の `paths` が同じ component に一致した場合は、設定順で最初に一致した area を使う
 - `technicalRole` は DDD 専用ではない。非DDD codebase でも broader architecture hint として使う
+- `technicalRole=contract` の target への strong coupling は score 計算上 `Model`
+  相当に補正し、契約 DTO / published language への過剰検知を抑える
+- `technicalRole=compositionRoot` の source からの cross-boundary orchestration は
+  score 計算上 `Model` 相当に補正し、composition root の意図的な配線を過剰検知しない
 - `core` の high churn は essential business volatility として説明できる
 - `core` は `expectedVolatility` が `low` / `medium` でも
   `AccidentalVolatility` としては報告しない
 - `supporting` / `generic` の high observed churn は、`expectedVolatility` が
   `low` / `medium` の場合に `AccidentalVolatility` として報告する
-- Balance Score / Grade の主計算式は変えない。domain context は追加 issue と説明に使う
-- role context は advisory-only。issue 数、grade、`--check` exit code は変更しない
+- subdomain に一致した target の score volatility は `expectedVolatility` を優先する
+- observed Git churn は `AccidentalVolatility` と Hotspots の補助情報に残す
+- `strategicRole` は advisory-only。issue 数、grade、`--check` exit code は変更しない
 - 設定がある場合は summary に `Domain Context: ...` 行を出し、JSON では
   `manifest.domainContext` に subdomain 数、matched / unmatched component 数、
   `AccidentalVolatility` issue 数、subdomain 別 match 数、area coverage を出す。

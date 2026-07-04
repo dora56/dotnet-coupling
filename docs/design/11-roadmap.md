@@ -315,7 +315,7 @@ Non-goals:
 - [x] Domain Context Config: user-supplied subdomain category / expected volatility を読み込む
 - [x] essential business volatility と design / implementation friction による accidental churn を区別して表示する
 - [x] `AccidentalVolatility` を issue または hotspot reason として扱う
-- [x] advisory role context: strategic boundary hints と technical area roles を summary / JSON / hotspot reason に表示する
+- [x] role context: strategic boundary hints と technical area roles を summary / JSON / hotspot reason に表示し、contract / composition root は score 補正に使う
 - [ ] `--impact`
 - [ ] `--trace`
 - [ ] `--ai`

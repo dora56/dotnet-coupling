@@ -156,7 +156,7 @@ Current supported settings include:
   suppressions
 - domain context for user-supplied core/supporting/generic subdomain categories
   and expected volatility
-- advisory role context for strategic boundaries and technical areas
+- role context for strategic boundaries and technical areas
 
 TOML keys use `snake_case`; JSON keeps the existing `camelCase` schema shape.
 `analysis.test_projects` / `analysis.testProjects` marks test project files.
@@ -173,14 +173,15 @@ file or passing it with `--config` does not change their meaning. Summary output
 and JSON `manifest.domainContext` show how many components matched configured
 subdomains and how many `AccidentalVolatility` issues were produced.
 
-Role context is advisory. `strategicRole` / `strategic_role` can describe
-boundary meanings such as `sharedKernel` / `shared_kernel`, while
-`domain.areas` assigns technical roles such as `domainModel`,
-`applicationService`, `adapter`, `compositionRoot`, `contract`, and
-`testSupport`. These technical roles are not DDD-only; for non-DDD codebases,
-use them as broad architectural hints. Role context can appear in summaries,
-JSON manifest data, and hotspot reasons, but it does not change issue counts,
-grades, or `--check` exit codes.
+Role context separates strategic boundary meaning from technical scoring hints.
+`strategicRole` / `strategic_role` can describe boundary meanings such as
+`sharedKernel` / `shared_kernel` and remains advisory. `domain.areas` assigns
+technical roles such as `domainModel`, `applicationService`, `adapter`,
+`compositionRoot`, `contract`, and `testSupport`. `contract` targets and
+`compositionRoot` sources reduce over-reporting for intentional contracts and
+orchestration, so technical roles can affect scores, issue counts, grades, and
+`--check` exit codes. Other technical roles are shown in summaries, JSON
+manifest data, and hotspot reasons without changing scoring.
 
 See [`.coupling.example.json`](.coupling.example.json),
 [`.coupling.example.toml`](.coupling.example.toml),

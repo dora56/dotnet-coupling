@@ -4,6 +4,7 @@ exclude = [
   "**/obj/**",
   "**/*.g.cs",
   "**/*.generated.cs",
+  "tests/fixtures/**",
 ]
 test_projects = [
   "**/tests/DotnetCoupling.Tests/**",
@@ -25,7 +26,7 @@ issue_types = [
 name = "Core"
 category = "core"
 paths = ["src/DotnetCoupling.Core/**"]
-expected_volatility = "high"
+expected_volatility = "medium"
 
 [[domain.subdomains]]
 name = "Roslyn"

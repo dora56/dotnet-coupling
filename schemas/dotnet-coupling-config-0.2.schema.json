@@ -197,7 +197,7 @@
         },
         "areas": {
           "type": "array",
-          "description": "Technical role areas are evaluated in order; the first matching path pattern wins. Names must be unique, case-insensitively.",
+          "description": "Technical role areas are evaluated in order; the first matching path pattern wins. Contract targets and composition-root sources may calibrate scoring. Names must be unique, case-insensitively.",
           "items": {
             "type": "object",
             "required": [
