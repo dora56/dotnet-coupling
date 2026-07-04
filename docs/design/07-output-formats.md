@@ -55,7 +55,7 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
   "$schema": "https://raw.githubusercontent.com/YOUR_GITHUB/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
   "schemaVersion": "0.1",
   "tool": "dotnet-coupling",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "analysis": {
     "path": "./src",
     "mode": "semantic-preview",

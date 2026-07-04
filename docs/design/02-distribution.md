@@ -37,7 +37,7 @@ MVP から **`net10.0` を最低対象**にする。`net8.0` / `net9.0` への�
     <PackageOutputPath>./nupkg</PackageOutputPath>
 
     <PackageId>dotnet-coupling</PackageId>
-    <Version>0.3.1</Version>
+    <Version>0.4.0</Version>
     <Authors>YOUR_NAME</Authors>
     <Description>Experimental coupling balance analyzer for C#/.NET projects.</Description>
     <PackageTags>coupling;architecture;analysis;dotnet-tool;roslyn</PackageTags>

@@ -217,13 +217,13 @@
       "dotnetcoupling.git": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[0.3.1, )"
+          "DotnetCoupling.Core": "[0.4.0, )"
         }
       },
       "dotnetcoupling.roslyn": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[0.3.1, )",
+          "DotnetCoupling.Core": "[0.4.0, )",
           "Microsoft.Build.Locator": "[1.11.2, )",
           "Microsoft.CodeAnalysis.CSharp": "[5.3.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.3.0, )",
@@ -233,7 +233,7 @@
       "dotnetcoupling.sarif": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[0.3.1, )",
+          "DotnetCoupling.Core": "[0.4.0, )",
           "Sarif.Sdk": "[5.0.0, )"
         }
       }

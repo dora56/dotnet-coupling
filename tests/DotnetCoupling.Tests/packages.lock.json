@@ -403,10 +403,10 @@
       "dotnet-coupling": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[0.3.1, )",
-          "DotnetCoupling.Git": "[0.3.1, )",
-          "DotnetCoupling.Roslyn": "[0.3.1, )",
-          "DotnetCoupling.Sarif": "[0.3.1, )",
+          "DotnetCoupling.Core": "[0.4.0, )",
+          "DotnetCoupling.Git": "[0.4.0, )",
+          "DotnetCoupling.Roslyn": "[0.4.0, )",
+          "DotnetCoupling.Sarif": "[0.4.0, )",
           "System.CommandLine": "[2.*, )"
         }
       },
@@ -416,13 +416,13 @@
       "dotnetcoupling.git": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[0.3.1, )"
+          "DotnetCoupling.Core": "[0.4.0, )"
         }
       },
       "dotnetcoupling.roslyn": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[0.3.1, )",
+          "DotnetCoupling.Core": "[0.4.0, )",
           "Microsoft.Build.Locator": "[1.11.2, )",
           "Microsoft.CodeAnalysis.CSharp": "[5.3.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.3.0, )",
@@ -432,7 +432,7 @@
       "dotnetcoupling.sarif": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[0.3.1, )",
+          "DotnetCoupling.Core": "[0.4.0, )",
           "Sarif.Sdk": "[5.0.0, )"
         }
       }
