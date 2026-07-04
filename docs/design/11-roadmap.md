@@ -298,7 +298,7 @@ Architecture drivers:
 - [x] baseline update workflow を Git ref ratchet + suppression 運用として具体化
 - [x] release notes を `CHANGELOG.md` に集約
 - [x] self + OSS 3 repos で SARIF / Hotspots / Suppression を dogfood
-- [ ] GitHub Code Scanning 表示と PR CI green を確認して `0.4.0` RC へ進む
+- [x] GitHub Code Scanning 表示と PR CI green を確認して `0.4.0` RC へ進む
 
 ### Phase 5: Advanced UX
 
