@@ -1,7 +1,6 @@
 using DotnetCoupling.Core;
 using DotnetCoupling.Git;
 using DotnetCoupling.Roslyn;
-using DotnetCoupling.Sarif;
 using System.CommandLine;
 
 namespace DotnetCoupling.Cli;
@@ -147,13 +146,13 @@ public static class CliApplication
 
             try
             {
-                string analysisTargetPath = ResolveAnalysisTargetPath(fullTargetPath, analysisMode);
+                string analysisTargetPath = CliPathResolver.ResolveAnalysisTargetPath(fullTargetPath, analysisMode);
                 ConfigurationLoadResult configuration = ConfigurationLoader.Load(fullTargetPath, config);
                 IVolatilityProvider? volatilityProvider = noGit ? null : new GitVolatilityProvider();
                 AnalysisReport report = CSharpDependencyAnalyzer.Analyze(analysisTargetPath, analysisMode, volatilityProvider, gitMonths, configuration.Options);
                 if (!string.IsNullOrWhiteSpace(baselineRef))
                 {
-                    string? repositoryRoot = FindGitRepositoryRoot(analysisTargetPath);
+                    string? repositoryRoot = CliPathResolver.FindGitRepositoryRoot(analysisTargetPath);
                     if (repositoryRoot is null)
                     {
                         Console.Error.WriteLine("Baseline comparison requires a Git repository.");
@@ -172,46 +171,10 @@ public static class CliApplication
                         BaselineComparer.Compare(baselineRef, report, baselineReport));
                 }
 
-                if (hotspotsRequested)
-                {
-                    int hotspotCount = hotspotsValue ?? HotspotAnalyzer.DefaultCount;
-                    report = report with { Hotspots = HotspotAnalyzer.Calculate(report, hotspotCount) };
-                }
-
-                string rendered;
-                if (json)
-                {
-                    rendered = ReportRenderer.Render(report, ReportFormat.Json);
-                }
-                else if (sarif)
-                {
-                    string repositoryRoot = FindGitRepositoryRoot(analysisTargetPath) ?? ResolveOutputRoot(analysisTargetPath);
-                    rendered = SarifReportRenderer.Render(report, repositoryRoot);
-                }
-                else
-                {
-                    ReportFormat format = hotspotsRequested
-                        ? ReportFormat.Hotspots
-                        : summary || check
-                            ? ReportFormat.Summary
-                            : ReportFormat.Text;
-                    rendered = ReportRenderer.Render(report, format);
-                }
-
-                if (output is not null)
-                {
-                    DirectoryInfo? outputDirectory = output.Directory;
-                    if (outputDirectory is not null && !outputDirectory.Exists)
-                    {
-                        outputDirectory.Create();
-                    }
-
-                    File.WriteAllText(output.FullName, rendered);
-                }
-                else
-                {
-                    Console.WriteLine(rendered);
-                }
+                report = CliReportWriter.AddHotspotsIfRequested(report, hotspotsRequested, hotspotsValue);
+                CliReportRenderOptions renderOptions = new(summary, json, sarif, hotspotsRequested, check, analysisTargetPath);
+                string rendered = CliReportWriter.Render(report, renderOptions);
+                CliReportWriter.Write(rendered, output);
 
                 if (!check)
                 {
@@ -314,63 +277,5 @@ public static class CliApplication
             Severity.Critical => 3,
             _ => 0,
         };
-    }
-
-    private static string ResolveAnalysisTargetPath(string fullTargetPath, AnalysisMode analysisMode)
-    {
-        if (analysisMode != AnalysisMode.Semantic || File.Exists(fullTargetPath))
-        {
-            return fullTargetPath;
-        }
-
-        string[] candidates = Directory
-            .EnumerateFiles(fullTargetPath, "*", SearchOption.TopDirectoryOnly)
-            .Where(path =>
-                path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase)
-                || path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
-                || path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        return candidates.Length switch
-        {
-            1 => candidates[0],
-            0 => throw new NotSupportedException(
-                "Semantic mode directory input requires one .slnx, .sln, or .csproj in the target directory. Pass a project or solution path explicitly."),
-            _ => throw new NotSupportedException(CreateAmbiguousSemanticDirectoryMessage(candidates)),
-        };
-    }
-
-    private static string CreateAmbiguousSemanticDirectoryMessage(IReadOnlyList<string> candidates)
-    {
-        return "Semantic mode directory input is ambiguous. Pass one of these project or solution paths explicitly:"
-            + Environment.NewLine
-            + string.Join(Environment.NewLine, candidates.Select(candidate => "- " + candidate));
-    }
-
-    private static string? FindGitRepositoryRoot(string targetPath)
-    {
-        DirectoryInfo? directory = File.Exists(targetPath)
-            ? new FileInfo(targetPath).Directory
-            : new DirectoryInfo(targetPath);
-
-        while (directory is not null)
-        {
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git")))
-            {
-                return directory.FullName;
-            }
-
-            directory = directory.Parent;
-        }
-
-        return null;
-    }
-
-    private static string ResolveOutputRoot(string targetPath)
-    {
-        return Directory.Exists(targetPath)
-            ? targetPath
-            : Path.GetDirectoryName(targetPath) ?? targetPath;
     }
 }

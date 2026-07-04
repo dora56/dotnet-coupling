@@ -4,6 +4,11 @@ public static class HotspotAnalyzer
 {
     public const int DefaultCount = 10;
 
+    public static IReadOnlyList<Hotspot> Calculate(AnalysisReport report)
+    {
+        return Calculate(report, DefaultCount);
+    }
+
     public static IReadOnlyList<Hotspot> Calculate(AnalysisReport report, int count)
     {
         if (count <= 0)
