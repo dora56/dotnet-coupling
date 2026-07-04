@@ -352,18 +352,24 @@ public static class ReportRenderer
         };
     }
 
-    private static IReadOnlyList<string> CreateRunNotes(AnalysisReport report)
+    private static List<string> CreateRunNotes(AnalysisReport report)
     {
+        List<string> notes;
         if (string.Equals(report.Summary.Mode, "semantic-preview", StringComparison.Ordinal))
         {
-            return
+            notes =
             [
                 "Semantic mode uses MSBuildWorkspace preview loading.",
                 "Semantic preview resolves many symbol-aware dependencies, but some flows remain syntax-equivalent.",
             ];
         }
+        else
+        {
+            notes = ["Semantic symbol resolution is not enabled."];
+        }
 
-        return ["Semantic symbol resolution is not enabled."];
+        notes.AddRange(CreateDomainContextCoverageNotes(report));
+        return notes;
     }
 
     private static void AppendDiagnosticsSummary(StringBuilder builder, AnalysisReport report)
@@ -397,12 +403,41 @@ public static class ReportRenderer
         if (domainContext.SubdomainCount > 0)
         {
             builder.AppendLine(CultureInfo.InvariantCulture, $"Domain Context: {domainContext.SubdomainCount} {Pluralize(domainContext.SubdomainCount, "subdomain")} configured, {domainContext.MatchedComponents} {Pluralize(domainContext.MatchedComponents, "matched component")}, {domainContext.UnmatchedComponents} {Pluralize(domainContext.UnmatchedComponents, "unmatched component")}, {domainContext.AccidentalVolatilityIssues} {Pluralize(domainContext.AccidentalVolatilityIssues, "AccidentalVolatility issue")}");
+            if (domainContext.UnmatchedComponents > 0)
+            {
+                builder.AppendLine(CultureInfo.InvariantCulture, $"Domain Context Hint: {domainContext.UnmatchedComponents} {Pluralize(domainContext.UnmatchedComponents, "component")} did not match any configured subdomain.");
+            }
         }
 
         if (domainContext.AreaCount > 0)
         {
             builder.AppendLine(CultureInfo.InvariantCulture, $"Role Context: {domainContext.AreaCount} {Pluralize(domainContext.AreaCount, "area")} configured, {domainContext.MatchedAreaComponents} {Pluralize(domainContext.MatchedAreaComponents, "matched component")}, {domainContext.UnmatchedAreaComponents} {Pluralize(domainContext.UnmatchedAreaComponents, "unmatched component")}");
+            if (domainContext.UnmatchedAreaComponents > 0)
+            {
+                builder.AppendLine(CultureInfo.InvariantCulture, $"Role Context Hint: {domainContext.UnmatchedAreaComponents} {Pluralize(domainContext.UnmatchedAreaComponents, "component")} did not match any configured technical role.");
+            }
         }
+    }
+
+    private static List<string> CreateDomainContextCoverageNotes(AnalysisReport report)
+    {
+        if (report.DomainContext is not DomainContextSummary domainContext)
+        {
+            return [];
+        }
+
+        List<string> notes = [];
+        if (domainContext.SubdomainCount > 0 && domainContext.UnmatchedComponents > 0)
+        {
+            notes.Add(string.Create(CultureInfo.InvariantCulture, $"Domain Context coverage is partial: {domainContext.UnmatchedComponents} {Pluralize(domainContext.UnmatchedComponents, "component")} did not match any configured subdomain."));
+        }
+
+        if (domainContext.AreaCount > 0 && domainContext.UnmatchedAreaComponents > 0)
+        {
+            notes.Add(string.Create(CultureInfo.InvariantCulture, $"Role Context coverage is partial: {domainContext.UnmatchedAreaComponents} {Pluralize(domainContext.UnmatchedAreaComponents, "component")} did not match any configured technical role."));
+        }
+
+        return notes;
     }
 
     private static string Pluralize(int count, string singular)

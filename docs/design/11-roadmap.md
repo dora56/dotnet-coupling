@@ -316,6 +316,9 @@ Non-goals:
 - [x] essential business volatility と design / implementation friction による accidental churn を区別して表示する
 - [x] `AccidentalVolatility` を issue または hotspot reason として扱う
 - [x] role context: strategic boundary hints と technical area roles を summary / JSON / hotspot reason に表示し、contract / composition root は score 補正に使う
+- [x] self / OSS evaluation で Domain Context calibration の妥当性と過補正リスクを記録する
+- [x] value object / identifier / DTO / published language / module startup 向けの config authoring guidance を追加する
+- [x] partial Domain Context / Role Context coverage を summary と JSON run notes で可視化する
 - [ ] `--impact`
 - [ ] `--trace`
 - [ ] `--ai`

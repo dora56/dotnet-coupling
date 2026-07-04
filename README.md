@@ -183,6 +183,14 @@ orchestration, so technical roles can affect scores, issue counts, grades, and
 `--check` exit codes. Other technical roles are shown in summaries, JSON
 manifest data, and hotspot reasons without changing scoring.
 
+Use `contract` for stable API shapes even inside a core subdomain: value
+objects, identifier types, DTOs, published language models, and shared-kernel
+contracts. Put these area patterns before broader `domainModel` patterns because
+the first matching area wins. Use `compositionRoot` for `Program`, `Startup`,
+module startup, DI registration, and host bootstrapping code. Summary output and
+JSON run notes include coverage hints when configured subdomains or technical
+roles leave components unmatched.
+
 See [`.coupling.example.json`](.coupling.example.json),
 [`.coupling.example.toml`](.coupling.example.toml),
 and [`schemas/dotnet-coupling-config-0.2.schema.json`](schemas/dotnet-coupling-config-0.2.schema.json).

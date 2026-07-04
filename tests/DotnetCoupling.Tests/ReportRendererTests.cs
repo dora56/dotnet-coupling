@@ -354,6 +354,48 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void Render_SummaryOutput_IncludesDomainContextCoverageHints()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 10, 10, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 7,
+                UnmatchedComponents: 3,
+                AccidentalVolatilityIssues: 0,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Core",
+                        SubdomainCategory.Core,
+                        Volatility.High,
+                        MatchedComponents: 7),
+                ],
+                AreaCount: 1,
+                MatchedAreaComponents: 6,
+                UnmatchedAreaComponents: 4,
+                Areas:
+                [
+                    new DomainAreaUsage(
+                        "CoreContracts",
+                        TechnicalRole.Contract,
+                        MatchedComponents: 6),
+                ]));
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Summary);
+
+        Assert.Contains("Domain Context Hint: 3 components did not match any configured subdomain.", rendered);
+        Assert.Contains("Role Context Hint: 4 components did not match any configured technical role.", rendered);
+    }
+
+    [Fact]
     public void Render_JsonOutput_IncludesDomainContextManifest()
     {
         AnalysisReport report = new(
@@ -432,6 +474,54 @@ public sealed class ReportRendererTests
         Assert.Equal("Application", area.GetProperty("name").GetString());
         Assert.Equal("ApplicationService", area.GetProperty("technicalRole").GetString());
         Assert.Equal(1, area.GetProperty("matchedComponents").GetInt32());
+    }
+
+    [Fact]
+    public void Render_JsonOutput_IncludesDomainContextCoverageHintsInRunNotes()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 10, 10, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 7,
+                UnmatchedComponents: 3,
+                AccidentalVolatilityIssues: 0,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Core",
+                        SubdomainCategory.Core,
+                        Volatility.High,
+                        MatchedComponents: 7),
+                ],
+                AreaCount: 1,
+                MatchedAreaComponents: 6,
+                UnmatchedAreaComponents: 4,
+                Areas:
+                [
+                    new DomainAreaUsage(
+                        "CoreContracts",
+                        TechnicalRole.Contract,
+                        MatchedComponents: 6),
+                ]));
+
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        string[] runNotes = document.RootElement
+            .GetProperty("manifest")
+            .GetProperty("runNotes")
+            .EnumerateArray()
+            .Select(item => item.GetString()!)
+            .ToArray();
+        Assert.Contains("Domain Context coverage is partial: 3 components did not match any configured subdomain.", runNotes);
+        Assert.Contains("Role Context coverage is partial: 4 components did not match any configured technical role.", runNotes);
     }
 
     [Fact]

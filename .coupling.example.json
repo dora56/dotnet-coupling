@@ -66,6 +66,16 @@
     ],
     "areas": [
       {
+        "name": "BillingContracts",
+        "paths": [
+          "src/Sample.App.Billing/Contracts/**",
+          "src/Sample.App.Billing/Domain/**/*Id.cs",
+          "src/Sample.App.Billing/Domain/**/*Dto.cs",
+          "src/Sample.App.SharedKernel/**"
+        ],
+        "technicalRole": "contract"
+      },
+      {
         "name": "BillingDomain",
         "paths": [
           "src/Sample.App.Billing/Domain/**"
@@ -80,19 +90,21 @@
         "technicalRole": "applicationService"
       },
       {
+        "name": "HostCompositionRoot",
+        "paths": [
+          "src/Sample.App.Web/Program.cs",
+          "src/Sample.App.Web/Startup.cs",
+          "src/Sample.App.Web/*Startup.cs",
+          "src/Sample.App.Web/Modules/**"
+        ],
+        "technicalRole": "compositionRoot"
+      },
+      {
         "name": "InfrastructureAdapters",
         "paths": [
           "src/Sample.App.Infrastructure/**"
         ],
         "technicalRole": "adapter"
-      },
-      {
-        "name": "HostCompositionRoot",
-        "paths": [
-          "src/Sample.App.Web/Program.cs",
-          "src/Sample.App.Web/Startup.cs"
-        ],
-        "technicalRole": "compositionRoot"
       }
     ]
   }

@@ -52,6 +52,16 @@ expected_volatility = "low"
 strategic_role = "shared_kernel"
 
 [[domain.areas]]
+name = "BillingContracts"
+paths = [
+  "src/Sample.App.Billing/Contracts/**",
+  "src/Sample.App.Billing/Domain/**/*Id.cs",
+  "src/Sample.App.Billing/Domain/**/*Dto.cs",
+  "src/Sample.App.SharedKernel/**",
+]
+technical_role = "contract"
+
+[[domain.areas]]
 name = "BillingDomain"
 paths = ["src/Sample.App.Billing/Domain/**"]
 technical_role = "domain_model"
@@ -62,11 +72,16 @@ paths = ["src/Sample.App.Billing/Application/**"]
 technical_role = "application_service"
 
 [[domain.areas]]
+name = "HostCompositionRoot"
+paths = [
+  "src/Sample.App.Web/Program.cs",
+  "src/Sample.App.Web/Startup.cs",
+  "src/Sample.App.Web/*Startup.cs",
+  "src/Sample.App.Web/Modules/**",
+]
+technical_role = "composition_root"
+
+[[domain.areas]]
 name = "InfrastructureAdapters"
 paths = ["src/Sample.App.Infrastructure/**"]
 technical_role = "adapter"
-
-[[domain.areas]]
-name = "HostCompositionRoot"
-paths = ["src/Sample.App.Web/Program.cs", "src/Sample.App.Web/Startup.cs"]
-technical_role = "composition_root"

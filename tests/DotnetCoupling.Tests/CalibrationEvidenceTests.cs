@@ -75,6 +75,26 @@ public sealed class CalibrationEvidenceTests
     }
 
     [Fact]
+    public void DetectIssues_DddValueObjectMarkedAsContract_DoesNotBecomeHighPriority()
+    {
+        CouplingMetrics observed = Coupling(
+            "Sample.Api.OrderEndpoint",
+            "Sample.Sales.Domain.Orders.OrderId",
+            IntegrationStrength.Functional,
+            Volatility.Low);
+        Component source = Component(observed.Source, "/repo/src/Api/OrderEndpoint.cs");
+        Component target = Component(observed.Target, "/repo/src/Sales/Domain/Orders/OrderId.cs");
+        DomainContext domainContext = new(
+            [new DomainSubdomain("Sales", SubdomainCategory.Core, ["src/Sales/**"], Volatility.High)],
+            [new DomainArea("SalesContracts", ["src/Sales/Domain/Orders/*Id.cs"], TechnicalRole.Contract)]);
+
+        List<CouplingIssue> issues = Detect([observed], Components(source, target), domainContext);
+
+        Assert.DoesNotContain(issues, issue =>
+            issue.Type is IssueType.GlobalComplexity or IssueType.CascadingChangeRisk);
+    }
+
+    [Fact]
     public void DetectIssues_CompositionRootSource_RemovesGlobalComplexity()
     {
         CouplingMetrics observed = Coupling(
@@ -91,6 +111,26 @@ public sealed class CalibrationEvidenceTests
         List<CouplingIssue> issues = Detect([observed], Components(source, target), domainContext);
 
         Assert.DoesNotContain(issues, issue => issue.Type == IssueType.GlobalComplexity);
+    }
+
+    [Fact]
+    public void DetectIssues_StartupCompositionRoot_DoesNotBecomeHighPriority()
+    {
+        CouplingMetrics observed = Coupling(
+            "Sample.Web.Startup",
+            "Sample.Sales.Infrastructure.SalesModule",
+            IntegrationStrength.Functional,
+            Volatility.Low);
+        Component source = Component(observed.Source, "/repo/src/Web/Startup.cs");
+        Component target = Component(observed.Target, "/repo/src/Sales/Infrastructure/SalesModule.cs");
+        DomainContext domainContext = new(
+            [new DomainSubdomain("Sales", SubdomainCategory.Core, ["src/Sales/**"], Volatility.High)],
+            [new DomainArea("WebCompositionRoot", ["src/Web/Startup.cs"], TechnicalRole.CompositionRoot)]);
+
+        List<CouplingIssue> issues = Detect([observed], Components(source, target), domainContext);
+
+        Assert.DoesNotContain(issues, issue =>
+            issue.Type is IssueType.GlobalComplexity or IssueType.CascadingChangeRisk);
     }
 
     private static List<CouplingIssue> Detect(

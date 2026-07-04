@@ -168,9 +168,27 @@ volatility の解釈に使うための設定である。
     ],
     "areas": [
       {
+        "name": "BillingContracts",
+        "paths": [
+          "src/MyApp.Billing/Contracts/**",
+          "src/MyApp.Billing/Domain/**/*Id.cs",
+          "src/MyApp.Billing/Domain/**/*Dto.cs"
+        ],
+        "technicalRole": "contract"
+      },
+      {
         "name": "BillingDomain",
         "paths": ["src/MyApp.Billing/Domain/**"],
         "technicalRole": "domainModel"
+      },
+      {
+        "name": "BillingCompositionRoot",
+        "paths": [
+          "src/MyApp.Billing/Program.cs",
+          "src/MyApp.Billing/*Startup.cs",
+          "src/MyApp.Billing/Modules/**"
+        ],
+        "technicalRole": "compositionRoot"
       },
       {
         "name": "InfrastructureAdapters",
@@ -202,8 +220,12 @@ Semantics:
 - `technicalRole` は DDD 専用ではない。非DDD codebase でも broader architecture hint として使う
 - `technicalRole=contract` の target への strong coupling は score 計算上 `Model`
   相当に補正し、契約 DTO / published language への過剰検知を抑える
+- `contract` は core subdomain 内の value object、identifier type、DTO、published
+  language、shared kernel contract にも使える。広い `domainModel` pattern より前に置く
 - `technicalRole=compositionRoot` の source からの cross-boundary orchestration は
   score 計算上 `Model` 相当に補正し、composition root の意図的な配線を過剰検知しない
+- `compositionRoot` は `Program`、`Startup`、module startup、DI registration、
+  host bootstrapping code に使う。広い `adapter` pattern より前に置く
 - `core` の high churn は essential business volatility として説明できる
 - `core` は `expectedVolatility` が `low` / `medium` でも
   `AccidentalVolatility` としては報告しない
@@ -216,6 +238,9 @@ Semantics:
   `manifest.domainContext` に subdomain 数、matched / unmatched component 数、
   `AccidentalVolatility` issue 数、subdomain 別 match 数、area coverage を出す。
   Hotspots では `technical role: composition_root` のような reason を追加する
+- subdomain / area coverage が部分的な場合は summary と JSON `manifest.runNotes`
+  に coverage hint を出す。これは config path の漏れや、意図的に未分類の code を
+  レビューするための手がかりである
 - 設定がない repository では従来の Git 履歴ベース volatility のみで解析する
 
 ### 21.6 Generated code の既定除外
