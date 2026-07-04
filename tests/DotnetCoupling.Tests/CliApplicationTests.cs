@@ -29,6 +29,29 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_JsonTakesPrecedenceOverSarifAndHotspots()
+    {
+        CommandResult result = await RunCliAsync("--json", "--sarif", "--hotspots", "1", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        Assert.Equal("0.3", document.RootElement.GetProperty("schemaVersion").GetString());
+        Assert.True(document.RootElement.TryGetProperty("hotspots", out _));
+        Assert.False(document.RootElement.TryGetProperty("runs", out _));
+    }
+
+    [Fact]
+    public async Task RunAsync_SarifTakesPrecedenceOverHotspots()
+    {
+        CommandResult result = await RunCliAsync("--sarif", "--hotspots", "1", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        Assert.Equal("2.1.0", document.RootElement.GetProperty("version").GetString());
+        Assert.False(document.RootElement.TryGetProperty("hotspots", out _));
+    }
+
+    [Fact]
     public async Task RunAsync_Sarif_ReturnsSarifOutput()
     {
         CommandResult result = await RunCliAsync("--sarif", "--no-git", TestPaths.Fixture("global-complexity"));

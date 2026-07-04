@@ -50,4 +50,44 @@ public sealed class SarifReportRendererTests
         Assert.Equal("Api/Handler.cs", uri);
         Assert.True(result.GetProperty("partialFingerprints").TryGetProperty("dotnetCouplingIssueKey", out _));
     }
+
+    [Fact]
+    public void Render_ReportWithUnlocatableIssue_OmitsResultAndRecordsOmittedCount()
+    {
+        CouplingIssue locatableIssue = new(
+            IssueType.GlobalComplexity,
+            Severity.Medium,
+            "Sample.Api.Handler",
+            "Sample.Infrastructure.Repository",
+            0.50,
+            "Problem",
+            "Recommendation",
+            new SourceLocation("/tmp/sample/Api.cs", 1));
+        CouplingIssue unlocatableIssue = new(
+            IssueType.HighAfferentCoupling,
+            Severity.High,
+            "",
+            "Sample.Shared.Model",
+            1.0,
+            "Problem",
+            "Recommendation",
+            null);
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 3, 1, 0, false, false, 6),
+            new GradeResult("D", "High risk", "issue-density", "Test"),
+            0.50,
+            [],
+            [],
+            [],
+            [locatableIssue, unlocatableIssue],
+            []);
+
+        using JsonDocument document = JsonDocument.Parse(SarifReportRenderer.Render(report, "/tmp/sample"));
+
+        JsonElement run = document.RootElement.GetProperty("runs")[0];
+        Assert.Single(run.GetProperty("results").EnumerateArray());
+        Assert.Equal(
+            1,
+            run.GetProperty("properties").GetProperty("dotnetCouplingOmittedIssueCount").GetInt32());
+    }
 }

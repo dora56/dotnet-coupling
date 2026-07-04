@@ -312,8 +312,9 @@ jobs:
           path: artifacts/coverage
 
       - name: Download mutation report
-        if: needs.mutation.result == 'success'
+        if: needs.mutation.result != 'skipped' && needs.mutation.result != 'cancelled'
         uses: actions/download-artifact@v8.0.1
+        continue-on-error: true
         with:
           name: mutation-report
           path: artifacts/mutation

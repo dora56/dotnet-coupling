@@ -28,6 +28,7 @@ public static class SarifReportRenderer
         CouplingIssue[] locatableIssues = report.Issues
             .Where(issue => issue.Location is not null)
             .ToArray();
+        int omittedIssueCount = report.Issues.Count - locatableIssues.Length;
         ReportingDescriptor[] rules = CreateRules(report.Issues);
         Dictionary<string, int> ruleIndexes = rules
             .Select((rule, index) => (rule.Id, index))
@@ -60,6 +61,10 @@ public static class SarifReportRenderer
                 .Select(issue => CreateResult(issue, repositoryRoot, ruleIndexes))
                 .ToArray(),
         };
+        if (omittedIssueCount > 0)
+        {
+            run.SetProperty("dotnetCouplingOmittedIssueCount", omittedIssueCount);
+        }
 
         return new SarifLog
         {
