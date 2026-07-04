@@ -168,6 +168,69 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_TomlConfigThresholds_AffectIssueDetection()
+    {
+        string directory = CreateDirectory();
+        string sourcePath = Path.Combine(directory, "Sample.cs");
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        WriteFile(
+            sourcePath,
+            """
+            namespace Sample;
+
+            public sealed class Handler
+            {
+                private readonly FirstDependency _first;
+                private readonly SecondDependency _second;
+                private readonly ThirdDependency _third;
+            }
+
+            public sealed class FirstDependency { }
+            public sealed class SecondDependency { }
+            public sealed class ThirdDependency { }
+            """);
+        CommandResult defaultResult = await RunCliAsync("--json", "--no-git", directory);
+        WriteFile(
+            configPath,
+            """
+            [thresholds]
+            max_dependencies = 2
+            """);
+        CommandResult configuredResult = await RunCliAsync("--json", "--config", configPath, "--no-git", directory);
+
+        Assert.Equal(0, defaultResult.ExitCode);
+        Assert.Equal(0, configuredResult.ExitCode);
+        using JsonDocument defaultDocument = JsonDocument.Parse(defaultResult.Output);
+        using JsonDocument configuredDocument = JsonDocument.Parse(configuredResult.Output);
+        Assert.DoesNotContain(
+            defaultDocument.RootElement.GetProperty("issues").EnumerateArray(),
+            issue => issue.GetProperty("type").GetString() == "HighEfferentCoupling");
+        Assert.Contains(
+            configuredDocument.RootElement.GetProperty("issues").EnumerateArray(),
+            issue => issue.GetProperty("type").GetString() == "HighEfferentCoupling");
+    }
+
+    [Fact]
+    public async Task RunAsync_InvalidTomlConfig_ReturnsCliArgumentError()
+    {
+        string directory = CreateDirectory();
+        string sourcePath = Path.Combine(directory, "Sample.cs");
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        WriteFile(sourcePath, "namespace Sample; public sealed class Type { }");
+        WriteFile(
+            configPath,
+            """
+            [thresholds
+            max_dependencies = 3
+            """);
+
+        CommandResult result = await RunCliAsync("--summary", "--config", configPath, "--no-git", directory);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Invalid TOML configuration", result.Error);
+    }
+
+    [Fact]
     public async Task RunAsync_ConfigIssueSuppression_RemovesIssueFromCheckAndReportsSuppressedCount()
     {
         string directory = CreateDirectory();

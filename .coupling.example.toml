@@ -1,0 +1,30 @@
+[analysis]
+exclude = [
+  "**/Generated/**",
+  "**/*.g.cs",
+  "**/*.generated.cs",
+]
+
+[thresholds]
+max_dependencies = 20
+max_dependents = 30
+min_temporal_coupling = 3
+max_temporal_files_per_commit = 50
+scattered_external_breadth = 5
+
+[ignore]
+paths = [
+  "**/Legacy/**",
+]
+namespaces = [
+  "Sample.Legacy",
+]
+issue_types = [
+  "ScatteredExternalCoupling",
+]
+
+[[ignore.issues]]
+type = "GlobalComplexity"
+source = "Sample.App.Api.LegacyHandler"
+target = "Sample.App.Infrastructure.LegacyRepository"
+reason = "Accepted legacy dependency tracked in ARCH-42"

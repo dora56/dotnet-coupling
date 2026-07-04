@@ -2,20 +2,24 @@
 
 ## 21. 設定ファイル設計
 
-### 21.1 MVP 方針
+### 21.1 方針
 
-MVP では `.coupling.json` / `coupling.json` のみサポートする。理由は単純で、`System.Text.Json` だけで実装でき、NuGet 依存を増やさずに済むためである。
+MVP では `.coupling.json` / `coupling.json` のみサポートした。理由は単純で、`System.Text.Json` だけで実装でき、NuGet 依存を増やさずに済むためである。
 
-TOML は semantic mode 以降で検討する。`cargo-coupling` との親和性を考えると `.coupling.toml` は魅力的だが、Phase 2 で設定ファイル形式を増やすと本体より設定ローダーの世話が増える。
+Phase 5 では developer experience 向上のため、Tomlyn による `.coupling.toml` /
+`coupling.toml` を追加した。JSON と TOML は同じ internal config model に正規化し、
+validation / unknown property handling / CLI exit code を揃える。
 
 ### 21.2 探索順
 
 1. 明示された `--config <file>`
 2. `.coupling.json`
 3. `coupling.json`
+4. `.coupling.toml`
+5. `coupling.toml`
 
-Phase 2 では `.coupling.toml` / `coupling.toml` は未対応である。明示的に
-`--config` へ渡された場合は CLI 引数エラーとして扱う。
+既存 JSON auto-discovery の優先順位を維持し、既存 repository の挙動を変えない。
+TOML を使いたい場合は `--config .coupling.toml` で明示指定できる。
 
 ### 21.3 JSON 例
 
@@ -57,47 +61,85 @@ suppressed issue は grade / issue count / `--check` から除外するが、sum
 JSON には suppressed count と reason を残す。`reason` は必須で、意図しない
 負債隠しを避ける。
 
-### 21.4 TOML 例 v0.2+
+### 21.4 TOML support
 
-TOML 対応時は `Tomlyn` を第一候補にする。
+TOML 対応は `Tomlyn` を採用する。Tomlyn は `System.Text.Json` 風の
+serializer API と TOML parser を提供し、将来の `Domain Context Config` を
+手書きしやすくする。
+
+Design constraints:
+
+- Tomlyn dependency は config loader を持つ production project に閉じる。
+- JSON と TOML は同じ `Configuration` model に map する。
+- TOML parse error は JSON parse error と同じ config error path で扱う。
+- unknown property は JSON と同じく error にし、設定 typo を silent ignore しない。
+- `.coupling.toml` と `.coupling.json` の両方がある場合は、auto-discovery では JSON を優先する。TOML を使いたい場合は `--config .coupling.toml` を指定する。
+- TOML keys は snake_case のみを標準とし、JSON keys は既存 camelCase を維持する。
 
 ```toml
 [analysis]
-exclude_tests = true
 exclude = [
-  "**/bin/**",
-  "**/obj/**",
-  "**/.git/**",
-  "**/.vs/**",
   "**/Generated/**",
   "**/*.g.cs",
-  "**/*.generated.cs",
-  "**/*.Designer.cs",
-  "**/*.AssemblyInfo.cs",
-  "**/GlobalUsings.g.cs"
+  "**/*.generated.cs"
 ]
 
 [thresholds]
 max_dependencies = 20
 max_dependents = 30
-strong_coupling = 0.75
-far_distance = 0.50
-high_volatility = 0.75
 min_temporal_coupling = 3
 max_temporal_files_per_commit = 50
 scattered_external_breadth = 5
 
-[volatility]
-high = ["src/MyApp.Domain/Core/**"]
-low = ["src/MyApp.Infrastructure/Shared/**"]
+[ignore]
+paths = ["**/Legacy/**"]
+namespaces = ["MyApp.Legacy"]
+issue_types = ["ScatteredExternalCoupling"]
 
-[subdomains]
-core = ["src/MyApp.Domain/**"]
-supporting = ["src/MyApp.Application/**"]
-generic = ["src/MyApp.Infrastructure/**"]
+[[ignore.issues]]
+type = "GlobalComplexity"
+source = "MyApp.Legacy.LegacyFacade"
+target = "MyApp.Infrastructure.LegacyRepository"
+reason = "Accepted legacy adapter until the replacement service ships."
 ```
 
-### 21.5 Generated code の既定除外
+### 21.5 Domain Context Config (Phase 5 planned)
+
+Phase 5 の次スライスでは config file に domain context を追加する。これは
+subdomain classification を tool が推論するものではなく、ユーザーが判断した分類を
+読み込んで volatility の解釈に使うための設定である。
+
+```json
+{
+  "domain": {
+    "subdomains": [
+      {
+        "name": "Billing",
+        "category": "core",
+        "paths": ["src/MyApp.Billing/**"],
+        "expectedVolatility": "high"
+      },
+      {
+        "name": "Reporting",
+        "category": "supporting",
+        "paths": ["src/MyApp.Reporting/**"],
+        "expectedVolatility": "low"
+      }
+    ]
+  }
+}
+```
+
+Semantics:
+
+- `category`: `core` / `supporting` / `generic`
+- `expectedVolatility`: `low` / `medium` / `high`
+- `paths`: config file location からの relative glob
+- `core` の high churn は essential business volatility として説明できる
+- `supporting` / `generic` の high observed churn は accidental churn として報告候補にする
+- 設定がない repository では従来の Git 履歴ベース volatility のみで解析する
+
+### 21.6 Generated code の既定除外
 
 既定除外:
 

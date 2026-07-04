@@ -10,7 +10,7 @@ Semantic Versioning を採用する。
 | `0.2.0-alpha.1` | public alpha feedback / config / baseline |
 | `0.3.0` | project model / semantic mode foundation |
 | `0.4.0` | SARIF / team CI integration / hotspots |
-| `0.5.0` | AI output / impact / trace |
+| `0.5.0` | TOML config / domain context / impact / trace / AI output |
 | `0.6.0` | complexity-assisted risk prioritization |
 | `1.0.0` | CLI と JSON schema を安定化 |
 
@@ -302,14 +302,36 @@ Architecture drivers:
 
 ### Phase 5: Advanced UX
 
-Goal: 調査・修正計画に使える体験へ広げる。
+Goal: GitHub / SARIF / Markdown / CLI 上で、調査・修正計画に使える体験へ広げる。
 
+Non-goals:
+
+- Web UI / dashboard は Phase 5 では実装しない。
+- 常時稼働する server や frontend は持たない。
+- PR feedback / Code Scanning / Markdown report で足りる間は、CLI と machine-readable output を優先する。
+- サブドメイン分類を tool が自動推論しない。分類はユーザー設定から読み込む。
+
+- [x] Tomlyn による `.coupling.toml` / `coupling.toml` config support を追加する
+- [ ] Domain Context Config: user-supplied subdomain category / expected volatility を読み込む
+- [ ] essential business volatility と design / implementation friction による accidental churn を区別して表示する
+- [ ] `AccidentalVolatility` を issue または hotspot reason として扱う
 - [ ] `--impact`
 - [ ] `--trace`
 - [ ] `--ai`
 - [ ] Markdown report
 - [ ] 日本語出力
-- [ ] Web UI
+
+#### Future / Optional: Visualization
+
+Web UI は、Phase 5 の既定タスクではなく、必要性が見えた場合に再検討する。
+
+検討条件:
+
+- PR comment / SARIF / Markdown だけでは調査導線が不足する
+- 複数 repo / 複数 team の trend を横断して見たい
+- 非エンジニアにも設計リスクを継続的に共有したい
+- `--impact` / `--trace` / complexity-assisted prioritization が増え、CLI 出力だけでは比較しづらい
+- 履歴推移、解消状況、ownership などを可視化する明確な需要がある
 
 ### Phase 6: Complexity-assisted prioritization
 

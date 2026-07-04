@@ -343,6 +343,11 @@
           "System.ValueTuple": "4.6.1"
         }
       },
+      "Tomlyn": {
+        "type": "Transitive",
+        "resolved": "2.10.1",
+        "contentHash": "ykjOY3IpYmC4SpPcAZRTl/w2jTmhPMDydHq8xcV7tTBAQ22nKBsOkPqauIrZlMjHm03cmKfV23UOPscKp+J4Og=="
+      },
       "xunit.analyzers": {
         "type": "Transitive",
         "resolved": "1.27.0",
@@ -411,7 +416,10 @@
         }
       },
       "dotnetcoupling.core": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "Tomlyn": "[2.10.1, )"
+        }
       },
       "dotnetcoupling.git": {
         "type": "Project",

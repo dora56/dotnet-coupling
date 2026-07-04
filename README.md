@@ -109,8 +109,9 @@ dotnet-coupling --hotspots 10 ./src
 # Skip Git history for faster local runs
 dotnet-coupling --no-git ./src
 
-# Apply JSON config
+# Apply JSON or TOML config
 dotnet-coupling --config .coupling.json ./src
+dotnet-coupling --config .coupling.toml ./src
 
 # CI gate on minimum grade
 dotnet-coupling --check --min-grade B ./src
@@ -140,8 +141,9 @@ dotnet-coupling --mode semantic --summary ./sample.sln
 
 ## Configuration
 
-JSON configuration is supported via `--config <file>`, `.coupling.json`, or
-`coupling.json`.
+JSON and TOML configuration are supported via `--config <file>`. Automatic
+discovery checks `.coupling.json` and `coupling.json` first, then
+`.coupling.toml` and `coupling.toml`.
 
 Current supported settings include:
 
@@ -152,7 +154,10 @@ Current supported settings include:
 - ignore rules for paths, namespaces, issue types, and precise issue
   suppressions
 
-See [`.coupling.example.json`](.coupling.example.json)
+TOML keys use `snake_case`; JSON keeps the existing `camelCase` schema shape.
+
+See [`.coupling.example.json`](.coupling.example.json),
+[`.coupling.example.toml`](.coupling.example.toml),
 and [`schemas/dotnet-coupling-config-0.2.schema.json`](schemas/dotnet-coupling-config-0.2.schema.json).
 
 ## Baseline Gate

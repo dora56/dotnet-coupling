@@ -43,7 +43,82 @@ FAIL: 2 new High issues found.
 
 ## 25. Hotspots / Impact / Trace 設計
 
-### 25.1 Hotspots
+### 25.0 TOML Config Support
+
+Phase 5 では、developer experience 向上のため Tomlyn による TOML config support を
+追加した。TOML は既存 JSON config と同じ internal config model に正規化する。
+
+Target files:
+
+- `.coupling.toml`
+- `coupling.toml`
+- explicit `--config <file>.toml`
+
+Design:
+
+- JSON と TOML は同じ internal config model に正規化する。
+- JSON の既存 auto-discovery 優先順位は変えない。
+- TOML は将来の `Domain Context Config` を手書きしやすくするための入力形式であり、
+  JSON schema / JSON report の互換性とは独立に扱う。
+- unknown property / invalid enum は JSON config と同じ validation
+  error として扱い、silent ignore しない。
+- TOML keys は snake_case のみを標準とし、JSON keys は既存 camelCase を維持する。
+
+### 25.1 Domain Context Config
+
+Phase 5 では、ユーザーが設定した domain context を読み込み、Git 履歴から観測した
+churn を「本質的な業務変化による揮発性」か「設計 / 実装の摩擦による churn」かに
+分けて解釈できるようにする。
+
+この tool は subdomain classification を自動推論しない。Core / Supporting /
+Generic の分類は組織戦略、競争優位、時期によって変わるため、ユーザーが設定で
+明示したものだけを根拠にする。
+
+設定例:
+
+```json
+{
+  "domain": {
+    "subdomains": [
+      {
+        "name": "Billing",
+        "category": "core",
+        "paths": ["src/MyApp.Billing/**"],
+        "expectedVolatility": "high"
+      },
+      {
+        "name": "Reporting",
+        "category": "supporting",
+        "paths": ["src/MyApp.Reporting/**"],
+        "expectedVolatility": "low"
+      },
+      {
+        "name": "IdentityProvider",
+        "category": "generic",
+        "paths": ["src/MyApp.IdentityProvider/**"],
+        "expectedVolatility": "low"
+      }
+    ]
+  }
+}
+```
+
+用語:
+
+- `observedChurn`: Git 履歴から観測した変更頻度
+- `expectedVolatility`: 設定から読み込んだ業務上期待される揮発性
+- `essentialVolatility`: core subdomain などで、product model の進化として説明できる高い揮発性
+- `accidentalChurn`: supporting / generic など本来安定してほしい領域で観測される高 churn
+
+初期契約:
+
+- Balance Score の主計算を急に変えない。
+- core の high churn は、それ自体を issue にしない。ただし core に遠く強く依存している component は、core の本質的な揮発性により引き続き risk が高い。
+- supporting / generic の high observed churn は `AccidentalVolatility` issue、または Hotspots / Markdown / AI output の reason として表示する。
+- JSON schema には optional fields として `domainContext`, `observedChurn`, `expectedVolatility`, `volatilityKind` を追加する。
+- `.coupling.json` に設定がない場合は従来どおり Git 履歴ベースの volatility のみで動作する。
+
+### 25.2 Hotspots
 
 Phase 4 で `--hotspots [N]` として実装する。リファクタリング候補をランキングする。
 
@@ -65,7 +140,7 @@ Phase 4 では complexity はまだ使わない。`--hotspots` のモデルは�
 complexity-assisted ranking を足せるように、Grade とは別の priority score として
 保持する。
 
-### 25.2 Impact
+### 25.3 Impact
 
 指定コンポーネントを変更した場合の影響範囲を出す。
 
@@ -80,7 +155,7 @@ dotnet coupling --impact MyApp.Domain.User ./src
 - risk score
 - 影響 project / namespace
 
-### 25.3 Trace
+### 25.4 Trace
 
 指定 symbol への依存を追う。
 
@@ -247,3 +322,22 @@ max と sum を優先し、平均値だけで判断しない。
 - field が無い場合も既存 consumer が動くようにする。
 - `--summary` では詳細数値を出しすぎず、hotspot reason として短く表示する。
 - complexity は補助指標であり、Phase 6 時点でも health grade の denominator には入れない。
+
+---
+
+## 29. Web UI / Visualization
+
+Web UI は Phase 5 の既定タスクから外し、必要性が見えた場合に検討する。
+
+Phase 4 までで PR comment、GitHub Code Scanning、SARIF artifact、Hotspots、
+JSON / Markdown 系出力による feedback loop はかなり目的を満たしている。そのため、
+当面は常時稼働する server / frontend よりも、CLI と machine-readable output の
+安定性を優先する。
+
+再検討条件:
+
+- PR comment / SARIF / Markdown だけでは調査導線が不足する
+- 複数 repo / 複数 team の trend を横断して見たい
+- 非エンジニアにも設計リスクを継続的に共有したい
+- `--impact` / `--trace` / complexity-assisted prioritization が増え、CLI 出力だけでは比較しづらい
+- 履歴推移、解消状況、ownership などを可視化する明確な需要がある

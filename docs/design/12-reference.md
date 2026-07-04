@@ -11,7 +11,7 @@
 | struct / enum | class / record / struct / enum |
 | `pub`, `pub(crate)` | `public`, `internal`, `protected`, `private` |
 | `cargo coupling` | `dotnet coupling` |
-| `.coupling.toml` | MVP は `.coupling.json`、v0.2 で `.coupling.toml` |
+| `.coupling.toml` | `.coupling.json` / `.coupling.toml` |
 | `--json` | `--json` |
 | `--check` | `--check` |
 | `--baseline` | `--baseline` |
@@ -107,7 +107,7 @@ Measure the right distance in your .NET code.
 | Balance Score の clamp 未記載 | `Math.Clamp` 必須に変更 |
 | `Visibility` 未定義 | C# 固有 enum を追加 |
 | `UsageContext` 未定義 | enum と strength mapping を追加 |
-| TOML parser 未選定 | MVP は JSON のみ、TOML は v0.2 + Tomlyn 候補 |
+| TOML parser | Tomlyn を採用し、config loader に閉じ込める |
 | Git command injection 懸念 | `ProcessStartInfo.ArgumentList` 使用を明記 |
 | generated code 除外不足 | `.generated.cs`, `.AssemblyInfo.cs`, `GlobalUsings.g.cs`, `.vs` を追加 |
 | namespace-level circular dependency の外部 edge | `System.*`, `Microsoft.*`, 外部 namespace 除外を明記 |
