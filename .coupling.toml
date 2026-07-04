@@ -40,6 +40,7 @@ name = "CoreContracts"
 category = "supporting"
 paths = [
   "src/DotnetCoupling.Core/Models.cs",
+  "src/DotnetCoupling.Core/UsingNamespace.cs",
   "src/DotnetCoupling.Core/VolatilityAnalysis.cs",
 ]
 expected_volatility = "medium"
@@ -110,6 +111,7 @@ technical_role = "domain_model"
 name = "CoreContracts"
 paths = [
   "src/DotnetCoupling.Core/Models.cs",
+  "src/DotnetCoupling.Core/UsingNamespace.cs",
   "src/DotnetCoupling.Core/VolatilityAnalysis.cs",
 ]
 technical_role = "contract"

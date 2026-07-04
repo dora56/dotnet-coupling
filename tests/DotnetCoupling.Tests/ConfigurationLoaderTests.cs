@@ -707,9 +707,18 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "CoreRules");
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "CoreContracts");
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "CoreUtilities");
+        Assert.Contains(
+            result.Options.DomainContext.Subdomains,
+            subdomain => subdomain.Name == "CoreContracts"
+                && subdomain.PathPatterns.Contains("src/DotnetCoupling.Core/UsingNamespace.cs"));
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Roslyn");
         Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CliCompositionRoot" && area.TechnicalRole == TechnicalRole.CompositionRoot);
         Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CoreContracts" && area.TechnicalRole == TechnicalRole.Contract);
+        Assert.Contains(
+            result.Options.DomainContext.Areas,
+            area => area.Name == "CoreContracts"
+                && area.TechnicalRole == TechnicalRole.Contract
+                && area.PathPatterns.Contains("src/DotnetCoupling.Core/UsingNamespace.cs"));
         Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CoreUtilities" && area.TechnicalRole == TechnicalRole.Contract);
     }
 
