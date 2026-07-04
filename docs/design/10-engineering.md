@@ -137,7 +137,7 @@ CLI ツール / 分析エンジンであり UI 層がないため、Testing Trop
 | Balance scoring | score formula の境界値 |
 | Issue detector | known graph -> expected issues |
 | Report renderer | golden file comparison |
-| Config loader | MVP は JSON 読み込み、v0.2 で TOML 追加 |
+| Config loader | JSON / TOML 読み込み、unknown property と validation error |
 
 ### 30.2 Fixture Projects
 

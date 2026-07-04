@@ -202,7 +202,7 @@ MVP ではファイルペア単位で Hidden Coupling を検出する。v0.2 以
 
 ### 14.4 設定による上書き
 
-Git の変更頻度だけでは、ビジネス上の重要な揮発性を判断できない。設定ファイルで上書きできるようにする。
+Git の変更頻度だけでは、ビジネス上の重要な揮発性を判断できない。将来の Domain Context Config で上書きできるようにする。
 
 ```toml
 [volatility]
@@ -211,6 +211,9 @@ low = ["src/MyApp.Infrastructure/Shared/**"]
 ```
 
 ### 14.5 DDD subdomain による補正
+
+Phase 5 の次スライスでは、ユーザー設定から subdomain category と expected volatility を読み込む。
+tool は subdomain を自動分類しない。
 
 ```toml
 [subdomains]
@@ -221,9 +224,12 @@ generic = ["src/MyApp.Infrastructure/**"]
 
 基本方針:
 
-- core subdomain は変化してよい
-- supporting / generic が頻繁に変化している場合は設計摩擦の疑いがある
-- supporting / generic の High volatility は `Accidental Volatility` として issue 化する
+- Git 履歴から見える変更頻度は `observedChurn` として扱う
+- 設定から読み込んだ業務上期待される揮発性は `expectedVolatility` として扱う
+- core subdomain の high churn は、product model の進化として説明できる場合があるため、それ自体を issue にしない
+- core に遠く強く依存している component は、core の本質的な揮発性により引き続き risk が高い
+- supporting / generic が頻繁に変化している場合は、設計摩擦や実装摩擦による `AccidentalVolatility` の疑いがある
+- `AccidentalVolatility` は Phase 5 では issue または hotspot reason として表示し、Balance Score の主計算は急に変えない
 
 ---
 

@@ -1,13 +1,12 @@
 using System.Text.Json;
+using Tomlyn;
 
 namespace DotnetCoupling.Core;
 
 public static class ConfigurationLoader
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNameCaseInsensitive = false,
-    };
+    private static readonly string[] JsonConfigFileNames = [".coupling.json", "coupling.json"];
+    private static readonly string[] TomlConfigFileNames = [".coupling.toml", "coupling.toml"];
 
     public static ConfigurationLoadResult Load(string targetPath, FileInfo? explicitConfig)
     {
@@ -22,87 +21,25 @@ public static class ConfigurationLoader
             throw new ConfigurationException($"Configuration file does not exist: {configFile.FullName}");
         }
 
-        if (!string.Equals(configFile.Extension, ".json", StringComparison.OrdinalIgnoreCase))
+        if (!IsSupportedConfigFile(configFile))
         {
             throw new ConfigurationException($"Unsupported configuration file format: {configFile.FullName}");
         }
 
         try
         {
-            using FileStream stream = configFile.OpenRead();
-            using JsonDocument document = JsonDocument.Parse(stream);
-            AssertKnownProperties(document.RootElement, "", ["$schema", "analysis", "thresholds", "ignore"]);
-
-            AnalysisOptions defaults = AnalysisOptions.Default;
-            List<string> excludePathPatterns = [.. defaults.ExcludePathPatterns];
-            List<string> ignorePathPatterns = [.. defaults.IgnorePathPatterns];
-            List<string> ignoreNamespaces = [.. defaults.IgnoreNamespaces];
-            HashSet<IssueType> ignoreIssueTypes = new(defaults.IgnoreIssueTypes);
-            List<IssueSuppression> issueSuppressions = [.. defaults.IssueSuppressions];
-            AnalysisThresholds thresholds = defaults.Thresholds;
-
-            if (document.RootElement.TryGetProperty("analysis", out JsonElement analysis))
-            {
-                AssertKnownProperties(analysis, "analysis", ["exclude"]);
-                if (analysis.TryGetProperty("exclude", out JsonElement exclude))
-                {
-                    excludePathPatterns = ReadStringArray(exclude, "analysis.exclude");
-                }
-            }
-
-            if (document.RootElement.TryGetProperty("thresholds", out JsonElement thresholdElement))
-            {
-                AssertKnownProperties(thresholdElement, "thresholds", [
-                    "maxDependencies",
-                    "maxDependents",
-                    "minTemporalCoupling",
-                    "maxTemporalFilesPerCommit",
-                    "scatteredExternalBreadth",
-                ]);
-                thresholds = new AnalysisThresholds(
-                    ReadPositiveInt(thresholdElement, "maxDependencies", thresholds.MaxDependencies),
-                    ReadPositiveInt(thresholdElement, "maxDependents", thresholds.MaxDependents),
-                    ReadPositiveInt(thresholdElement, "minTemporalCoupling", thresholds.MinTemporalCoupling),
-                    ReadPositiveInt(thresholdElement, "maxTemporalFilesPerCommit", thresholds.MaxTemporalFilesPerCommit),
-                    ReadPositiveInt(thresholdElement, "scatteredExternalBreadth", thresholds.ScatteredExternalBreadth));
-            }
-
-            if (document.RootElement.TryGetProperty("ignore", out JsonElement ignore))
-            {
-                AssertKnownProperties(ignore, "ignore", ["paths", "namespaces", "issueTypes", "issues"]);
-                if (ignore.TryGetProperty("paths", out JsonElement paths))
-                {
-                    ignorePathPatterns = ReadStringArray(paths, "ignore.paths");
-                }
-
-                if (ignore.TryGetProperty("namespaces", out JsonElement namespaces))
-                {
-                    ignoreNamespaces = ReadStringArray(namespaces, "ignore.namespaces");
-                }
-
-                if (ignore.TryGetProperty("issueTypes", out JsonElement issueTypes))
-                {
-                    ignoreIssueTypes = ReadIssueTypes(issueTypes);
-                }
-
-                if (ignore.TryGetProperty("issues", out JsonElement issues))
-                {
-                    issueSuppressions = ReadIssueSuppressions(issues);
-                }
-            }
-
-            AnalysisOptions loaded = new(
-                excludePathPatterns,
-                ignorePathPatterns,
-                ignoreNamespaces,
-                ignoreIssueTypes,
-                issueSuppressions,
-                thresholds);
-            return new ConfigurationLoadResult(loaded, configFile.FullName, []);
+            RawConfiguration rawConfiguration = IsJsonConfigFile(configFile)
+                ? JsonConfigurationReader.Load(configFile)
+                : TomlConfigurationReader.Load(configFile);
+            return new ConfigurationLoadResult(ConfigurationOptionsFactory.Create(rawConfiguration), configFile.FullName, []);
         }
         catch (JsonException ex)
         {
             throw new ConfigurationException($"Invalid JSON configuration: {ex.Message}");
+        }
+        catch (TomlException ex)
+        {
+            throw new ConfigurationException($"Invalid TOML configuration: {ex.Message}");
         }
     }
 
@@ -112,18 +49,21 @@ public static class ConfigurationLoader
             ? new FileInfo(targetPath).Directory
             : new DirectoryInfo(targetPath);
 
+        FileInfo? jsonConfig = FindConfigFile(directory, JsonConfigFileNames);
+        return jsonConfig ?? FindConfigFile(directory, TomlConfigFileNames);
+    }
+
+    private static FileInfo? FindConfigFile(DirectoryInfo? directory, IReadOnlyList<string> fileNames)
+    {
         while (directory is not null)
         {
-            FileInfo dotConfig = new(Path.Combine(directory.FullName, ".coupling.json"));
-            if (dotConfig.Exists)
+            foreach (string fileName in fileNames)
             {
-                return dotConfig;
-            }
-
-            FileInfo config = new(Path.Combine(directory.FullName, "coupling.json"));
-            if (config.Exists)
-            {
-                return config;
+                FileInfo config = new(Path.Combine(directory.FullName, fileName));
+                if (config.Exists)
+                {
+                    return config;
+                }
             }
 
             directory = directory.Parent;
@@ -132,117 +72,14 @@ public static class ConfigurationLoader
         return null;
     }
 
-    private static void AssertKnownProperties(JsonElement element, string path, IReadOnlyCollection<string> knownProperties)
-    {
-        if (element.ValueKind != JsonValueKind.Object)
-        {
-            throw new ConfigurationException($"{(path.Length == 0 ? "configuration" : path)} must be an object.");
-        }
+    private static bool IsSupportedConfigFile(FileInfo configFile) =>
+        IsJsonConfigFile(configFile) || IsTomlConfigFile(configFile);
 
-        foreach (JsonProperty property in element.EnumerateObject())
-        {
-            if (!knownProperties.Contains(property.Name))
-            {
-                string prefix = path.Length == 0 ? "" : path + ".";
-                throw new ConfigurationException($"Unknown configuration property: {prefix}{property.Name}");
-            }
-        }
-    }
+    private static bool IsJsonConfigFile(FileInfo configFile) =>
+        string.Equals(configFile.Extension, ".json", StringComparison.OrdinalIgnoreCase);
 
-    private static List<string> ReadStringArray(JsonElement element, string path)
-    {
-        if (element.ValueKind != JsonValueKind.Array)
-        {
-            throw new ConfigurationException($"{path} must be an array.");
-        }
-
-        List<string> values = [];
-        foreach (JsonElement item in element.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(item.GetString()))
-            {
-                throw new ConfigurationException($"{path} must contain non-empty strings.");
-            }
-
-            values.Add(item.GetString()!);
-        }
-
-        return values;
-    }
-
-    private static int ReadPositiveInt(JsonElement element, string propertyName, int fallback)
-    {
-        if (!element.TryGetProperty(propertyName, out JsonElement value))
-        {
-            return fallback;
-        }
-
-        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int result) || result <= 0)
-        {
-            throw new ConfigurationException($"thresholds.{propertyName} must be a positive integer.");
-        }
-
-        return result;
-    }
-
-    private static HashSet<IssueType> ReadIssueTypes(JsonElement element)
-    {
-        HashSet<IssueType> values = [];
-        foreach (string value in ReadStringArray(element, "ignore.issueTypes"))
-        {
-            if (!Enum.TryParse(value, ignoreCase: true, out IssueType issueType))
-            {
-                throw new ConfigurationException($"Invalid issue type in ignore.issueTypes: {value}");
-            }
-
-            values.Add(issueType);
-        }
-
-        return values;
-    }
-
-    private static List<IssueSuppression> ReadIssueSuppressions(JsonElement element)
-    {
-        if (element.ValueKind != JsonValueKind.Array)
-        {
-            throw new ConfigurationException("ignore.issues must be an array.");
-        }
-
-        List<IssueSuppression> suppressions = [];
-        int index = 0;
-        foreach (JsonElement item in element.EnumerateArray())
-        {
-            string path = $"ignore.issues[{index}]";
-            AssertKnownProperties(item, path, ["type", "source", "target", "reason"]);
-
-            string type = ReadRequiredString(item, path, "type");
-            string source = ReadRequiredString(item, path, "source");
-            string target = ReadRequiredString(item, path, "target");
-            string reason = ReadRequiredString(item, path, "reason");
-
-            if (!Enum.TryParse(type, ignoreCase: true, out IssueType issueType))
-            {
-                throw new ConfigurationException($"Invalid issue type in {path}.type: {type}");
-            }
-
-            suppressions.Add(new IssueSuppression(issueType, source, target, reason));
-            index++;
-        }
-
-        return suppressions;
-    }
-
-    private static string ReadRequiredString(JsonElement element, string path, string propertyName)
-    {
-        if (!element.TryGetProperty(propertyName, out JsonElement property)
-            || property.ValueKind != JsonValueKind.String
-            || string.IsNullOrWhiteSpace(property.GetString()))
-        {
-            throw new ConfigurationException($"{path}.{propertyName} must be a non-empty string.");
-        }
-
-        return property.GetString()!;
-    }
+    private static bool IsTomlConfigFile(FileInfo configFile) =>
+        string.Equals(configFile.Extension, ".toml", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record ConfigurationLoadResult(

@@ -115,7 +115,7 @@ flowchart TD
 | ステップ | 内容 |
 |---|---|
 | Resolve Target Path | 入力パスを絶対パスへ変換し、存在確認する |
-| Load Config | MVP では `.coupling.json` / `coupling.json` のみ読む。TOML は v0.2 で追加する |
+| Load Config | `.coupling.json` / `coupling.json` を優先し、見つからない場合は `.coupling.toml` / `coupling.toml` を読む |
 | Discover C# Files | `*.cs` を再帰探索する。`bin`, `obj`, `.git`, `.vs`, generated code は除外する |
 | Parse Syntax Trees | Roslyn の `CSharpSyntaxTree` で構文解析する |
 | Build Component Index | 型、名前空間、ファイル、プロジェクト情報をインデックス化する |

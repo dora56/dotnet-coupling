@@ -30,7 +30,7 @@ project boundary distance を補助する。Phase 3b では明示 `semantic` mod
 | `--mode <syntax|semantic>` | 解析モードを指定 | `syntax` |
 | `--no-git` | Git 履歴解析をスキップ | `false` |
 | `--git-months <n>` | Git 履歴を見る月数 | `6` |
-| `--config <file>` | 設定ファイル指定 | 自動探索 |
+| `--config <file>` | 設定ファイル指定 (`.json`, `.toml`) | 自動探索 |
 | `--baseline <ref>` | 指定 Git ref と比較する | 未指定 |
 | `--help` | ヘルプ表示 | - |
 | `--version` | バージョン表示 | - |
@@ -42,6 +42,9 @@ project boundary distance を補助する。Phase 3b では明示 `semantic` mod
 `--sarif` は Phase 4 の PR feedback 用出力で、`--output` と併用できる。
 `--check --sarif` では SARIF を出力しつつ、既存の品質 gate exit code を返す。
 `--hotspots` は値なしなら `10`、値ありなら正の整数のみを受け付ける。
+設定ファイルは `.coupling.json` / `coupling.json` を優先して自動探索し、見つからない
+場合に `.coupling.toml` / `coupling.toml` を探す。TOML を使いたい場合は
+`--config .coupling.toml` で明示指定できる。
 
 ### 5.3 将来オプション
 
@@ -51,7 +54,7 @@ project boundary distance を補助する。Phase 3b では明示 `semantic` mod
 | `--trace <symbol>` | 指定型・メソッドへの依存を追跡 |
 | `--ai` | AI coding agent 向け出力 |
 | `--jp`, `--japanese` | 日本語説明付き出力 |
-| `--web` | Web UI 起動 |
+| `--web` | 必要性が確認された場合に検討する Web UI 起動 |
 
 ---
 
