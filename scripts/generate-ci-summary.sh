@@ -62,6 +62,7 @@ coverage_files = sorted(
         path
         for pattern in (
             "coverage.cobertura.xml",
+            "coverage-*.cobertura.xml",
             "*.coverage.cobertura.xml",
             "coverage.cobertura*.xml",
             "*.coverage.cobertura*.xml",
@@ -181,7 +182,7 @@ print("- The summary is written from the generated test, mutation, and coupling 
 if mutation_report is None:
     print("- Mutation reporting is skipped when the workflow does not produce a Stryker report.")
 else:
-    print("- The mutation ratio above is a simple killed / tracked-mutants ratio for the report; Stryker still enforces the official gate in the mutation job.")
+    print("- The mutation ratio above is a simple killed / tracked-mutants ratio for the report; Stryker still enforces the official gate in nightly or manual mutation runs.")
 if coupling_sarif_files or hotspot_files:
     print("- Coupling feedback is generated from the packaged CLI and uploaded as SARIF / hotspots artifacts.")
 else:

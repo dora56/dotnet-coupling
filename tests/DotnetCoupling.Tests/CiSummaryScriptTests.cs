@@ -12,7 +12,6 @@ public sealed class CiSummaryScriptTests
         string coverageDirectory = CreateCoverageDirectory(directory);
         string mutationDirectory = Path.Combine(directory, "mutation");
         string couplingDirectory = Path.Combine(directory, "coupling");
-        Directory.CreateDirectory(mutationDirectory);
 
         CommandResult result = await RunSummaryScriptAsync(coverageDirectory, mutationDirectory, couplingDirectory);
 
@@ -28,7 +27,6 @@ public sealed class CiSummaryScriptTests
         string coverageDirectory = CreateCoverageDirectory(directory);
         string mutationDirectory = Path.Combine(directory, "mutation");
         string couplingDirectory = Path.Combine(directory, "coupling");
-        Directory.CreateDirectory(mutationDirectory);
         Directory.CreateDirectory(couplingDirectory);
         File.WriteAllText(Path.Combine(couplingDirectory, "dotnet-coupling.sarif"), "{}");
         File.WriteAllText(
@@ -50,7 +48,7 @@ public sealed class CiSummaryScriptTests
         string coverageDirectory = Path.Combine(directory, "coverage");
         Directory.CreateDirectory(coverageDirectory);
         File.WriteAllText(
-            Path.Combine(coverageDirectory, "coverage.cobertura.xml"),
+            Path.Combine(coverageDirectory, "coverage-1.cobertura.xml"),
             """<coverage lines-covered="8" lines-valid="10" branches-covered="2" branches-valid="4" />""");
         return coverageDirectory;
     }

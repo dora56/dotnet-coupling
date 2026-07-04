@@ -265,7 +265,7 @@ Architecture drivers:
 - 既存 CLI / JSON 契約を壊さない。
 - 導入チームが既存負債で詰まらないように、baseline と suppression を組み合わせる。
 - `syntax` mode は既定のまま維持し、`semantic` は preview 明示オプションに留める。
-- mutation は PR / branch 中心で実行し、release workflow からは外す。
+- mutation は nightly / manual / local 中心で実行し、PR / release workflow からは外す。
 - complexity 指標は Phase 6 に残し、Phase 4 の `--hotspots` では使わない。
 
 #### Phase 4a: PR Feedback First

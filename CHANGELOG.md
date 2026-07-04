@@ -19,9 +19,9 @@ Phase 4 moves `dotnet-coupling` into PR feedback and team workflow use.
 ### Changed
 
 - Suppressed issues are excluded from active issue counts, grade calculation, `--check`, and SARIF upload while remaining visible in summary and JSON output.
-- CI report aggregation now includes coverage, mutation, and coupling feedback sections.
+- CI report aggregation now includes coverage and coupling feedback, plus mutation availability status when no Stryker report is produced.
 - Test execution is aligned with Microsoft Testing Platform.
-- Mutation remains PR-focused and uses Stryker `since` for diff-scoped feedback.
+- Mutation moved out of PR CI into a scheduled/manual `nightly-mutation` workflow; local Stryker runs remain supported for focused checks.
 
 ### Compatibility Notes
 

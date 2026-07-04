@@ -260,12 +260,12 @@ xUnit v3 test project は `<UseMicrosoftTestingPlatformRunner>true</UseMicrosoft
 `Microsoft.Testing.Extensions.CodeCoverage` で Cobertura XML を出力する。
 test assembly は既定で除外される。
 
-PR CI では mutation testing を独立した job として実行し、`stryker-config.json`
-の `break` threshold で失敗させる。Coverage は同じ CI 内で収集するが、Phase 1
-では threshold gate にしない。CI は `coverage-report`、`mutation-report`、
+PR CI では mutation testing を実行しない。Coverage は同じ CI 内で収集するが、
+Phase 1 では threshold gate にしない。CI は `coverage-report`、
 `dotnet-coupling-sarif`、`dotnet-coupling-hotspots` を artifact として保存し、
-coverage は Cobertura XML、mutation は Stryker HTML/JSON、coupling feedback は
-SARIF / Hotspots text で確認できるようにする。
+coverage は Cobertura XML、coupling feedback は SARIF / Hotspots text で確認できる
+ようにする。Mutation は `nightly-mutation` workflow と local/manual 実行で扱い、
+`stryker-config.json` の `break` threshold はその実行で検証する。
 
 #### 対象と除外
 
@@ -341,10 +341,10 @@ SARIF / Hotspots text で確認できるようにする。
 
 | Suite | Stryker 実行 | 理由 |
 |---|---|---|
-| PR gate | Yes (`since`) | 変更差分だけを mutation して feedback loop を維持する |
+| PR gate | No | PR feedback loop は build / test / format / coupling feedback に集中する |
 | Branch / manual | Yes (`workflow_dispatch` or local) | 大きめの refactor で事前検証する |
 | Main branch | No by default | main push は build / test / format / package smoke を優先し、feedback loop を重くしない |
-| Nightly | Optional | 長期 trend や heavy な構成に広げる場合に使う |
+| Nightly | Yes | full mutation と長期 trend を CI feedback loop から分離する |
 | Release gate | No | 公開フローの責務を pack/publish/release に限定する |
 
 ### 30.7 テスト依存パッケージ
@@ -368,15 +368,14 @@ dotnet tool install --global dotnet-stryker
 
 | Suite | Trigger | 含むテスト | 目標時間 |
 |---|---|---|---|
-| PR gate | `pull_request` | Static + Unit (small) + Integration (medium) + diff-scoped mutation | < 5 min |
+| PR gate | `pull_request` | Static + Unit (small) + Integration (medium) + coupling feedback | < 5 min |
 | Main push | `main` への push | Static + Unit + Integration + package smoke + report aggregation | < 10 min |
-| Nightly | schedule | Optional: full mutation + extended diagnostics | < 20 min |
+| Nightly | schedule / manual | Full mutation + extended diagnostics | < 90 min |
 | Release | tag push | All + E2E + pack/publish/release | < 10 min |
 
-PR の mutation job では Stryker.NET の `since` を使い、`pull_request.base.sha`
-以降の差分に限定して実行する。`main` への push では full mutation を既定では
-実行しない。公開前に必要な mutation 確認は PR / branch / manual / nightly の
-いずれかで実施し、release workflow からは外す。
+Mutation は PR workflow から外し、`nightly-mutation` の schedule / manual dispatch
+または local 実行で確認する。公開前に必要な mutation 確認は nightly / manual /
+local のいずれかで実施し、release workflow からは外す。
 
 ---
 
@@ -444,26 +443,41 @@ name: nightly-mutation
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # JST 12:00
+    - cron: "0 4 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   mutation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
-      - run: dotnet tool install --global dotnet-stryker
-      - run: dotnet restore
-      - run: dotnet stryker --config-file stryker-config.json
+          dotnet-version: "10.0.x"
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet/toolResolverCache
+          key: dotnet-${{ runner.os }}-${{ hashFiles('dotnet-coupling.slnx', '**/*.csproj', '**/packages.lock.json', 'Directory.Build.*', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            dotnet-${{ runner.os }}-
+      - run: dotnet restore dotnet-coupling.slnx --locked-mode
+      - run: dotnet tool restore
+      - run: dotnet tool run dotnet-stryker -- --config-file stryker-config.json
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: stryker-report
-          path: StrykerOutput/**/reports/
+          name: mutation-report
+          path: StrykerOutput/**
+          if-no-files-found: warn
+          retention-days: 14
 ```
 
 ### 31.4 GitHub Release ノート生成 (`softprops/action-gh-release`)

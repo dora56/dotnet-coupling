@@ -211,14 +211,16 @@ supporting signal to find unexercised areas, not as the main quality gate.
 
 Current CI posture:
 
-- `pull_request`: diff-scoped mutation with Stryker `since`
+- `pull_request`: build, test, format, package smoke, report aggregation, and coupling feedback
 - `main` push: build, test, format, package smoke, and report aggregation
 - same-repo PR / main push: coupling SARIF upload to GitHub Code Scanning
+- `nightly-mutation`: full Stryker run on schedule or manual dispatch
 - `release`: build, test, format, pack, local tool smoke, publish
 
-CI uploads `coverage-report`, `mutation-report`, `dotnet-coupling-sarif`,
-`dotnet-coupling-hotspots`, and dogfood artifacts for inspection. The PR
-summary includes coverage, mutation, and coupling feedback sections.
+CI uploads `coverage-report`, `dotnet-coupling-sarif`, `dotnet-coupling-hotspots`,
+and dogfood artifacts for inspection. The PR summary includes coverage and
+coupling feedback; mutation appears as not available in PR CI and is reported by
+the nightly workflow instead.
 
 ## Current Blind Spots
 

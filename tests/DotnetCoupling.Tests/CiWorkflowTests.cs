@@ -5,18 +5,15 @@ namespace DotnetCoupling.Tests;
 public sealed class CiWorkflowTests
 {
     [Fact]
-    public void ReportJob_WhenMutationJobFails_AttemptsMutationArtifactDownloadWithoutFailingSummary()
+    public void CiWorkflow_DoesNotRunMutationInPullRequestFeedbackLoop()
     {
         string workflow = ReadCiWorkflow();
+        string reportJob = ExtractJob(workflow, "report");
 
-        string step = ExtractStep(workflow, "Download mutation report");
-
-        Assert.Contains("uses: actions/download-artifact@v8.0.1", step);
-        Assert.Contains("name: mutation-report", step);
-        Assert.Contains("continue-on-error: true", step);
-        Assert.DoesNotContain("needs.mutation.result == 'success'", step);
-        Assert.Contains("needs.mutation.result != 'skipped'", step);
-        Assert.Contains("needs.mutation.result != 'cancelled'", step);
+        Assert.DoesNotContain("\n  mutation:", workflow);
+        Assert.DoesNotContain("- mutation", reportJob);
+        Assert.DoesNotContain("Download mutation report", reportJob);
+        Assert.Contains("--mutation-dir artifacts/mutation", reportJob);
     }
 
     [Fact]
@@ -53,6 +50,22 @@ public sealed class CiWorkflowTests
         Assert.Contains("path: artifacts/coupling/hotspots", hotspotsStep);
         Assert.Contains("continue-on-error: true", hotspotsStep);
         Assert.Contains("--coupling-dir artifacts/coupling", reportJob);
+    }
+
+    [Fact]
+    public void NightlyMutationWorkflow_RunsFullStrykerAndUploadsReport()
+    {
+        string workflowPath = Path.Combine(TestPaths.RepositoryRoot, ".github", "workflows", "nightly-mutation.yml");
+        string workflow = File.ReadAllText(workflowPath);
+
+        Assert.Contains("name: nightly-mutation", workflow);
+        Assert.Contains("schedule:", workflow);
+        Assert.Contains("workflow_dispatch:", workflow);
+        Assert.Contains("timeout-minutes: 90", workflow);
+        Assert.Contains("dotnet tool run dotnet-stryker -- --config-file stryker-config.json", workflow);
+        Assert.DoesNotContain("--since", workflow);
+        Assert.Contains("name: mutation-report", workflow);
+        Assert.Contains("path: StrykerOutput/**", workflow);
     }
 
     private static string ReadCiWorkflow()
