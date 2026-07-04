@@ -14,7 +14,7 @@ public static class CliApplication
 
         Argument<string> pathArgument = new("path")
         {
-            Description = "Directory or C# file to analyze.",
+            Description = "Directory, project, solution, or C# file to analyze.",
             DefaultValueFactory = _ => ".",
         };
 
@@ -147,19 +147,20 @@ public static class CliApplication
 
             try
             {
+                string analysisTargetPath = ResolveAnalysisTargetPath(fullTargetPath, analysisMode);
                 ConfigurationLoadResult configuration = ConfigurationLoader.Load(fullTargetPath, config);
                 IVolatilityProvider? volatilityProvider = noGit ? null : new GitVolatilityProvider();
-                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fullTargetPath, analysisMode, volatilityProvider, gitMonths, configuration.Options);
+                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(analysisTargetPath, analysisMode, volatilityProvider, gitMonths, configuration.Options);
                 if (!string.IsNullOrWhiteSpace(baselineRef))
                 {
-                    string? repositoryRoot = FindGitRepositoryRoot(fullTargetPath);
+                    string? repositoryRoot = FindGitRepositoryRoot(analysisTargetPath);
                     if (repositoryRoot is null)
                     {
                         Console.Error.WriteLine("Baseline comparison requires a Git repository.");
                         return 4;
                     }
 
-                    using BaselineWorkspace baselineWorkspace = BaselineWorkspace.Create(repositoryRoot, fullTargetPath, baselineRef);
+                    using BaselineWorkspace baselineWorkspace = BaselineWorkspace.Create(repositoryRoot, analysisTargetPath, baselineRef);
                     AnalysisReport baselineReport = CSharpDependencyAnalyzer.Analyze(
                         baselineWorkspace.TargetPath,
                         analysisMode,
@@ -184,7 +185,7 @@ public static class CliApplication
                 }
                 else if (sarif)
                 {
-                    string repositoryRoot = FindGitRepositoryRoot(fullTargetPath) ?? ResolveOutputRoot(fullTargetPath);
+                    string repositoryRoot = FindGitRepositoryRoot(analysisTargetPath) ?? ResolveOutputRoot(analysisTargetPath);
                     rendered = SarifReportRenderer.Render(report, repositoryRoot);
                 }
                 else
@@ -313,6 +314,38 @@ public static class CliApplication
             Severity.Critical => 3,
             _ => 0,
         };
+    }
+
+    private static string ResolveAnalysisTargetPath(string fullTargetPath, AnalysisMode analysisMode)
+    {
+        if (analysisMode != AnalysisMode.Semantic || File.Exists(fullTargetPath))
+        {
+            return fullTargetPath;
+        }
+
+        string[] candidates = Directory
+            .EnumerateFiles(fullTargetPath, "*", SearchOption.TopDirectoryOnly)
+            .Where(path =>
+                path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return candidates.Length switch
+        {
+            1 => candidates[0],
+            0 => throw new NotSupportedException(
+                "Semantic mode directory input requires one .slnx, .sln, or .csproj in the target directory. Pass a project or solution path explicitly."),
+            _ => throw new NotSupportedException(CreateAmbiguousSemanticDirectoryMessage(candidates)),
+        };
+    }
+
+    private static string CreateAmbiguousSemanticDirectoryMessage(IReadOnlyList<string> candidates)
+    {
+        return "Semantic mode directory input is ambiguous. Pass one of these project or solution paths explicitly:"
+            + Environment.NewLine
+            + string.Join(Environment.NewLine, candidates.Select(candidate => "- " + candidate));
     }
 
     private static string? FindGitRepositoryRoot(string targetPath)

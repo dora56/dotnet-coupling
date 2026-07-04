@@ -586,12 +586,57 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
-    public async Task RunAsync_ModeSemantic_ReturnsCliArgumentErrorUntilImplemented()
+    public async Task RunAsync_ModeSemanticDirectoryWithoutProject_ReturnsCliArgumentError()
     {
         CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
 
         Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Semantic mode requires a .csproj, .sln, or .slnx input", result.Error);
+        Assert.Contains("Semantic mode directory input requires one .slnx, .sln, or .csproj", result.Error);
+    }
+
+    [Fact]
+    public async Task RunAsync_ModeSemanticDirectoryWithSingleProject_UsesDiscoveredProject()
+    {
+        string directory = CreateDirectory();
+        WriteFile(
+            Path.Combine(directory, "Sample.App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            Path.Combine(directory, "Sample.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+            }
+            """);
+
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", directory);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Mode: semantic-preview", result.Output);
+        Assert.Contains("Files: 1 | Types: 1", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_ModeSemanticDirectoryWithMultipleCandidates_ReturnsCliArgumentError()
+    {
+        string directory = CreateDirectory();
+        WriteFile(Path.Combine(directory, "First.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        WriteFile(Path.Combine(directory, "Second.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", directory);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Semantic mode directory input is ambiguous", result.Error);
+        Assert.Contains("First.csproj", result.Error);
+        Assert.Contains("Second.csproj", result.Error);
     }
 
     [Fact]
