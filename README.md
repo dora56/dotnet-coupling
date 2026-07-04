@@ -166,6 +166,11 @@ severity or higher. If `--fail-on` is omitted, the baseline gate uses `High`.
 This makes it practical to adopt in an existing codebase without forcing a
 one-shot cleanup of all historical debt.
 
+For long-lived accepted debt, use `.coupling.json` `ignore.issues` with a
+stable `(type, source, target)` key and a required `reason`. Suppressed issues
+are excluded from active counts, grade, `--check`, and SARIF upload, but remain
+visible in summary and JSON output.
+
 ## SARIF and Hotspots
 
 `--sarif` emits SARIF 2.1.0 using Microsoft's `Sarif.Sdk`, with issue types
@@ -208,10 +213,12 @@ Current CI posture:
 
 - `pull_request`: diff-scoped mutation with Stryker `since`
 - `main` push: build, test, format, package smoke, and report aggregation
+- same-repo PR / main push: coupling SARIF upload to GitHub Code Scanning
 - `release`: build, test, format, pack, local tool smoke, publish
 
-CI uploads `coverage-report`, `mutation-report`, SARIF dogfood output, and
-dogfood artifacts for inspection.
+CI uploads `coverage-report`, `mutation-report`, `dotnet-coupling-sarif`,
+`dotnet-coupling-hotspots`, and dogfood artifacts for inspection. The PR
+summary includes coverage, mutation, and coupling feedback sections.
 
 ## Current Blind Spots
 
@@ -235,6 +242,8 @@ dotnet test dotnet-coupling.slnx --configuration Release --results-directory Tes
 dotnet tool restore
 dotnet tool run dotnet-stryker -- --config-file stryker-config.json
 ```
+
+Release history is collected in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 

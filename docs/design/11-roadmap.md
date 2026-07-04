@@ -293,10 +293,12 @@ Architecture drivers:
 #### Phase 4d: CI / team workflow
 
 - [x] dogfood workflow に SARIF artifact を追加
-- [ ] GitHub Code Scanning upload を main push / same-repo PR に限定して実地検証
-- [ ] baseline update workflow の具体化
-- [ ] self + OSS 3 repos で SARIF / Hotspots / Suppression を dogfood
-- [ ] CLI / JSON 互換、artifact、Code Scanning 表示、CI green を確認して `0.4.0` RC へ進む
+- [x] CI の coupling feedback job で SARIF / Hotspots artifact を生成
+- [x] GitHub Code Scanning upload を main push / same-repo PR に限定
+- [x] baseline update workflow を Git ref ratchet + suppression 運用として具体化
+- [x] release notes を `CHANGELOG.md` に集約
+- [x] self + OSS 3 repos で SARIF / Hotspots / Suppression を dogfood
+- [ ] GitHub Code Scanning 表示と PR CI green を確認して `0.4.0` RC へ進む
 
 ### Phase 5: Advanced UX
 

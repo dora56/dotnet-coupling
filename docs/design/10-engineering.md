@@ -262,9 +262,10 @@ test assembly は既定で除外される。
 
 PR CI では mutation testing を独立した job として実行し、`stryker-config.json`
 の `break` threshold で失敗させる。Coverage は同じ CI 内で収集するが、Phase 1
-では threshold gate にしない。CI は `coverage-report` と `mutation-report` を
-artifact として保存し、coverage は Cobertura XML、mutation は Stryker HTML/JSON
-report を確認できるようにする。
+では threshold gate にしない。CI は `coverage-report`、`mutation-report`、
+`dotnet-coupling-sarif`、`dotnet-coupling-hotspots` を artifact として保存し、
+coverage は Cobertura XML、mutation は Stryker HTML/JSON、coupling feedback は
+SARIF / Hotspots text で確認できるようにする。
 
 #### 対象と除外
 
