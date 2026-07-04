@@ -56,19 +56,19 @@ jobs:
 
       - name: Dogfood summary
         run: |
-          "$TOOL_PATH/dotnet-coupling" --summary ./src | tee dogfood-summary.txt
+          "$TOOL_PATH/dotnet-coupling" --config .coupling.toml --summary ./src | tee dogfood-summary.txt
 
       - name: Dogfood no-git summary
         run: |
-          "$TOOL_PATH/dotnet-coupling" --summary --no-git ./src | tee dogfood-no-git-summary.txt
+          "$TOOL_PATH/dotnet-coupling" --config .coupling.toml --summary --no-git ./src | tee dogfood-no-git-summary.txt
 
       - name: Dogfood JSON
         run: |
-          "$TOOL_PATH/dotnet-coupling" --json --no-git ./src > dogfood-report.json
+          "$TOOL_PATH/dotnet-coupling" --config .coupling.toml --json --no-git ./src > dogfood-report.json
 
       - name: Dogfood SARIF
         run: |
-          "$TOOL_PATH/dotnet-coupling" --sarif --output dogfood-report.sarif --no-git ./src
+          "$TOOL_PATH/dotnet-coupling" --config .coupling.toml --sarif --output dogfood-report.sarif --no-git ./src
 
       - name: Dogfood syntax vs semantic compare
         run: |
@@ -76,7 +76,8 @@ jobs:
           scripts/generate-semantic-compare-report.sh \
             "$TOOL_PATH/dotnet-coupling" \
             ./dotnet-coupling.slnx \
-            dogfood-compare
+            dogfood-compare \
+            .coupling.toml
 
       - name: Upload dogfood reports
         if: always()

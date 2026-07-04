@@ -211,6 +211,64 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_TomlConfigTestProjects_RemovesTestSourceIssues()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        WriteFile(
+            Path.Combine(directory, "src", "Api", "Handler.cs"),
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private readonly FirstDependency _first;
+                private readonly SecondDependency _second;
+            }
+
+            public sealed class FirstDependency { }
+            public sealed class SecondDependency { }
+            """);
+        WriteFile(
+            Path.Combine(directory, "tests", "Sample.App.Tests", "HandlerTests.cs"),
+            """
+            namespace Sample.App.Tests;
+
+            public sealed class HandlerTests
+            {
+                private readonly FirstDependency _first;
+                private readonly SecondDependency _second;
+            }
+
+            public sealed class FirstDependency { }
+            public sealed class SecondDependency { }
+            """);
+        WriteFile(
+            configPath,
+            """
+            [analysis]
+            test_projects = ["**/tests/**"]
+
+            [thresholds]
+            max_dependencies = 1
+            """);
+
+        CommandResult result = await RunCliAsync("--json", "--config", configPath, "--no-git", directory);
+
+        Assert.Equal(0, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        JsonElement.ArrayEnumerator issues = document.RootElement.GetProperty("issues").EnumerateArray();
+        Assert.DoesNotContain(
+            issues,
+            issue => issue.GetProperty("source").GetString() == "Sample.App.Tests.HandlerTests");
+        Assert.Contains(
+            document.RootElement.GetProperty("issues").EnumerateArray(),
+            issue =>
+                issue.GetProperty("type").GetString() == "HighEfferentCoupling"
+                && issue.GetProperty("source").GetString() == "Sample.App.Api.Handler");
+    }
+
+    [Fact]
     public async Task RunAsync_InvalidTomlConfig_ReturnsCliArgumentError()
     {
         string directory = CreateDirectory();
@@ -278,6 +336,82 @@ public sealed class CliApplicationTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Suppressed Issues: 1", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_DomainContextConfigWithExplicitConfigAndTargetPath_UsesWorkspaceRelativeDomainPaths()
+    {
+        string repository = CreateGitRepository();
+        string apiPath = Path.Combine(repository, "src", "Api", "Handler.cs");
+        string reportingPath = Path.Combine(repository, "src", "Reporting", "ReportBuilder.cs");
+        string configPath = Path.Combine(repository, "config", "coupling.toml");
+        WriteFile(
+            apiPath,
+            """
+            using Sample.App.Reporting;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public ReportBuilder? Report { get; init; }
+            }
+            """);
+        WriteFile(
+            reportingPath,
+            """
+            namespace Sample.App.Reporting;
+
+            public sealed class ReportBuilder
+            {
+                public int Version => 0;
+            }
+            """);
+        WriteFile(
+            configPath,
+            """
+            [[domain.subdomains]]
+            name = "Reporting"
+            category = "supporting"
+            paths = ["src/Reporting/**"]
+            expected_volatility = "low"
+            """);
+        Commit(repository, "initial");
+
+        for (int version = 1; version <= 10; version++)
+        {
+            WriteFile(
+                reportingPath,
+                $$"""
+                namespace Sample.App.Reporting;
+
+                public sealed class ReportBuilder
+                {
+                    public int Version => {{version}};
+                }
+                """);
+            Commit(repository, $"change reporting {version}");
+        }
+
+        CommandResult noGitResult = await RunCliAsync("--json", "--config", configPath, "--no-git", Path.Combine(repository, "src"));
+        CommandResult checkResult = await RunCliAsync("--json", "--check", "--fail-on", "Medium", "--config", configPath, Path.Combine(repository, "src"));
+
+        Assert.Equal(0, noGitResult.ExitCode);
+        using JsonDocument noGitDocument = JsonDocument.Parse(noGitResult.Output);
+        Assert.False(noGitDocument.RootElement.GetProperty("analysis").GetProperty("gitUsed").GetBoolean());
+        Assert.DoesNotContain(
+            noGitDocument.RootElement.GetProperty("issues").EnumerateArray(),
+            issue => issue.GetProperty("type").GetString() == "AccidentalVolatility");
+
+        Assert.Equal(1, checkResult.ExitCode);
+        using JsonDocument checkDocument = JsonDocument.Parse(checkResult.Output);
+        Assert.True(checkDocument.RootElement.GetProperty("analysis").GetProperty("gitUsed").GetBoolean());
+        Assert.Equal(1, checkDocument.RootElement.GetProperty("issueCounts").GetProperty("medium").GetInt32());
+        Assert.Contains(
+            checkDocument.RootElement.GetProperty("issues").EnumerateArray(),
+            issue =>
+                issue.GetProperty("type").GetString() == "AccidentalVolatility"
+                && issue.GetProperty("target").GetString() == "Reporting");
     }
 
     [Fact]
@@ -452,12 +586,57 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
-    public async Task RunAsync_ModeSemantic_ReturnsCliArgumentErrorUntilImplemented()
+    public async Task RunAsync_ModeSemanticDirectoryWithoutProject_ReturnsCliArgumentError()
     {
         CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", TestPaths.Fixture("global-complexity"));
 
         Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Semantic mode requires a .csproj, .sln, or .slnx input", result.Error);
+        Assert.Contains("Semantic mode directory input requires one .slnx, .sln, or .csproj", result.Error);
+    }
+
+    [Fact]
+    public async Task RunAsync_ModeSemanticDirectoryWithSingleProject_UsesDiscoveredProject()
+    {
+        string directory = CreateDirectory();
+        WriteFile(
+            Path.Combine(directory, "Sample.App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            Path.Combine(directory, "Sample.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+            }
+            """);
+
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", directory);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Mode: semantic-preview", result.Output);
+        Assert.Contains("Files: 1 | Types: 1", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_ModeSemanticDirectoryWithMultipleCandidates_ReturnsCliArgumentError()
+    {
+        string directory = CreateDirectory();
+        WriteFile(Path.Combine(directory, "First.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        WriteFile(Path.Combine(directory, "Second.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--summary", "--no-git", directory);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Semantic mode directory input is ambiguous", result.Error);
+        Assert.Contains("First.csproj", result.Error);
+        Assert.Contains("Second.csproj", result.Error);
     }
 
     [Fact]
@@ -489,6 +668,53 @@ public sealed class CliApplicationTests
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Files: 1 | Types: 1", result.Output);
         Assert.Contains("Mode: semantic-preview", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_ModeSemanticCsprojWithGit_UsesGitVolatility()
+    {
+        string repository = CreateGitRepository();
+        string projectPath = Path.Combine(repository, "Sample.App.csproj");
+        string samplePath = Path.Combine(repository, "Sample.cs");
+        WriteFile(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            samplePath,
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+                public int Version => 0;
+            }
+            """);
+        Commit(repository, "initial");
+
+        WriteFile(
+            samplePath,
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+                public int Version => 1;
+            }
+            """);
+        Commit(repository, "change sample");
+
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--json", projectPath);
+
+        Assert.Equal(0, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        Assert.Equal("semantic-preview", document.RootElement.GetProperty("analysis").GetProperty("mode").GetString());
+        Assert.True(document.RootElement.GetProperty("analysis").GetProperty("gitUsed").GetBoolean());
     }
 
     [Fact]

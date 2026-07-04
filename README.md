@@ -148,13 +148,48 @@ discovery checks `.coupling.json` and `coupling.json` first, then
 Current supported settings include:
 
 - analysis excludes
+- test project path patterns for issue-noise reduction
 - fan-in and fan-out thresholds
 - temporal coupling thresholds
 - scattered external breadth thresholds
 - ignore rules for paths, namespaces, issue types, and precise issue
   suppressions
+- domain context for user-supplied core/supporting/generic subdomain categories
+  and expected volatility
+- role context for strategic boundaries and technical areas
 
 TOML keys use `snake_case`; JSON keeps the existing `camelCase` schema shape.
+`analysis.test_projects` / `analysis.testProjects` marks test project files.
+Those couplings remain visible as observed data, but couplings whose source file
+matches a test project pattern are excluded from active issue detection and
+grade calculation.
+Domain context does not infer subdomain categories; it uses only the paths and
+categories provided in config. Supporting or generic subdomains with high
+observed Git churn and lower expected volatility are reported as
+`AccidentalVolatility`. Subdomain names must be unique. If multiple path
+patterns match the same component, the first matching subdomain in the config
+is used. Domain paths are repository/workspace-relative, so moving the config
+file or passing it with `--config` does not change their meaning. Summary output
+and JSON `manifest.domainContext` show how many components matched configured
+subdomains and how many `AccidentalVolatility` issues were produced.
+
+Role context separates strategic boundary meaning from technical scoring hints.
+`strategicRole` / `strategic_role` can describe boundary meanings such as
+`sharedKernel` / `shared_kernel` and remains advisory. `domain.areas` assigns
+technical roles such as `domainModel`, `applicationService`, `adapter`,
+`compositionRoot`, `contract`, and `testSupport`. `contract` targets and
+`compositionRoot` sources reduce over-reporting for intentional contracts and
+orchestration, so technical roles can affect scores, issue counts, grades, and
+`--check` exit codes. Other technical roles are shown in summaries, JSON
+manifest data, and hotspot reasons without changing scoring.
+
+Use `contract` for stable API shapes even inside a core subdomain: value
+objects, identifier types, DTOs, published language models, and shared-kernel
+contracts. Put these area patterns before broader `domainModel` patterns because
+the first matching area wins. Use `compositionRoot` for `Program`, `Startup`,
+module startup, DI registration, and host bootstrapping code. Summary output and
+JSON run notes include coverage hints when configured subdomains or technical
+roles leave components unmatched.
 
 See [`.coupling.example.json`](.coupling.example.json),
 [`.coupling.example.toml`](.coupling.example.toml),
@@ -188,7 +223,8 @@ dotnet-coupling --sarif --output dotnet-coupling.sarif --no-git ./src
 
 `--hotspots [N]` ranks the top coupling repair candidates from active issues,
 fan-in, fan-out, volatility, boundary crossing, and cycle participation. The
-default count is `10`.
+default count is `10`. Treat hotspots as a remediation priority list; the
+project Grade remains the health gate based on issue density.
 
 ```bash
 dotnet-coupling --hotspots ./src

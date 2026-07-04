@@ -181,7 +181,7 @@ internal static class ConfigurationValueReader
         return table;
     }
 
-    private static string ReadRequiredString(JsonElement element, string path, string propertyName)
+    internal static string ReadRequiredString(JsonElement element, string path, string propertyName)
     {
         if (!element.TryGetProperty(propertyName, out JsonElement property)
             || property.ValueKind != JsonValueKind.String
@@ -193,7 +193,7 @@ internal static class ConfigurationValueReader
         return property.GetString()!;
     }
 
-    private static string ReadRequiredString(TomlTable table, string path, string propertyName)
+    internal static string ReadRequiredString(TomlTable table, string path, string propertyName)
     {
         if (!table.TryGetValue(propertyName, out object? value)
             || value is not string stringValue

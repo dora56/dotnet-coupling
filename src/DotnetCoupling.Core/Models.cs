@@ -95,6 +95,31 @@ public enum Volatility
     High,
 }
 
+public enum SubdomainCategory
+{
+    Core,
+    Supporting,
+    Generic,
+}
+
+public enum StrategicRole
+{
+    AnticorruptionLayer,
+    PublishedLanguage,
+    SharedKernel,
+    OpenHostService,
+}
+
+public enum TechnicalRole
+{
+    DomainModel,
+    ApplicationService,
+    Adapter,
+    CompositionRoot,
+    Contract,
+    TestSupport,
+}
+
 public enum IssueType
 {
     GlobalComplexity,
@@ -118,19 +143,23 @@ public enum Severity
 
 public sealed record AnalysisOptions(
     IReadOnlyList<string> ExcludePathPatterns,
+    IReadOnlyList<string> TestProjectPathPatterns,
     IReadOnlyList<string> IgnorePathPatterns,
     IReadOnlyList<string> IgnoreNamespaces,
     IReadOnlySet<IssueType> IgnoreIssueTypes,
     IReadOnlyList<IssueSuppression> IssueSuppressions,
-    AnalysisThresholds Thresholds)
+    AnalysisThresholds Thresholds,
+    DomainContext DomainContext)
 {
     public static AnalysisOptions Default { get; } = new(
         [],
         [],
         [],
+        [],
         new HashSet<IssueType>(),
         [],
-        AnalysisThresholds.Default);
+        AnalysisThresholds.Default,
+        DomainContext.Empty);
 }
 
 public sealed record AnalysisThresholds(
@@ -147,6 +176,72 @@ public sealed record AnalysisThresholds(
         50,
         5);
 }
+
+public sealed record DomainContext(
+    IReadOnlyList<DomainSubdomain> Subdomains,
+    IReadOnlyList<DomainArea> Areas)
+{
+    public DomainContext(IReadOnlyList<DomainSubdomain> subdomains)
+        : this(subdomains, [])
+    {
+    }
+
+    public static DomainContext Empty { get; } = new([], []);
+}
+
+public sealed record DomainSubdomain(
+    string Name,
+    SubdomainCategory Category,
+    IReadOnlyList<string> PathPatterns,
+    Volatility ExpectedVolatility,
+    StrategicRole? StrategicRole = null);
+
+public sealed record DomainArea(
+    string Name,
+    IReadOnlyList<string> PathPatterns,
+    TechnicalRole TechnicalRole);
+
+public sealed record DomainContextSummary(
+    int SubdomainCount,
+    int MatchedComponents,
+    int UnmatchedComponents,
+    int AccidentalVolatilityIssues,
+    IReadOnlyList<DomainSubdomainUsage> Subdomains,
+    int AreaCount,
+    int MatchedAreaComponents,
+    int UnmatchedAreaComponents,
+    IReadOnlyList<DomainAreaUsage> Areas)
+{
+    public DomainContextSummary(
+        int SubdomainCount,
+        int MatchedComponents,
+        int UnmatchedComponents,
+        int AccidentalVolatilityIssues,
+        IReadOnlyList<DomainSubdomainUsage> Subdomains)
+        : this(SubdomainCount, MatchedComponents, UnmatchedComponents, AccidentalVolatilityIssues, Subdomains, 0, 0, 0, [])
+    {
+    }
+}
+
+public sealed record DomainSubdomainUsage(
+    string Name,
+    SubdomainCategory Category,
+    Volatility ExpectedVolatility,
+    int MatchedComponents,
+    StrategicRole? StrategicRole = null);
+
+public sealed record DomainAreaUsage(
+    string Name,
+    TechnicalRole TechnicalRole,
+    int MatchedComponents);
+
+public sealed record ComponentRoleContext(
+    string ComponentId,
+    string FilePath,
+    string? SubdomainName,
+    StrategicRole? StrategicRole,
+    string? AreaName,
+    TechnicalRole? TechnicalRole);
 
 public sealed record SourceLocation(string File, int Line);
 
@@ -262,7 +357,9 @@ public sealed record AnalysisReport(
     IReadOnlyList<AnalysisDiagnostic>? Diagnostics = null,
     ProjectMetadata? ProjectMetadata = null,
     IReadOnlyList<SuppressedIssue>? SuppressedIssues = null,
-    IReadOnlyList<Hotspot>? Hotspots = null);
+    IReadOnlyList<Hotspot>? Hotspots = null,
+    DomainContextSummary? DomainContext = null,
+    IReadOnlyList<ComponentRoleContext>? ComponentRoles = null);
 
 public sealed record BaselineComparison(
     string Ref,

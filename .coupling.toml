@@ -1,0 +1,170 @@
+[analysis]
+exclude = [
+  "**/bin/**",
+  "**/obj/**",
+  "**/*.g.cs",
+  "**/*.generated.cs",
+  "tests/fixtures/**",
+]
+test_projects = [
+  "**/tests/DotnetCoupling.Tests/**",
+]
+
+[thresholds]
+max_dependencies = 20
+max_dependents = 30
+min_temporal_coupling = 3
+max_temporal_files_per_commit = 50
+scattered_external_breadth = 5
+
+[ignore]
+issue_types = [
+  "ScatteredExternalCoupling",
+]
+
+[[domain.subdomains]]
+name = "CoreRules"
+category = "core"
+paths = [
+  "src/DotnetCoupling.Core/CouplingCalibrator.cs",
+  "src/DotnetCoupling.Core/CouplingResolver.cs",
+  "src/DotnetCoupling.Core/CouplingScoring.cs",
+  "src/DotnetCoupling.Core/ExternalCouplingDetector.cs",
+  "src/DotnetCoupling.Core/HotspotAnalyzer.cs",
+  "src/DotnetCoupling.Core/IssueDetector.cs",
+]
+expected_volatility = "high"
+
+[[domain.subdomains]]
+name = "CoreContracts"
+category = "supporting"
+paths = [
+  "src/DotnetCoupling.Core/Models.cs",
+  "src/DotnetCoupling.Core/UsingNamespace.cs",
+  "src/DotnetCoupling.Core/VolatilityAnalysis.cs",
+]
+expected_volatility = "medium"
+
+[[domain.subdomains]]
+name = "CoreConfig"
+category = "supporting"
+paths = [
+  "src/DotnetCoupling.Core/Configuration*.cs",
+  "src/DotnetCoupling.Core/JsonConfigurationReader.cs",
+  "src/DotnetCoupling.Core/RawConfiguration.cs",
+  "src/DotnetCoupling.Core/TomlConfigurationReader.cs",
+]
+expected_volatility = "medium"
+
+[[domain.subdomains]]
+name = "CoreReporting"
+category = "supporting"
+paths = ["src/DotnetCoupling.Core/ReportRenderer.cs"]
+expected_volatility = "medium"
+
+[[domain.subdomains]]
+name = "CoreUtilities"
+category = "generic"
+paths = [
+  "src/DotnetCoupling.Core/DomainContextMatcher.cs",
+  "src/DotnetCoupling.Core/PathPatternMatcher.cs",
+]
+expected_volatility = "low"
+
+[[domain.subdomains]]
+name = "Roslyn"
+category = "supporting"
+paths = ["src/DotnetCoupling.Roslyn/**"]
+expected_volatility = "medium"
+
+[[domain.subdomains]]
+name = "Git"
+category = "supporting"
+paths = ["src/DotnetCoupling.Git/**"]
+expected_volatility = "low"
+
+[[domain.subdomains]]
+name = "Sarif"
+category = "generic"
+paths = ["src/DotnetCoupling.Sarif/**"]
+expected_volatility = "low"
+
+[[domain.subdomains]]
+name = "Cli"
+category = "supporting"
+paths = ["src/DotnetCoupling.Cli/**"]
+expected_volatility = "medium"
+
+[[domain.areas]]
+name = "CoreRules"
+paths = [
+  "src/DotnetCoupling.Core/CouplingCalibrator.cs",
+  "src/DotnetCoupling.Core/CouplingResolver.cs",
+  "src/DotnetCoupling.Core/CouplingScoring.cs",
+  "src/DotnetCoupling.Core/ExternalCouplingDetector.cs",
+  "src/DotnetCoupling.Core/IssueDetector.cs",
+  "src/DotnetCoupling.Core/HotspotAnalyzer.cs",
+]
+technical_role = "domain_model"
+
+[[domain.areas]]
+name = "CoreContracts"
+paths = [
+  "src/DotnetCoupling.Core/Models.cs",
+  "src/DotnetCoupling.Core/UsingNamespace.cs",
+  "src/DotnetCoupling.Core/VolatilityAnalysis.cs",
+]
+technical_role = "contract"
+
+[[domain.areas]]
+name = "CoreConfig"
+paths = [
+  "src/DotnetCoupling.Core/Configuration*.cs",
+  "src/DotnetCoupling.Core/JsonConfigurationReader.cs",
+  "src/DotnetCoupling.Core/RawConfiguration.cs",
+  "src/DotnetCoupling.Core/TomlConfigurationReader.cs",
+]
+technical_role = "application_service"
+
+[[domain.areas]]
+name = "CoreReporting"
+paths = ["src/DotnetCoupling.Core/ReportRenderer.cs"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "CoreUtilities"
+paths = [
+  "src/DotnetCoupling.Core/DomainContextMatcher.cs",
+  "src/DotnetCoupling.Core/PathPatternMatcher.cs",
+]
+technical_role = "contract"
+
+[[domain.areas]]
+name = "RoslynAdapter"
+paths = ["src/DotnetCoupling.Roslyn/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "GitAdapter"
+paths = ["src/DotnetCoupling.Git/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "SarifAdapter"
+paths = ["src/DotnetCoupling.Sarif/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "CliCompositionRoot"
+paths = ["src/DotnetCoupling.Cli/CliApplication.cs"]
+technical_role = "composition_root"
+
+[[domain.areas]]
+name = "CliOutputAdapter"
+paths = ["src/DotnetCoupling.Cli/CliReportWriter.cs"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "Tests"
+paths = ["tests/**"]
+technical_role = "test_support"

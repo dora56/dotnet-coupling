@@ -12,10 +12,11 @@ public static class GitVolatility
         try
         {
             string repositoryRoot = GetRepositoryRoot(repositoryPath);
+            string workingDirectory = ResolveWorkingDirectory(repositoryPath);
             ProcessStartInfo startInfo = new()
             {
                 FileName = "git",
-                WorkingDirectory = repositoryPath,
+                WorkingDirectory = workingDirectory,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -69,10 +70,11 @@ public static class GitVolatility
         try
         {
             string repositoryRoot = GetRepositoryRoot(repositoryPath);
+            string workingDirectory = ResolveWorkingDirectory(repositoryPath);
             ProcessStartInfo startInfo = new()
             {
                 FileName = "git",
-                WorkingDirectory = repositoryPath,
+                WorkingDirectory = workingDirectory,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -171,10 +173,11 @@ public static class GitVolatility
 
     private static string GetRepositoryRoot(string repositoryPath)
     {
+        string workingDirectory = ResolveWorkingDirectory(repositoryPath);
         ProcessStartInfo startInfo = new()
         {
             FileName = "git",
-            WorkingDirectory = repositoryPath,
+            WorkingDirectory = workingDirectory,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -189,25 +192,33 @@ public static class GitVolatility
 
         if (process.ExitCode != 0)
         {
-            return repositoryPath;
+            return workingDirectory;
         }
 
         string prefix = output.Trim().TrimEnd('/');
         if (string.IsNullOrWhiteSpace(prefix))
         {
-            return Path.GetFullPath(repositoryPath);
+            return workingDirectory;
         }
 
-        DirectoryInfo? directory = new(Path.GetFullPath(repositoryPath));
+        DirectoryInfo? directory = new(workingDirectory);
         foreach (string _ in prefix.Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
             directory = directory.Parent;
             if (directory is null)
             {
-                return repositoryPath;
+                return workingDirectory;
             }
         }
 
         return directory.FullName;
+    }
+
+    private static string ResolveWorkingDirectory(string repositoryPath)
+    {
+        string fullPath = Path.GetFullPath(repositoryPath);
+        return File.Exists(fullPath)
+            ? Path.GetDirectoryName(fullPath) ?? fullPath
+            : fullPath;
     }
 }

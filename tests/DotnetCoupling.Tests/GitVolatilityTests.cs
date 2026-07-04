@@ -43,6 +43,22 @@ public sealed class GitVolatilityTests
     }
 
     [Fact]
+    public void GetChangeCounts_FileTarget_UsesContainingDirectoryForGitWorkingDirectory()
+    {
+        string repositoryPath = CreateGitRepository();
+        string projectPath = Path.Combine(repositoryPath, "Sample.csproj");
+        string first = Path.GetFullPath(Path.Combine(repositoryPath, "src", "First.cs"));
+
+        WriteFile(projectPath, "<Project />");
+        WriteFile(first, "public sealed class First { }");
+        Commit(repositoryPath, "initial");
+
+        IReadOnlyDictionary<string, int> counts = GitVolatility.GetChangeCounts(projectPath, months: 120);
+
+        Assert.Equal(1, counts[first]);
+    }
+
+    [Fact]
     public void GetTemporalCouplings_GitRepository_ReturnsRepeatedCSharpCoChanges()
     {
         string repositoryPath = CreateGitRepository();
@@ -84,6 +100,32 @@ public sealed class GitVolatilityTests
 
         IReadOnlyList<TemporalCoupling> couplings = GitVolatility.GetTemporalCouplings(
             sourcePath,
+            months: 120,
+            analyzedFiles,
+            minTemporalCoupling: 1);
+
+        TemporalCoupling coupling = Assert.Single(couplings);
+        Assert.Equal(first, coupling.FileA);
+        Assert.Equal(second, coupling.FileB);
+        Assert.Equal(1, coupling.CoChangeCount);
+    }
+
+    [Fact]
+    public void GetTemporalCouplings_FileTarget_UsesContainingDirectoryForGitWorkingDirectory()
+    {
+        string repositoryPath = CreateGitRepository();
+        string projectPath = Path.Combine(repositoryPath, "Sample.csproj");
+        string first = Path.GetFullPath(Path.Combine(repositoryPath, "src", "First.cs"));
+        string second = Path.GetFullPath(Path.Combine(repositoryPath, "src", "Second.cs"));
+        HashSet<string> analyzedFiles = [first, second];
+
+        WriteFile(projectPath, "<Project />");
+        WriteFile(first, "public sealed class First { }");
+        WriteFile(second, "public sealed class Second { }");
+        Commit(repositoryPath, "initial");
+
+        IReadOnlyList<TemporalCoupling> couplings = GitVolatility.GetTemporalCouplings(
+            projectPath,
             months: 120,
             analyzedFiles,
             minTemporalCoupling: 1);

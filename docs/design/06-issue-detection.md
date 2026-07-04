@@ -67,6 +67,13 @@ C# 固有または重めの smell は v0.2 以降に回す。
 strength >= 0.75 && distance >= 0.50
 ```
 
+severity は Balance Score だけでなく Domain Context も使って調整する。
+score `< 0.40` でも、target が supporting / generic subdomain の安定した
+adapter / reporting code なら Medium に留める。一方で target が
+`expectedVolatility = high` の core rules、または `technicalRole = domainModel`
+に属する場合は High のまま扱う。Domain Context がない場合は従来どおり
+score `< 0.40` を High とする。
+
 推奨:
 
 - interface を導入する
@@ -76,12 +83,13 @@ strength >= 0.75 && distance >= 0.50
 
 #### Cascading Change Risk
 
-変更頻度の高い対象に強く依存している。
+変更頻度の高い遠方の対象に強く依存している。強い結合でも同一 namespace
+内に閉じている場合は高凝集として扱い、この issue では報告しない。
 
 条件例:
 
 ```text
-strength >= 0.75 && volatility >= 0.75
+strength >= 0.75 && distance >= DifferentNamespace && volatility >= 0.75
 ```
 
 推奨:

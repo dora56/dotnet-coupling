@@ -20,19 +20,31 @@ internal static class IssueDetector
         IReadOnlyCollection<BalanceScore> scores,
         IReadOnlyList<TemporalCoupling> temporalCouplings,
         IReadOnlyDictionary<string, Component> componentsById,
-        AnalysisOptions? options = null)
+        AnalysisOptions? options = null,
+        IReadOnlyCollection<CouplingMetrics>? observedCouplings = null)
     {
         options ??= AnalysisOptions.Default;
         List<CouplingIssue> issues = [];
+        List<BalanceScore> issueScores = scores
+            .Where(score => !IsTestProjectFile(score.Coupling.Location.File, options.TestProjectPathPatterns))
+            .ToList();
+        List<CouplingMetrics> observedIssueCouplings = (observedCouplings ?? issueScores.Select(score => score.Coupling).ToArray())
+            .Where(coupling => !IsTestProjectFile(coupling.Location.File, options.TestProjectPathPatterns))
+            .ToList();
+        List<TemporalCoupling> issueTemporalCouplings = temporalCouplings
+            .Where(temporalCoupling =>
+                !IsTestProjectFile(temporalCoupling.FileA, options.TestProjectPathPatterns)
+                && !IsTestProjectFile(temporalCoupling.FileB, options.TestProjectPathPatterns))
+            .ToList();
 
-        foreach (BalanceScore score in scores)
+        foreach (BalanceScore score in issueScores)
         {
             CouplingMetrics coupling = score.Coupling;
             if (coupling.Strength >= IntegrationStrength.Functional && coupling.Distance >= Distance.DifferentNamespace)
             {
                 issues.Add(new CouplingIssue(
                     IssueType.GlobalComplexity,
-                    score.Score < 0.40 ? Severity.High : Severity.Medium,
+                    DetermineGlobalComplexitySeverity(score, componentsById, options.DomainContext),
                     coupling.Source,
                     coupling.Target,
                     score.Score,
@@ -41,7 +53,9 @@ internal static class IssueDetector
                     coupling.Location));
             }
 
-            if (coupling.Strength >= IntegrationStrength.Functional && coupling.Volatility == Volatility.High)
+            if (coupling.Strength >= IntegrationStrength.Functional
+                && coupling.Distance >= Distance.DifferentNamespace
+                && coupling.Volatility == Volatility.High)
             {
                 issues.Add(new CouplingIssue(
                     IssueType.CascadingChangeRisk,
@@ -68,10 +82,12 @@ internal static class IssueDetector
             }
         }
 
-        AddFanInFanOutIssues(scores.Select(score => score.Coupling), issues, options.Thresholds);
-        AddCircularDependencyIssues(scores.Select(score => score.Coupling), issues);
-        AddHiddenCouplingIssues(temporalCouplings, scores.Select(score => score.Coupling), componentsById, issues);
-        AddScatteredExternalCouplingIssues(scores.Select(score => score.Coupling), issues, options.Thresholds);
+        IEnumerable<CouplingMetrics> issueCouplings = issueScores.Select(score => score.Coupling);
+        AddFanInFanOutIssues(issueCouplings, issues, options.Thresholds);
+        AddCircularDependencyIssues(issueCouplings, issues);
+        AddHiddenCouplingIssues(issueTemporalCouplings, observedIssueCouplings, componentsById, issues);
+        AddScatteredExternalCouplingIssues(issueCouplings, issues, options.Thresholds);
+        AddAccidentalVolatilityIssues(observedIssueCouplings, componentsById, issues, options.DomainContext);
         List<CouplingIssue> deduplicatedIssues = ApplyIgnores(issues, options)
             .GroupBy(issue => new IssueIdentity(issue.Type, issue.Source, issue.Target))
             .Select(group => group
@@ -80,7 +96,19 @@ internal static class IssueDetector
                 .First())
             .ToList();
 
-        return ApplySuppressions(deduplicatedIssues, options.IssueSuppressions);
+        IssueDetectionResult result = ApplySuppressions(deduplicatedIssues, options.IssueSuppressions);
+        return result with
+        {
+            DomainContext = CreateDomainContextSummary(
+                options.DomainContext,
+                componentsById.Values,
+                options.TestProjectPathPatterns,
+                result.Issues),
+            ComponentRoles = CreateComponentRoleContexts(
+                options.DomainContext,
+                componentsById.Values,
+                options.TestProjectPathPatterns),
+        };
     }
 
     internal static void AddFanInFanOutIssues(
@@ -166,6 +194,36 @@ internal static class IssueDetector
         }
     }
 
+    private static Severity DetermineGlobalComplexitySeverity(
+        BalanceScore score,
+        IReadOnlyDictionary<string, Component> componentsById,
+        DomainContext domainContext)
+    {
+        if (score.Score >= 0.40)
+        {
+            return Severity.Medium;
+        }
+
+        if (!componentsById.TryGetValue(score.Coupling.Target, out Component? target))
+        {
+            return Severity.High;
+        }
+
+        DomainArea? targetArea = DomainContextMatcher.FindArea(target.FilePath, domainContext);
+        if (targetArea?.TechnicalRole == TechnicalRole.DomainModel)
+        {
+            return Severity.High;
+        }
+
+        DomainSubdomain? targetSubdomain = DomainContextMatcher.FindSubdomain(target.FilePath, domainContext);
+        if (targetSubdomain is null)
+        {
+            return Severity.High;
+        }
+
+        return targetSubdomain.ExpectedVolatility == Volatility.High ? Severity.High : Severity.Medium;
+    }
+
     internal static void AddHiddenCouplingIssues(
         IReadOnlyList<TemporalCoupling> temporalCouplings,
         IEnumerable<CouplingMetrics> couplings,
@@ -234,6 +292,46 @@ internal static class IssueDetector
                 $"External package namespace is used directly by {directUsers} internal components.",
                 "Introduce a wrapper or adapter so upgrade risk is concentrated behind an internal API.",
                 null));
+        }
+    }
+
+    internal static void AddAccidentalVolatilityIssues(
+        IEnumerable<CouplingMetrics> couplings,
+        IReadOnlyDictionary<string, Component> componentsById,
+        List<CouplingIssue> issues,
+        DomainContext domainContext)
+    {
+        if (domainContext.Subdomains.Count == 0)
+        {
+            return;
+        }
+
+        foreach (CouplingMetrics coupling in couplings
+            .Where(coupling => coupling.Volatility == Volatility.High)
+            .DistinctBy(coupling => coupling.Target))
+        {
+            if (!componentsById.TryGetValue(coupling.Target, out Component? target))
+            {
+                continue;
+            }
+
+            DomainSubdomain? subdomain = DomainContextMatcher.FindSubdomain(target.FilePath, domainContext);
+            if (subdomain is null
+                || subdomain.Category == SubdomainCategory.Core
+                || subdomain.ExpectedVolatility == Volatility.High)
+            {
+                continue;
+            }
+
+            issues.Add(new CouplingIssue(
+                IssueType.AccidentalVolatility,
+                Severity.Medium,
+                target.Id,
+                subdomain.Name,
+                0.50,
+                $"{subdomain.Category} subdomain '{subdomain.Name}' has High observed churn but expected {subdomain.ExpectedVolatility} volatility.",
+                "Review whether the churn is business-driven; if not, stabilize the boundary or remove design and implementation friction.",
+                new SourceLocation(target.FilePath, 1)));
         }
     }
 
@@ -308,6 +406,132 @@ internal static class IssueDetector
         return !string.IsNullOrWhiteSpace(value) && PathPatternMatcher.IsMatch(value, patterns);
     }
 
+    private static bool IsTestProjectFile(string filePath, IReadOnlyList<string> testProjectPathPatterns)
+    {
+        return testProjectPathPatterns.Count > 0
+            && !string.IsNullOrWhiteSpace(filePath)
+            && PathPatternMatcher.IsMatch(filePath, testProjectPathPatterns);
+    }
+
+    private static DomainContextSummary? CreateDomainContextSummary(
+        DomainContext domainContext,
+        IEnumerable<Component> components,
+        IReadOnlyList<string> testProjectPathPatterns,
+        IReadOnlyCollection<CouplingIssue> activeIssues)
+    {
+        if (domainContext.Subdomains.Count == 0 && domainContext.Areas.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, int> matchedCountsByName = domainContext.Subdomains.ToDictionary(
+            subdomain => subdomain.Name,
+            _ => 0,
+            StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> matchedAreaCountsByName = domainContext.Areas.ToDictionary(
+            area => area.Name,
+            _ => 0,
+            StringComparer.OrdinalIgnoreCase);
+        int matchedComponents = 0;
+        int unmatchedComponents = 0;
+        int matchedAreaComponents = 0;
+        int unmatchedAreaComponents = 0;
+
+        foreach (Component component in components.Where(component =>
+            component.Kind != ComponentKind.ExternalPackage
+            && !IsTestProjectFile(component.FilePath, testProjectPathPatterns)))
+        {
+            if (domainContext.Subdomains.Count > 0)
+            {
+                DomainSubdomain? subdomain = DomainContextMatcher.FindSubdomain(component.FilePath, domainContext);
+                if (subdomain is null)
+                {
+                    unmatchedComponents++;
+                }
+                else
+                {
+                    matchedComponents++;
+                    matchedCountsByName[subdomain.Name]++;
+                }
+            }
+
+            if (domainContext.Areas.Count > 0)
+            {
+                DomainArea? area = DomainContextMatcher.FindArea(component.FilePath, domainContext);
+                if (area is null)
+                {
+                    unmatchedAreaComponents++;
+                }
+                else
+                {
+                    matchedAreaComponents++;
+                    matchedAreaCountsByName[area.Name]++;
+                }
+            }
+        }
+
+        DomainSubdomainUsage[] subdomains = domainContext.Subdomains
+            .Select(subdomain => new DomainSubdomainUsage(
+                subdomain.Name,
+                subdomain.Category,
+                subdomain.ExpectedVolatility,
+                matchedCountsByName[subdomain.Name],
+                subdomain.StrategicRole))
+            .ToArray();
+
+        DomainAreaUsage[] areas = domainContext.Areas
+            .Select(area => new DomainAreaUsage(
+                area.Name,
+                area.TechnicalRole,
+                matchedAreaCountsByName[area.Name]))
+            .ToArray();
+
+        return new DomainContextSummary(
+            domainContext.Subdomains.Count,
+            matchedComponents,
+            unmatchedComponents,
+            activeIssues.Count(issue => issue.Type == IssueType.AccidentalVolatility),
+            subdomains,
+            domainContext.Areas.Count,
+            matchedAreaComponents,
+            unmatchedAreaComponents,
+            areas);
+    }
+
+    private static List<ComponentRoleContext>? CreateComponentRoleContexts(
+        DomainContext domainContext,
+        IEnumerable<Component> components,
+        IReadOnlyList<string> testProjectPathPatterns)
+    {
+        if (domainContext.Subdomains.Count == 0 && domainContext.Areas.Count == 0)
+        {
+            return null;
+        }
+
+        List<ComponentRoleContext> contexts = [];
+        foreach (Component component in components.Where(component =>
+            component.Kind != ComponentKind.ExternalPackage
+            && !IsTestProjectFile(component.FilePath, testProjectPathPatterns)))
+        {
+            DomainSubdomain? subdomain = DomainContextMatcher.FindSubdomain(component.FilePath, domainContext);
+            DomainArea? area = DomainContextMatcher.FindArea(component.FilePath, domainContext);
+            if (subdomain is null && area is null)
+            {
+                continue;
+            }
+
+            contexts.Add(new ComponentRoleContext(
+                component.Id,
+                component.FilePath,
+                subdomain?.Name,
+                subdomain?.StrategicRole,
+                area?.Name,
+                area?.TechnicalRole));
+        }
+
+        return contexts.Count == 0 ? null : contexts;
+    }
+
     private static List<IReadOnlyCollection<string>> FindStronglyConnectedComponents(Dictionary<string, HashSet<string>> graph)
     {
         int index = 0;
@@ -372,4 +596,6 @@ internal static class IssueDetector
 
 internal sealed record IssueDetectionResult(
     List<CouplingIssue> Issues,
-    List<SuppressedIssue> SuppressedIssues);
+    List<SuppressedIssue> SuppressedIssues,
+    DomainContextSummary? DomainContext = null,
+    IReadOnlyList<ComponentRoleContext>? ComponentRoles = null);

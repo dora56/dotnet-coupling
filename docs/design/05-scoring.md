@@ -200,19 +200,24 @@ git log --no-merges --pretty=format:"COMMIT:%H" --name-only --diff-filter=AMRC -
 
 MVP ではファイルペア単位で Hidden Coupling を検出する。v0.2 以降で、ファイルペアを type / namespace に集約して表示品質を上げる。
 
-### 14.4 設定による上書き
+### 14.4 Domain Context による上書き
 
-Git の変更頻度だけでは、ビジネス上の重要な揮発性を判断できない。将来の Domain Context Config で上書きできるようにする。
+Git の変更頻度だけでは、ビジネス上の重要な揮発性を判断できない。Domain Context
+Config がある場合、score 用の target volatility は target component が属する
+subdomain の `expectedVolatility` を優先する。Git 由来の observed churn は捨てず、
+`AccidentalVolatility` と Hotspots の補助情報に使う。
 
 ```toml
-[volatility]
-high = ["src/MyApp.Domain/Core/**"]
-low = ["src/MyApp.Infrastructure/Shared/**"]
+[[domain.subdomains]]
+name = "Billing"
+category = "core"
+paths = ["src/MyApp.Domain/Billing/**"]
+expected_volatility = "high"
 ```
 
 ### 14.5 DDD subdomain による補正
 
-Phase 5 の次スライスでは、ユーザー設定から subdomain category と expected volatility を読み込む。
+Phase 5 では、ユーザー設定から subdomain category と expected volatility を読み込む。
 tool は subdomain を自動分類しない。
 
 ```toml
@@ -229,7 +234,30 @@ generic = ["src/MyApp.Infrastructure/**"]
 - core subdomain の high churn は、product model の進化として説明できる場合があるため、それ自体を issue にしない
 - core に遠く強く依存している component は、core の本質的な揮発性により引き続き risk が高い
 - supporting / generic が頻繁に変化している場合は、設計摩擦や実装摩擦による `AccidentalVolatility` の疑いがある
-- `AccidentalVolatility` は Phase 5 では issue または hotspot reason として表示し、Balance Score の主計算は急に変えない
+- `AccidentalVolatility` は issue として表示し、score 用 volatility は
+  `expectedVolatility` を優先する
+
+### 14.6 Technical role による strength 補正
+
+`domain.areas` の `technicalRole` は、構文上の呼び出しだけでは強く見えすぎる
+意図的な境界を補正する。
+
+- target が `contract` area に属する場合、Functional / Intrusive は score 計算上
+  最大 `Model` として扱う
+- source が `compositionRoot` area に属し、namespace / project boundary をまたぐ場合、
+  orchestration の Functional / Intrusive は score 計算上最大 `Model` として扱う
+- `adapter`, `domainModel`, `applicationService`, `testSupport` は score 補正せず、
+  summary / manifest / hotspot reason の説明に使う
+
+観測された coupling 自体は変更しない。report の coupling graph や fan-in / fan-out は
+実際に見つかった依存を保持し、Balance Score / GlobalComplexity / Grade だけ補正後の
+effective coupling を使う。
+
+GlobalComplexity の severity は、effective coupling の score に加えて target の
+Domain Context を見る。`technicalRole = domainModel` や `expectedVolatility = high`
+の core rules は低 score を High のまま扱うが、stable な supporting / generic target
+への遠い functional 依存は Medium に留める。これにより「本当に優先すべき設計リスク」と
+「許容可能だが見直し候補の依存」を分ける。
 
 ---
 

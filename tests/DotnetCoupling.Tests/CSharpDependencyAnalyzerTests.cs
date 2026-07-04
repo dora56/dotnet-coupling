@@ -632,6 +632,358 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_DomainContextSupportingHighChurn_ReportsAccidentalVolatility()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        string apiPath = Path.Combine(directory, "src", "Api", "Handler.cs");
+        string reportingPath = Path.Combine(directory, "src", "Reporting", "ReportBuilder.cs");
+        WriteFile(
+            apiPath,
+            """
+            using Sample.App.Reporting;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public ReportBuilder? Report { get; init; }
+            }
+            """);
+        WriteFile(
+            reportingPath,
+            """
+            namespace Sample.App.Reporting;
+
+            public sealed class ReportBuilder
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+            [
+                new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Low),
+            ]),
+        };
+        StaticVolatilityProvider volatilityProvider = new(new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [reportingPath] = 11,
+        });
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, AnalysisMode.Syntax, volatilityProvider, gitMonths: 6, options);
+
+        CouplingIssue issue = Assert.Single(report.Issues, issue => issue.Type == IssueType.AccidentalVolatility);
+        Assert.Equal("Sample.App.Reporting.ReportBuilder", issue.Source);
+        Assert.Equal("Reporting", issue.Target);
+        Assert.Equal(Severity.Medium, issue.Severity);
+        Assert.NotNull(report.DomainContext);
+        Assert.Equal(1, report.DomainContext.SubdomainCount);
+        Assert.Equal(1, report.DomainContext.MatchedComponents);
+        Assert.Equal(1, report.DomainContext.AccidentalVolatilityIssues);
+        DomainSubdomainUsage reporting = Assert.Single(report.DomainContext.Subdomains);
+        Assert.Equal("Reporting", reporting.Name);
+        Assert.Equal(1, reporting.MatchedComponents);
+    }
+
+    [Fact]
+    public void Analyze_DomainContextSummary_ExcludesConfiguredTestProjects()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        WriteFile(
+            Path.Combine(directory, "src", "Reporting", "ReportBuilder.cs"),
+            """
+            namespace Sample.App.Reporting;
+
+            public sealed class ReportBuilder
+            {
+            }
+            """);
+        WriteFile(
+            Path.Combine(directory, "tests", "Sample.App.Tests", "ReportBuilderTests.cs"),
+            """
+            namespace Sample.App.Tests;
+
+            public sealed class ReportBuilderTests
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            TestProjectPathPatterns = ["**/tests/**"],
+            DomainContext = new DomainContext(
+            [
+                new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Low),
+            ]),
+        };
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.NotNull(report.DomainContext);
+        Assert.Equal(1, report.DomainContext.MatchedComponents);
+        Assert.Equal(0, report.DomainContext.UnmatchedComponents);
+    }
+
+    [Fact]
+    public void Analyze_DomainAreas_ReportsCoverageAndUsesFirstMatchingArea()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        WriteFile(
+            Path.Combine(directory, "src", "App", "Handler.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+            }
+            """);
+        WriteFile(
+            Path.Combine(directory, "src", "Infrastructure", "Repository.cs"),
+            """
+            namespace Sample.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+                [],
+                [
+                    new DomainArea("AllSource", ["src/**"], TechnicalRole.Adapter),
+                    new DomainArea("Application", ["src/App/**"], TechnicalRole.ApplicationService),
+                ]),
+        };
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.NotNull(report.DomainContext);
+        Assert.Equal(2, report.DomainContext.AreaCount);
+        Assert.Equal(2, report.DomainContext.MatchedAreaComponents);
+        Assert.Equal(0, report.DomainContext.UnmatchedAreaComponents);
+        DomainAreaUsage allSource = Assert.Single(report.DomainContext.Areas, area => area.Name == "AllSource");
+        Assert.Equal(2, allSource.MatchedComponents);
+        DomainAreaUsage application = Assert.Single(report.DomainContext.Areas, area => area.Name == "Application");
+        Assert.Equal(0, application.MatchedComponents);
+        ComponentRoleContext handlerRole = Assert.Single(report.ComponentRoles ?? [], context => context.ComponentId == "Sample.App.Handler");
+        Assert.Equal("AllSource", handlerRole.AreaName);
+        Assert.Equal(TechnicalRole.Adapter, handlerRole.TechnicalRole);
+    }
+
+    [Fact]
+    public void Analyze_DomainAreas_AdjustIssueCountAndGradeWhenRoleChangesCouplingRisk()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport baseline = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+                [],
+                [
+                    new DomainArea("Application", ["**/Api/**"], TechnicalRole.ApplicationService),
+                    new DomainArea("Adapters", ["**/Infrastructure/**"], TechnicalRole.Adapter),
+                ]),
+        };
+
+        AnalysisReport withRoles = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6, options);
+
+        Assert.True(withRoles.Issues.Count <= baseline.Issues.Count);
+        Assert.True(GradeRank(withRoles.Grade.Letter) <= GradeRank(baseline.Grade.Letter));
+    }
+
+    [Fact]
+    public void Analyze_TargetContractRole_RemovesGlobalComplexityButKeepsObservedCoupling()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        WriteFile(
+            Path.Combine(directory, "src", "Cli", "Writer.cs"),
+            """
+            using Sample.Core;
+
+            namespace Sample.Cli;
+
+            public sealed class Writer
+            {
+                public ContractDto Create()
+                {
+                    return new ContractDto();
+                }
+            }
+            """);
+        WriteFile(
+            Path.Combine(directory, "src", "Core", "ContractDto.cs"),
+            """
+            namespace Sample.Core;
+
+            public sealed record ContractDto;
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+                [],
+                [new DomainArea("Contracts", ["src/Core/**"], TechnicalRole.Contract)]),
+        };
+
+        AnalysisReport baseline = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6);
+        AnalysisReport calibrated = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.Contains(baseline.Issues, issue => issue.Type == IssueType.GlobalComplexity);
+        Assert.DoesNotContain(calibrated.Issues, issue => issue.Type == IssueType.GlobalComplexity);
+        Assert.Contains(calibrated.Couplings, coupling =>
+            coupling.Source == "Sample.Cli.Writer"
+            && coupling.Target == "Sample.Core.ContractDto"
+            && coupling.Strength == IntegrationStrength.Functional);
+    }
+
+    [Fact]
+    public void Analyze_CompositionRootRole_RemovesGlobalComplexityForOrchestration()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        WriteFile(
+            Path.Combine(directory, "src", "Cli", "CliApplication.cs"),
+            """
+            using Sample.Roslyn;
+
+            namespace Sample.Cli;
+
+            public sealed class CliApplication
+            {
+                public CSharpDependencyAnalyzer Create()
+                {
+                    return new CSharpDependencyAnalyzer();
+                }
+            }
+            """);
+        WriteFile(
+            Path.Combine(directory, "src", "Roslyn", "CSharpDependencyAnalyzer.cs"),
+            """
+            namespace Sample.Roslyn;
+
+            public sealed class CSharpDependencyAnalyzer
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+                [],
+                [new DomainArea("CompositionRoot", ["src/Cli/CliApplication.cs"], TechnicalRole.CompositionRoot)]),
+        };
+
+        AnalysisReport baseline = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6);
+        AnalysisReport calibrated = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.Contains(baseline.Issues, issue => issue.Type == IssueType.GlobalComplexity);
+        Assert.DoesNotContain(calibrated.Issues, issue => issue.Type == IssueType.GlobalComplexity);
+    }
+
+    [Fact]
+    public void Analyze_DomainExpectedVolatility_DrivesScoreWhileObservedChurnStillReportsAccidentalVolatility()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        string reportingPath = Path.Combine(directory, "src", "Reporting", "ReportBuilder.cs");
+        WriteFile(
+            Path.Combine(directory, "src", "Api", "Handler.cs"),
+            """
+            using Sample.Reporting;
+
+            namespace Sample.Api;
+
+            public sealed class Handler
+            {
+                public ReportBuilder Create()
+                {
+                    return new ReportBuilder();
+                }
+            }
+            """);
+        WriteFile(
+            reportingPath,
+            """
+            namespace Sample.Reporting;
+
+            public sealed class ReportBuilder
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+                [new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Low)],
+                []),
+        };
+        IVolatilityProvider volatilityProvider = new StaticVolatilityProvider(new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [reportingPath] = 11,
+        });
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, volatilityProvider, gitMonths: 6, options);
+
+        CouplingIssue globalComplexity = Assert.Single(report.Issues, issue => issue.Type == IssueType.GlobalComplexity);
+        Assert.Equal(Severity.Medium, globalComplexity.Severity);
+        Assert.DoesNotContain(report.Issues, issue => issue.Type == IssueType.CascadingChangeRisk);
+        Assert.Contains(report.Issues, issue => issue.Type == IssueType.AccidentalVolatility);
+    }
+
+    [Fact]
+    public void Analyze_SemanticModeDomainContextSupportingHighChurn_ReportsAccidentalVolatility()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        string projectPath = Path.Combine(directory, "Sample.App.csproj");
+        string apiPath = Path.Combine(directory, "src", "Api", "Handler.cs");
+        string reportingPath = Path.Combine(directory, "src", "Reporting", "ReportBuilder.cs");
+        WriteFile(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            apiPath,
+            """
+            using Sample.App.Reporting;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public ReportBuilder? Report { get; init; }
+            }
+            """);
+        WriteFile(
+            reportingPath,
+            """
+            namespace Sample.App.Reporting;
+
+            public sealed class ReportBuilder
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+            [
+                new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Low),
+            ]),
+        };
+        StaticVolatilityProvider volatilityProvider = new(new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [reportingPath] = 11,
+        });
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(projectPath, AnalysisMode.Semantic, volatilityProvider, gitMonths: 6, options);
+
+        Assert.Equal("semantic-preview", report.Summary.Mode);
+        CouplingIssue issue = Assert.Single(report.Issues, issue => issue.Type == IssueType.AccidentalVolatility);
+        Assert.Equal("Sample.App.Reporting.ReportBuilder", issue.Source);
+        Assert.Equal("Reporting", issue.Target);
+        Assert.Equal(Severity.Medium, issue.Severity);
+    }
+
+    [Fact]
     public void Analyze_NamespaceScopedExternalUsingAcrossManyComponents_ReportsScatteredExternalCoupling()
     {
         string directory = CreateFixture(
@@ -2979,6 +3331,12 @@ public sealed class CSharpDependencyAnalyzerTests
         return projectPath;
     }
 
+    private static void WriteFile(string path, string source)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, source);
+    }
+
     private static string ExternalUsingSource(string typeName)
     {
         return $$"""
@@ -3004,5 +3362,31 @@ public sealed class CSharpDependencyAnalyzerTests
                 }
             }
             """;
+    }
+
+    private static int GradeRank(string grade)
+    {
+        return grade switch
+        {
+            "S" => 0,
+            "A" => 1,
+            "B" => 2,
+            "C" => 3,
+            "D" => 4,
+            "F" => 5,
+            _ => 3,
+        };
+    }
+
+    private sealed class StaticVolatilityProvider(IReadOnlyDictionary<string, int> changeCounts) : IVolatilityProvider
+    {
+        public VolatilityAnalysis Analyze(
+            string repositoryPath,
+            int months,
+            IReadOnlySet<string> analyzedFiles,
+            AnalysisOptions options)
+        {
+            return new VolatilityAnalysis(changeCounts, []);
+        }
     }
 }

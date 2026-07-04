@@ -44,7 +44,10 @@
           "type": "string"
         },
         "mode": {
-          "const": "syntax-only"
+          "enum": [
+            "syntax-only",
+            "semantic-preview"
+          ]
         },
         "files": {
           "type": "integer",
@@ -121,6 +124,9 @@
         "$ref": "#/$defs/issue"
       }
     },
+    "projectModel": {
+      "$ref": "#/$defs/projectModel"
+    },
     "manifest": {
       "type": "object",
       "required": [
@@ -130,7 +136,10 @@
       ],
       "properties": {
         "confidence": {
-          "const": "syntax-only"
+          "enum": [
+            "syntax-only",
+            "semantic-preview"
+          ]
         },
         "runNotes": {
           "type": "array",
@@ -143,6 +152,15 @@
           "items": {
             "$ref": "#/$defs/blindSpot"
           }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        },
+        "domainContext": {
+          "$ref": "#/$defs/domainContext"
         }
       },
       "additionalProperties": false
@@ -284,6 +302,219 @@
         },
         "description": {
           "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "path"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "domainContext": {
+      "type": "object",
+      "required": [
+        "subdomainCount",
+        "matchedComponents",
+        "unmatchedComponents",
+        "accidentalVolatilityIssues",
+        "subdomains",
+        "areaCount",
+        "matchedAreaComponents",
+        "unmatchedAreaComponents",
+        "areas"
+      ],
+      "properties": {
+        "subdomainCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matchedComponents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmatchedComponents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accidentalVolatilityIssues": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subdomains": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/domainSubdomainUsage"
+          }
+        },
+        "areaCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matchedAreaComponents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmatchedAreaComponents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/domainAreaUsage"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "domainSubdomainUsage": {
+      "type": "object",
+      "required": [
+        "name",
+        "category",
+        "expectedVolatility",
+        "matchedComponents"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "Core",
+            "Supporting",
+            "Generic"
+          ]
+        },
+        "expectedVolatility": {
+          "enum": [
+            "Low",
+            "Medium",
+            "High"
+          ]
+        },
+        "matchedComponents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "strategicRole": {
+          "enum": [
+            "AnticorruptionLayer",
+            "PublishedLanguage",
+            "SharedKernel",
+            "OpenHostService",
+            null
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "domainAreaUsage": {
+      "type": "object",
+      "required": [
+        "name",
+        "technicalRole",
+        "matchedComponents"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "technicalRole": {
+          "enum": [
+            "DomainModel",
+            "ApplicationService",
+            "Adapter",
+            "CompositionRoot",
+            "Contract",
+            "TestSupport"
+          ]
+        },
+        "matchedComponents": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "projectModel": {
+      "type": "object",
+      "required": [
+        "projectCount",
+        "projects"
+      ],
+      "properties": {
+        "projectCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/projectMetadataEntry"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "projectMetadataEntry": {
+      "type": "object",
+      "required": [
+        "projectPath",
+        "projectName",
+        "assemblyName",
+        "sourceFileCount",
+        "projectReferences",
+        "packageReferences"
+      ],
+      "properties": {
+        "projectPath": {
+          "type": "string"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "assemblyName": {
+          "type": "string"
+        },
+        "sourceFileCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projectReferences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "packageReferences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false

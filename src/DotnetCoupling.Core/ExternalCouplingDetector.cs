@@ -67,5 +67,3 @@ internal static class ExternalCouplingDetector
         return segments.FirstOrDefault() ?? namespaceName;
     }
 }
-
-internal sealed record UsingNamespace(string Name, int Line);

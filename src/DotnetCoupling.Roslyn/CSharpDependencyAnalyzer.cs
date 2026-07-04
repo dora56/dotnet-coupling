@@ -115,10 +115,16 @@ public sealed class CSharpDependencyAnalyzer
         List<CouplingMetrics> couplings = CouplingResolver.Resolve(components, observations, volatilityAnalysis.ChangeCounts);
         ExternalCouplingDetector.AddExternalUsingCouplings(couplings, components, usingNamespacesByFile, internalNamespaces);
 
-        List<BalanceScore> scores = couplings.Select(CouplingScoring.Calculate).ToList();
+        List<CouplingMetrics> effectiveCouplings = CouplingCalibrator.Calibrate(couplings, componentsById, options.DomainContext);
+        List<BalanceScore> scores = effectiveCouplings.Select(CouplingScoring.Calculate).ToList();
         int internalCouplingCount = couplings.Count(coupling => coupling.Distance != Distance.ExternalPackage);
         int externalCouplingCount = couplings.Count - internalCouplingCount;
-        IssueDetectionResult issueDetection = IssueDetector.DetectIssuesWithSuppression(scores, volatilityAnalysis.TemporalCouplings, componentsById, options);
+        IssueDetectionResult issueDetection = IssueDetector.DetectIssuesWithSuppression(
+            scores,
+            volatilityAnalysis.TemporalCouplings,
+            componentsById,
+            options,
+            couplings);
         GradeResult grade = CouplingScoring.CalculateGrade(internalCouplingCount, issueDetection.Issues);
         AnalysisSummary summary = new(
             fullPath,
@@ -142,7 +148,9 @@ public sealed class CSharpDependencyAnalyzer
             CreateBlindSpots(mode),
             Diagnostics: diagnostics,
             ProjectMetadata: projectMetadata,
-            SuppressedIssues: issueDetection.SuppressedIssues.Count == 0 ? null : issueDetection.SuppressedIssues);
+            SuppressedIssues: issueDetection.SuppressedIssues.Count == 0 ? null : issueDetection.SuppressedIssues,
+            DomainContext: issueDetection.DomainContext,
+            ComponentRoles: issueDetection.ComponentRoles);
     }
 
     private sealed record ProjectFile(string FilePath, string? ProjectName);

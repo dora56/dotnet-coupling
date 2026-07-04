@@ -31,6 +31,9 @@ TOML を使いたい場合は `--config .coupling.toml` で明示指定できる
       "**/Generated/**",
       "**/*.g.cs",
       "**/*.generated.cs"
+    ],
+    "testProjects": [
+      "**/tests/**"
     ]
   },
   "thresholds": {
@@ -50,6 +53,22 @@ TOML を使いたい場合は `--config .coupling.toml` で明示指定できる
         "source": "MyApp.Legacy.LegacyFacade",
         "target": "MyApp.Infrastructure.LegacyRepository",
         "reason": "Accepted legacy adapter until the replacement service ships."
+      }
+    ]
+  },
+  "domain": {
+    "subdomains": [
+      {
+        "name": "Billing",
+        "category": "core",
+        "paths": ["src/MyApp.Billing/**"],
+        "expectedVolatility": "high"
+      },
+      {
+        "name": "Reporting",
+        "category": "supporting",
+        "paths": ["src/MyApp.Reporting/**"],
+        "expectedVolatility": "low"
       }
     ]
   }
@@ -83,6 +102,9 @@ exclude = [
   "**/*.g.cs",
   "**/*.generated.cs"
 ]
+test_projects = [
+  "**/tests/**"
+]
 
 [thresholds]
 max_dependencies = 20
@@ -101,13 +123,31 @@ type = "GlobalComplexity"
 source = "MyApp.Legacy.LegacyFacade"
 target = "MyApp.Infrastructure.LegacyRepository"
 reason = "Accepted legacy adapter until the replacement service ships."
+
+[[domain.subdomains]]
+name = "Billing"
+category = "core"
+paths = ["src/MyApp.Billing/**"]
+expected_volatility = "high"
+
+[[domain.subdomains]]
+name = "Reporting"
+category = "supporting"
+paths = ["src/MyApp.Reporting/**"]
+expected_volatility = "low"
 ```
 
-### 21.5 Domain Context Config (Phase 5 planned)
+`analysis.testProjects` / `analysis.test_projects` は test project を明示指定する。
+該当する source file から出る coupling は観測データとして残すが、active issue 検出
+から除外する。テストコードの検証用依存で `GlobalComplexity` /
+`InappropriateIntimacy` / `HiddenCoupling` などが増え、production code の設計リスクが
+読みにくくなるケースを避けるための設定である。
 
-Phase 5 の次スライスでは config file に domain context を追加する。これは
-subdomain classification を tool が推論するものではなく、ユーザーが判断した分類を
-読み込んで volatility の解釈に使うための設定である。
+### 21.5 Domain Context Config
+
+Phase 5 では config file に domain context を追加した。これは subdomain
+classification を tool が推論するものではなく、ユーザーが判断した分類を読み込んで
+volatility の解釈に使うための設定である。
 
 ```json
 {
@@ -125,6 +165,36 @@ subdomain classification を tool が推論するものではなく、ユーザ�
         "paths": ["src/MyApp.Reporting/**"],
         "expectedVolatility": "low"
       }
+    ],
+    "areas": [
+      {
+        "name": "BillingContracts",
+        "paths": [
+          "src/MyApp.Billing/Contracts/**",
+          "src/MyApp.Billing/Domain/**/*Id.cs",
+          "src/MyApp.Billing/Domain/**/*Dto.cs"
+        ],
+        "technicalRole": "contract"
+      },
+      {
+        "name": "BillingDomain",
+        "paths": ["src/MyApp.Billing/Domain/**"],
+        "technicalRole": "domainModel"
+      },
+      {
+        "name": "BillingCompositionRoot",
+        "paths": [
+          "src/MyApp.Billing/Program.cs",
+          "src/MyApp.Billing/*Startup.cs",
+          "src/MyApp.Billing/Modules/**"
+        ],
+        "technicalRole": "compositionRoot"
+      },
+      {
+        "name": "InfrastructureAdapters",
+        "paths": ["src/MyApp.Infrastructure/**"],
+        "technicalRole": "adapter"
+      }
     ]
   }
 }
@@ -134,9 +204,43 @@ Semantics:
 
 - `category`: `core` / `supporting` / `generic`
 - `expectedVolatility`: `low` / `medium` / `high`
-- `paths`: config file location からの relative glob
+- `strategicRole` / `strategic_role`: optional。`anticorruptionLayer` /
+  `anticorruption_layer`, `publishedLanguage` / `published_language`,
+  `sharedKernel` / `shared_kernel`, `openHostService` / `open_host_service`
+- `name`: 同一 config 内で一意。大文字小文字だけが異なる名前も重複として扱う
+- `paths`: repository / workspace root から見た glob。`--config` の場所や config file
+  の保存場所では意味を変えない
+- 複数 subdomain の `paths` が同じ component に一致した場合は、設定順で最初に一致した
+  subdomain を使う
+- `domain.areas` は code role context を表す。`technicalRole` /
+  `technical_role` は `domainModel` / `domain_model`, `applicationService` /
+  `application_service`, `adapter`, `compositionRoot` / `composition_root`,
+  `contract`, `testSupport` / `test_support`
+- 複数 area の `paths` が同じ component に一致した場合は、設定順で最初に一致した area を使う
+- `technicalRole` は DDD 専用ではない。非DDD codebase でも broader architecture hint として使う
+- `technicalRole=contract` の target への strong coupling は score 計算上 `Model`
+  相当に補正し、契約 DTO / published language への過剰検知を抑える
+- `contract` は core subdomain 内の value object、identifier type、DTO、published
+  language、shared kernel contract にも使える。広い `domainModel` pattern より前に置く
+- `technicalRole=compositionRoot` の source からの cross-boundary orchestration は
+  score 計算上 `Model` 相当に補正し、composition root の意図的な配線を過剰検知しない
+- `compositionRoot` は `Program`、`Startup`、module startup、DI registration、
+  host bootstrapping code に使う。広い `adapter` pattern より前に置く
 - `core` の high churn は essential business volatility として説明できる
-- `supporting` / `generic` の high observed churn は accidental churn として報告候補にする
+- `core` は `expectedVolatility` が `low` / `medium` でも
+  `AccidentalVolatility` としては報告しない
+- `supporting` / `generic` の high observed churn は、`expectedVolatility` が
+  `low` / `medium` の場合に `AccidentalVolatility` として報告する
+- subdomain に一致した target の score volatility は `expectedVolatility` を優先する
+- observed Git churn は `AccidentalVolatility` と Hotspots の補助情報に残す
+- `strategicRole` は advisory-only。issue 数、grade、`--check` exit code は変更しない
+- 設定がある場合は summary に `Domain Context: ...` 行を出し、JSON では
+  `manifest.domainContext` に subdomain 数、matched / unmatched component 数、
+  `AccidentalVolatility` issue 数、subdomain 別 match 数、area coverage を出す。
+  Hotspots では `technical role: composition_root` のような reason を追加する
+- subdomain / area coverage が部分的な場合は summary と JSON `manifest.runNotes`
+  に coverage hint を出す。これは config path の漏れや、意図的に未分類の code を
+  レビューするための手がかりである
 - 設定がない repository では従来の Git 履歴ベース volatility のみで解析する
 
 ### 21.6 Generated code の既定除外

@@ -1,0 +1,2 @@
+# Fixture tests use default analysis options and should not inherit the
+# repository self-dogfooding configuration from the workspace root.

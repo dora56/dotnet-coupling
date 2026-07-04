@@ -126,7 +126,27 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
         "message": "Referenced project was not found: /repo/src/Missing/Missing.csproj",
         "path": "/repo/src/App/App.csproj"
       }
-    ]
+    ],
+    "domainContext": {
+      "subdomainCount": 2,
+      "matchedComponents": 40,
+      "unmatchedComponents": 8,
+      "accidentalVolatilityIssues": 1,
+      "subdomains": [
+        {
+          "name": "Billing",
+          "category": "Core",
+          "expectedVolatility": "High",
+          "matchedComponents": 28
+        },
+        {
+          "name": "Reporting",
+          "category": "Supporting",
+          "expectedVolatility": "Low",
+          "matchedComponents": 12
+        }
+      ]
+    }
   }
 }
 ```
@@ -165,6 +185,8 @@ CI 利用者向けに、少なくとも以下は安定させる。
 - `issues[].location`
 - `manifest.blindSpots`
 - `manifest.diagnostics` は optional field として後方互換を保ちながら追加できる
+- `manifest.domainContext` は optional field として、config がある場合だけ
+  subdomain matching と `AccidentalVolatility` の適用状況を示す
 
 ### 19.5 SARIF 出力
 
@@ -190,8 +212,9 @@ SARIF upload 対象には出さず、summary / JSON 側で可視化する。
 
 ### 19.6 Hotspots 出力
 
-`--hotspots [N]` は coupling issue の修正候補をランキングする。Phase 4 では
-complexity 指標を使わず、以下を入力にする。
+`--hotspots [N]` は coupling issue の修正候補をランキングする。これは
+remediation priority であり、project health gate は §16 の issue density Grade
+に残す。Phase 4 では complexity 指標を使わず、以下を入力にする。
 
 - active issue count / severity / balance score
 - fan-in / fan-out

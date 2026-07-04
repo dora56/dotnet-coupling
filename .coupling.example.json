@@ -5,6 +5,9 @@
       "**/Generated/**",
       "**/*.g.cs",
       "**/*.generated.cs"
+    ],
+    "testProjects": [
+      "**/tests/**"
     ]
   },
   "thresholds": {
@@ -30,6 +33,78 @@
         "source": "Sample.App.Api.LegacyHandler",
         "target": "Sample.App.Infrastructure.LegacyRepository",
         "reason": "Accepted legacy dependency tracked in ARCH-42"
+      }
+    ]
+  },
+  "domain": {
+    "subdomains": [
+      {
+        "name": "Billing",
+        "category": "core",
+        "paths": [
+          "src/Sample.App.Billing/**"
+        ],
+        "expectedVolatility": "high"
+      },
+      {
+        "name": "Reporting",
+        "category": "supporting",
+        "paths": [
+          "src/Sample.App.Reporting/**"
+        ],
+        "expectedVolatility": "low"
+      },
+      {
+        "name": "SharedKernel",
+        "category": "supporting",
+        "paths": [
+          "src/Sample.App.SharedKernel/**"
+        ],
+        "expectedVolatility": "low",
+        "strategicRole": "sharedKernel"
+      }
+    ],
+    "areas": [
+      {
+        "name": "BillingContracts",
+        "paths": [
+          "src/Sample.App.Billing/Contracts/**",
+          "src/Sample.App.Billing/Domain/**/*Id.cs",
+          "src/Sample.App.Billing/Domain/**/*Dto.cs",
+          "src/Sample.App.SharedKernel/**"
+        ],
+        "technicalRole": "contract"
+      },
+      {
+        "name": "BillingDomain",
+        "paths": [
+          "src/Sample.App.Billing/Domain/**"
+        ],
+        "technicalRole": "domainModel"
+      },
+      {
+        "name": "BillingApplication",
+        "paths": [
+          "src/Sample.App.Billing/Application/**"
+        ],
+        "technicalRole": "applicationService"
+      },
+      {
+        "name": "HostCompositionRoot",
+        "paths": [
+          "src/Sample.App.Web/Program.cs",
+          "src/Sample.App.Web/Startup.cs",
+          "src/Sample.App.Web/*Startup.cs",
+          "src/Sample.App.Web/Modules/**"
+        ],
+        "technicalRole": "compositionRoot"
+      },
+      {
+        "name": "InfrastructureAdapters",
+        "paths": [
+          "src/Sample.App.Infrastructure/**"
+        ],
+        "technicalRole": "adapter"
       }
     ]
   }

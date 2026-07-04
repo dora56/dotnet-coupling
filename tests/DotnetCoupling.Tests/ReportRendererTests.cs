@@ -99,6 +99,82 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void Render_HotspotsOutput_SeparatesRemediationPriorityFromHealthGrade()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        report = report with { Hotspots = HotspotAnalyzer.Calculate(report, count: 1) };
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Hotspots);
+
+        Assert.Contains("Priority ranking for remediation;", rendered);
+        Assert.Contains("Grade remains the project health gate.", rendered);
+    }
+
+    [Fact]
+    public void Render_JsonOutputWithHotspotsAndRoleContext_KeepsRoleContextInExtendedManifest()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 1,
+                UnmatchedComponents: 0,
+                AccidentalVolatilityIssues: 0,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Contracts",
+                        SubdomainCategory.Supporting,
+                        Volatility.Low,
+                        MatchedComponents: 1,
+                        StrategicRole.PublishedLanguage),
+                ],
+                AreaCount: 1,
+                MatchedAreaComponents: 1,
+                UnmatchedAreaComponents: 0,
+                Areas:
+                [
+                    new DomainAreaUsage(
+                        "PublicApi",
+                        TechnicalRole.Contract,
+                        MatchedComponents: 1),
+                ]),
+            Hotspots:
+            [
+                new Hotspot(
+                    Rank: 1,
+                    Component: "Sample.Contracts.PublicApi",
+                    Score: 0.50,
+                    IssueCount: 0,
+                    FanIn: 1,
+                    FanOut: 1,
+                    Volatility.Medium,
+                    CrossesBoundary: false,
+                    ParticipatesInCycle: false,
+                    Reasons: ["technical role: contract"]),
+            ]);
+
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestPaths.RepositoryRoot, "schemas", "dotnet-coupling-report-0.3.schema.json")));
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        AssertRequiredProperties(schema.RootElement, document.RootElement);
+        Assert.Equal("0.3", document.RootElement.GetProperty("schemaVersion").GetString());
+        JsonElement domainContext = document.RootElement.GetProperty("manifest").GetProperty("domainContext");
+        JsonElement subdomain = Assert.Single(domainContext.GetProperty("subdomains").EnumerateArray());
+        Assert.Equal("PublishedLanguage", subdomain.GetProperty("strategicRole").GetString());
+        JsonElement area = Assert.Single(domainContext.GetProperty("areas").EnumerateArray());
+        Assert.Equal("Contract", area.GetProperty("technicalRole").GetString());
+    }
+
+    [Fact]
     public void Render_JsonOutputWithSuppressedIssues_UsesExtendedSchemaContract()
     {
         CouplingIssue issue = new(
@@ -205,6 +281,247 @@ public sealed class ReportRendererTests
         string rendered = ReportRenderer.Render(report, ReportFormat.Summary);
 
         Assert.Contains("Mode: semantic-preview", rendered);
+    }
+
+    [Fact]
+    public void Render_SummaryOutput_IncludesDomainContextSummary()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 1,
+                UnmatchedComponents: 1,
+                AccidentalVolatilityIssues: 1,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Reporting",
+                        SubdomainCategory.Supporting,
+                        Volatility.Low,
+                        MatchedComponents: 1),
+                ]));
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Summary);
+
+        Assert.Contains("Domain Context: 1 subdomain configured, 1 matched component, 1 unmatched component, 1 AccidentalVolatility issue", rendered);
+    }
+
+    [Fact]
+    public void Render_SummaryOutput_IncludesRoleContextSummary()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 0,
+                MatchedComponents: 0,
+                UnmatchedComponents: 0,
+                AccidentalVolatilityIssues: 0,
+                Subdomains: [],
+                AreaCount: 2,
+                MatchedAreaComponents: 1,
+                UnmatchedAreaComponents: 1,
+                Areas:
+                [
+                    new DomainAreaUsage(
+                        "Application",
+                        TechnicalRole.ApplicationService,
+                        MatchedComponents: 1),
+                    new DomainAreaUsage(
+                        "Adapters",
+                        TechnicalRole.Adapter,
+                        MatchedComponents: 0),
+                ]));
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Summary);
+
+        Assert.DoesNotContain("Domain Context:", rendered);
+        Assert.Contains("Role Context: 2 areas configured, 1 matched component, 1 unmatched component", rendered);
+    }
+
+    [Fact]
+    public void Render_SummaryOutput_IncludesDomainContextCoverageHints()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 10, 10, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 7,
+                UnmatchedComponents: 3,
+                AccidentalVolatilityIssues: 0,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Core",
+                        SubdomainCategory.Core,
+                        Volatility.High,
+                        MatchedComponents: 7),
+                ],
+                AreaCount: 1,
+                MatchedAreaComponents: 6,
+                UnmatchedAreaComponents: 4,
+                Areas:
+                [
+                    new DomainAreaUsage(
+                        "CoreContracts",
+                        TechnicalRole.Contract,
+                        MatchedComponents: 6),
+                ]));
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Summary);
+
+        Assert.Contains("Domain Context Hint: 3 components did not match any configured subdomain.", rendered);
+        Assert.Contains("Role Context Hint: 4 components did not match any configured technical role.", rendered);
+    }
+
+    [Fact]
+    public void Render_JsonOutput_IncludesDomainContextManifest()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 1,
+                UnmatchedComponents: 1,
+                AccidentalVolatilityIssues: 1,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Reporting",
+                        SubdomainCategory.Supporting,
+                        Volatility.Low,
+                        MatchedComponents: 1),
+                ]));
+
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        JsonElement domainContext = document.RootElement.GetProperty("manifest").GetProperty("domainContext");
+        Assert.Equal(1, domainContext.GetProperty("subdomainCount").GetInt32());
+        Assert.Equal(1, domainContext.GetProperty("matchedComponents").GetInt32());
+        Assert.Equal(1, domainContext.GetProperty("unmatchedComponents").GetInt32());
+        Assert.Equal(1, domainContext.GetProperty("accidentalVolatilityIssues").GetInt32());
+        JsonElement reporting = Assert.Single(domainContext.GetProperty("subdomains").EnumerateArray());
+        Assert.Equal("Reporting", reporting.GetProperty("name").GetString());
+        Assert.Equal("Supporting", reporting.GetProperty("category").GetString());
+        Assert.Equal("Low", reporting.GetProperty("expectedVolatility").GetString());
+        Assert.Equal(1, reporting.GetProperty("matchedComponents").GetInt32());
+    }
+
+    [Fact]
+    public void Render_JsonOutput_IncludesRoleContextManifest()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 0,
+                MatchedComponents: 0,
+                UnmatchedComponents: 0,
+                AccidentalVolatilityIssues: 0,
+                Subdomains: [],
+                AreaCount: 1,
+                MatchedAreaComponents: 1,
+                UnmatchedAreaComponents: 0,
+                Areas:
+                [
+                    new DomainAreaUsage(
+                        "Application",
+                        TechnicalRole.ApplicationService,
+                        MatchedComponents: 1),
+                ]));
+
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        JsonElement domainContext = document.RootElement.GetProperty("manifest").GetProperty("domainContext");
+        Assert.Equal(1, domainContext.GetProperty("areaCount").GetInt32());
+        Assert.Equal(1, domainContext.GetProperty("matchedAreaComponents").GetInt32());
+        Assert.Equal(0, domainContext.GetProperty("unmatchedAreaComponents").GetInt32());
+        JsonElement area = Assert.Single(domainContext.GetProperty("areas").EnumerateArray());
+        Assert.Equal("Application", area.GetProperty("name").GetString());
+        Assert.Equal("ApplicationService", area.GetProperty("technicalRole").GetString());
+        Assert.Equal(1, area.GetProperty("matchedComponents").GetInt32());
+    }
+
+    [Fact]
+    public void Render_JsonOutput_IncludesDomainContextCoverageHintsInRunNotes()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 10, 10, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 7,
+                UnmatchedComponents: 3,
+                AccidentalVolatilityIssues: 0,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Core",
+                        SubdomainCategory.Core,
+                        Volatility.High,
+                        MatchedComponents: 7),
+                ],
+                AreaCount: 1,
+                MatchedAreaComponents: 6,
+                UnmatchedAreaComponents: 4,
+                Areas:
+                [
+                    new DomainAreaUsage(
+                        "CoreContracts",
+                        TechnicalRole.Contract,
+                        MatchedComponents: 6),
+                ]));
+
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        string[] runNotes = document.RootElement
+            .GetProperty("manifest")
+            .GetProperty("runNotes")
+            .EnumerateArray()
+            .Select(item => item.GetString()!)
+            .ToArray();
+        Assert.Contains("Domain Context coverage is partial: 3 components did not match any configured subdomain.", runNotes);
+        Assert.Contains("Role Context coverage is partial: 4 components did not match any configured technical role.", runNotes);
     }
 
     [Fact]

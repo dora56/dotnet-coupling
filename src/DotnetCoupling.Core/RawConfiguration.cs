@@ -3,9 +3,12 @@ namespace DotnetCoupling.Core;
 internal sealed record RawConfiguration(
     RawAnalysis? Analysis,
     RawThresholds? Thresholds,
-    RawIgnore? Ignore);
+    RawIgnore? Ignore,
+    RawDomain? Domain);
 
-internal sealed record RawAnalysis(IReadOnlyList<string>? ExcludePathPatterns);
+internal sealed record RawAnalysis(
+    IReadOnlyList<string>? ExcludePathPatterns,
+    IReadOnlyList<string>? TestProjectPathPatterns);
 
 internal sealed record RawThresholds(
     int? MaxDependencies,
@@ -25,3 +28,23 @@ internal sealed record RawIssueSuppression(
     string Source,
     string Target,
     string Reason);
+
+internal sealed record RawDomain(
+    IReadOnlyList<RawDomainSubdomain>? Subdomains,
+    IReadOnlyList<RawDomainArea>? Areas);
+
+internal sealed record RawDomainSubdomain(
+    string Name,
+    string Category,
+    string CategoryPath,
+    IReadOnlyList<string> PathPatterns,
+    string ExpectedVolatility,
+    string ExpectedVolatilityPath,
+    string? StrategicRole,
+    string? StrategicRolePath);
+
+internal sealed record RawDomainArea(
+    string Name,
+    IReadOnlyList<string> PathPatterns,
+    string TechnicalRole,
+    string TechnicalRolePath);
