@@ -52,8 +52,16 @@ coverage_dir = pathlib.Path(sys.argv[1])
 mutation_dir = pathlib.Path(sys.argv[2])
 
 coverage_files = sorted(
-    list(coverage_dir.rglob("coverage.cobertura.xml"))
-    + list(coverage_dir.rglob("*.coverage.cobertura.xml"))
+    {
+        path
+        for pattern in (
+            "coverage.cobertura.xml",
+            "*.coverage.cobertura.xml",
+            "coverage.cobertura*.xml",
+            "*.coverage.cobertura*.xml",
+        )
+        for path in coverage_dir.rglob(pattern)
+    }
 )
 mutation_files = sorted(mutation_dir.rglob("mutation-report.json"))
 

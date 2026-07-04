@@ -136,14 +136,15 @@ jobs:
           find tests -type f -path '*/bin/Release/*' -exec chmod +x {} +
 
       - name: Test
-        run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --no-build --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
+        run: dotnet test dotnet-coupling.slnx --configuration Release --no-restore --no-build --results-directory TestResults/Coverage --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 
       - name: Stage coverage report
         if: always()
         shell: bash
         run: |
           mkdir -p artifacts/coverage
-          mapfile -t coverage_reports < <(find . -type f -name 'coverage.cobertura.xml' \
+          mapfile -t coverage_reports < <(find . -type f \
+            \( -name 'coverage.cobertura.xml' -o -name 'coverage.cobertura*.xml' -o -name '*.coverage.cobertura.xml' -o -name '*.coverage.cobertura*.xml' \) \
             -not -path './artifacts/coverage/*' | sort)
 
           if [[ "${#coverage_reports[@]}" -eq 0 ]]; then
@@ -151,8 +152,10 @@ jobs:
             exit 1
           fi
 
+          index=0
           for report in "${coverage_reports[@]}"; do
-            cp "$report" "artifacts/coverage/$(basename "$(dirname "$report")").coverage.cobertura.xml"
+            index=$((index + 1))
+            cp "$report" "artifacts/coverage/coverage-$index.cobertura.xml"
           done
 
       - name: Upload coverage report

@@ -66,6 +66,10 @@ jobs:
         run: |
           "$TOOL_PATH/dotnet-coupling" --json --no-git ./src > dogfood-report.json
 
+      - name: Dogfood SARIF
+        run: |
+          "$TOOL_PATH/dotnet-coupling" --sarif --output dogfood-report.sarif --no-git ./src
+
       - name: Dogfood syntax vs semantic compare
         run: |
           mkdir -p dogfood-compare
@@ -83,6 +87,7 @@ jobs:
             dogfood-summary.txt
             dogfood-no-git-summary.txt
             dogfood-report.json
+            dogfood-report.sarif
             dogfood-compare/**
           if-no-files-found: error
           retention-days: 14
@@ -99,6 +104,9 @@ jobs:
             echo
             echo "### No-git Summary"
             cat dogfood-no-git-summary.txt
+            echo
+            echo "### SARIF"
+            echo "Generated \`dogfood-report.sarif\` and uploaded it in the dogfood artifact."
             echo
             echo "### Syntax vs Semantic Compare"
             cat dogfood-compare/semantic-compare.md
