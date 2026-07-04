@@ -29,7 +29,15 @@ public sealed class ConfigurationLoaderTests
               "ignore": {
                 "paths": ["**/Legacy/**"],
                 "namespaces": ["Sample.Legacy"],
-                "issueTypes": ["GlobalComplexity"]
+                "issueTypes": ["GlobalComplexity"],
+                "issues": [
+                  {
+                    "type": "CascadingChangeRisk",
+                    "source": "Sample.Api.Handler",
+                    "target": "Sample.Domain.Model",
+                    "reason": "Tracked in ADR-001"
+                  }
+                ]
               }
             }
             """);
@@ -42,6 +50,11 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains("**/Generated/**", result.Options.ExcludePathPatterns);
         Assert.Contains("Sample.Legacy", result.Options.IgnoreNamespaces);
         Assert.Contains(IssueType.GlobalComplexity, result.Options.IgnoreIssueTypes);
+        IssueSuppression suppression = Assert.Single(result.Options.IssueSuppressions);
+        Assert.Equal(IssueType.CascadingChangeRisk, suppression.Type);
+        Assert.Equal("Sample.Api.Handler", suppression.Source);
+        Assert.Equal("Sample.Domain.Model", suppression.Target);
+        Assert.Equal("Tracked in ADR-001", suppression.Reason);
     }
 
     [Fact]
@@ -80,6 +93,19 @@ public sealed class ConfigurationLoaderTests
             ConfigurationLoader.Load(directory, new FileInfo(configPath)));
 
         Assert.Contains("Invalid issue type", exception.Message);
+    }
+
+    [Fact]
+    public void Load_InvalidSuppressedIssue_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(configPath, """{ "ignore": { "issues": [{ "type": "GlobalComplexity", "source": "Sample.Api.Handler", "target": "Sample.Infrastructure.Repository" }] } }""");
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("ignore.issues[0].reason", exception.Message);
     }
 
     [Fact]

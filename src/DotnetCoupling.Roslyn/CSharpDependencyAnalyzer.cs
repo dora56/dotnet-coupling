@@ -118,8 +118,8 @@ public sealed class CSharpDependencyAnalyzer
         List<BalanceScore> scores = couplings.Select(CouplingScoring.Calculate).ToList();
         int internalCouplingCount = couplings.Count(coupling => coupling.Distance != Distance.ExternalPackage);
         int externalCouplingCount = couplings.Count - internalCouplingCount;
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(scores, volatilityAnalysis.TemporalCouplings, componentsById, options);
-        GradeResult grade = CouplingScoring.CalculateGrade(internalCouplingCount, issues);
+        IssueDetectionResult issueDetection = IssueDetector.DetectIssuesWithSuppression(scores, volatilityAnalysis.TemporalCouplings, componentsById, options);
+        GradeResult grade = CouplingScoring.CalculateGrade(internalCouplingCount, issueDetection.Issues);
         AnalysisSummary summary = new(
             fullPath,
             analysisModeLabel,
@@ -138,10 +138,11 @@ public sealed class CSharpDependencyAnalyzer
             components,
             observations,
             couplings,
-            issues,
+            issueDetection.Issues,
             CreateBlindSpots(mode),
             Diagnostics: diagnostics,
-            ProjectMetadata: projectMetadata);
+            ProjectMetadata: projectMetadata,
+            SuppressedIssues: issueDetection.SuppressedIssues.Count == 0 ? null : issueDetection.SuppressedIssues);
     }
 
     private sealed record ProjectFile(string FilePath, string? ProjectName);

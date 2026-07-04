@@ -7,6 +7,7 @@ using DotnetCoupling.Cli;
 using DotnetCoupling.Core;
 using DotnetCoupling.Git;
 using DotnetCoupling.Roslyn;
+using DotnetCoupling.Sarif;
 using Xunit;
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
 
@@ -19,7 +20,8 @@ public sealed class ArchitectureBoundaryTests
             typeof(CliApplication).Assembly,
             typeof(ConfigurationLoader).Assembly,
             typeof(GitVolatility).Assembly,
-            typeof(CSharpDependencyAnalyzer).Assembly)
+            typeof(CSharpDependencyAnalyzer).Assembly,
+            typeof(SarifReportRenderer).Assembly)
         .Build();
 
     private static readonly IObjectProvider<IType> CoreTypes = Types().That()
@@ -34,6 +36,10 @@ public sealed class ArchitectureBoundaryTests
         .ResideInAssembly("DotnetCoupling.Roslyn")
         .As("DotnetCoupling.Roslyn");
 
+    private static readonly IObjectProvider<IType> SarifTypes = Types().That()
+        .ResideInAssembly("DotnetCoupling.Sarif")
+        .As("DotnetCoupling.Sarif");
+
     private static readonly IObjectProvider<IType> CliTypes = Types().That()
         .ResideInAssembly("DotnetCoupling.Cli")
         .As("DotnetCoupling.Cli");
@@ -41,6 +47,10 @@ public sealed class ArchitectureBoundaryTests
     private static readonly IObjectProvider<IType> MicrosoftCodeAnalysisTypes = Types().That()
         .HaveFullNameContaining("Microsoft.CodeAnalysis.")
         .As("Microsoft.CodeAnalysis");
+
+    private static readonly IObjectProvider<IType> MicrosoftSarifTypes = Types().That()
+        .HaveFullNameContaining("Microsoft.CodeAnalysis.Sarif")
+        .As("Microsoft.CodeAnalysis.Sarif");
 
     private static readonly IObjectProvider<IType> SystemCommandLineTypes = Types().That()
         .HaveFullNameContaining("System.CommandLine.")
@@ -53,6 +63,7 @@ public sealed class ArchitectureBoundaryTests
             .Should().NotDependOnAny(CliTypes)
             .AndShould().NotDependOnAny(GitTypes)
             .AndShould().NotDependOnAny(RoslynTypes)
+            .AndShould().NotDependOnAny(SarifTypes)
             .AndShould().NotDependOnAny(MicrosoftCodeAnalysisTypes)
             .AndShould().NotDependOnAny(SystemCommandLineTypes)
             .WithoutRequiringPositiveResults();
@@ -66,6 +77,7 @@ public sealed class ArchitectureBoundaryTests
         IArchRule rule = Types().That().Are(GitTypes)
             .Should().NotDependOnAny(CliTypes)
             .AndShould().NotDependOnAny(RoslynTypes)
+            .AndShould().NotDependOnAny(SarifTypes)
             .AndShould().NotDependOnAny(MicrosoftCodeAnalysisTypes)
             .AndShould().NotDependOnAny(SystemCommandLineTypes)
             .WithoutRequiringPositiveResults();
@@ -79,6 +91,20 @@ public sealed class ArchitectureBoundaryTests
         IArchRule rule = Types().That().Are(RoslynTypes)
             .Should().NotDependOnAny(CliTypes)
             .AndShould().NotDependOnAny(GitTypes)
+            .AndShould().NotDependOnAny(SarifTypes)
+            .AndShould().NotDependOnAny(SystemCommandLineTypes)
+            .WithoutRequiringPositiveResults();
+
+        rule.Check(Architecture);
+    }
+
+    [Fact]
+    public void SarifProject_DependsOnlyOnCoreProject()
+    {
+        IArchRule rule = Types().That().Are(SarifTypes)
+            .Should().NotDependOnAny(CliTypes)
+            .AndShould().NotDependOnAny(GitTypes)
+            .AndShould().NotDependOnAny(RoslynTypes)
             .AndShould().NotDependOnAny(SystemCommandLineTypes)
             .WithoutRequiringPositiveResults();
 
@@ -93,5 +119,23 @@ public sealed class ArchitectureBoundaryTests
             .WithoutRequiringPositiveResults();
 
         rule.Check(Architecture);
+    }
+
+    [Fact]
+    public void SarifSdkDependency_IsIsolatedToSarifProject()
+    {
+        IArchRule coreRule = Types().That().Are(CoreTypes)
+            .Should().NotDependOnAny(MicrosoftSarifTypes)
+            .WithoutRequiringPositiveResults();
+        IArchRule gitRule = Types().That().Are(GitTypes)
+            .Should().NotDependOnAny(MicrosoftSarifTypes)
+            .WithoutRequiringPositiveResults();
+        IArchRule roslynRule = Types().That().Are(RoslynTypes)
+            .Should().NotDependOnAny(MicrosoftSarifTypes)
+            .WithoutRequiringPositiveResults();
+
+        coreRule.Check(Architecture);
+        gitRule.Check(Architecture);
+        roslynRule.Check(Architecture);
     }
 }

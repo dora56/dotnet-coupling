@@ -29,6 +29,7 @@ public static class ReportRenderer
         {
             ReportFormat.Json => RenderJson(report),
             ReportFormat.Summary => RenderSummary(report),
+            ReportFormat.Hotspots => RenderHotspots(report),
             _ => RenderText(report),
         };
     }
@@ -43,6 +44,7 @@ public static class ReportRenderer
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade: {report.Grade.Letter} ({report.Grade.Display}) | Avg Score: {report.AverageBalanceScore:0.00} | Issues: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade basis: {report.Grade.Basis} across {report.Summary.InternalCouplings} internal couplings");
         builder.AppendLine(DescribeGit(report));
+        AppendSuppressedSummary(builder, report);
         builder.AppendLine("Analysis confidence: syntax-only");
         AppendBaselineText(builder, report);
         builder.AppendLine();
@@ -81,6 +83,7 @@ public static class ReportRenderer
         }
         builder.AppendLine(DescribeGit(report));
         AppendDiagnosticsSummary(builder, report);
+        AppendSuppressedSummary(builder, report);
         AppendBaselineSummary(builder, report);
         if (report.Grade.Letter == "S")
         {
@@ -91,12 +94,43 @@ public static class ReportRenderer
         return builder.ToString().TrimEnd();
     }
 
+    private static string RenderHotspots(AnalysisReport report)
+    {
+        IReadOnlyList<Hotspot> hotspots = report.Hotspots ?? [];
+        StringBuilder builder = new();
+        builder.AppendLine("Hotspots");
+        builder.AppendLine("------------------------------------------------------------");
+        if (hotspots.Count == 0)
+        {
+            builder.AppendLine("No hotspots detected.");
+            return builder.ToString().TrimEnd();
+        }
+
+        foreach (Hotspot hotspot in hotspots)
+        {
+            builder.AppendLine(CultureInfo.InvariantCulture, $"{hotspot.Rank}. {hotspot.Component}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"   Priority: {hotspot.Score:0.00}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"   Issues: {hotspot.IssueCount} | Fan-in: {hotspot.FanIn} | Fan-out: {hotspot.FanOut} | Volatility: {hotspot.Volatility}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"   Reasons: {string.Join(", ", hotspot.Reasons)}");
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
     private static string RenderJson(AnalysisReport report)
     {
-        object document = report.Baseline is null ? CreateJsonDocument(report) : CreateJsonDocumentWithBaseline(report);
+        object document = HasExtendedJson(report)
+            ? CreateExtendedJsonDocument(report)
+            : report.Baseline is null ? CreateJsonDocument(report) : CreateJsonDocumentWithBaseline(report);
 
         string json = JsonSerializer.Serialize(document, JsonOptions);
         return json.Replace("\"schema\"", "\"$schema\"", StringComparison.Ordinal);
+    }
+
+    private static bool HasExtendedJson(AnalysisReport report)
+    {
+        return report.Hotspots is not null
+            || report.SuppressedIssues is { Count: > 0 };
     }
 
     private static Dictionary<string, object?> CreateJsonDocument(AnalysisReport report)
@@ -128,6 +162,65 @@ public static class ReportRenderer
         if (report.ProjectMetadata is not null)
         {
             document["ProjectModel"] = CreateProjectModelJson(report.ProjectMetadata);
+        }
+
+        return document;
+    }
+
+    private static Dictionary<string, object?> CreateExtendedJsonDocument(AnalysisReport report)
+    {
+        IssueCounts counts = CountIssues(report);
+        Dictionary<string, object?> document = new(StringComparer.Ordinal)
+        {
+            ["Schema"] = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.3.schema.json",
+            ["SchemaVersion"] = "0.3",
+            ["Tool"] = "dotnet-coupling",
+            ["Version"] = ToolVersion,
+            ["Analysis"] = CreateAnalysisJson(report),
+            ["Grade"] = report.Grade,
+            ["Scores"] = new
+            {
+                AverageBalanceScore = report.AverageBalanceScore,
+            },
+            ["IssueCounts"] = new
+            {
+                counts.Critical,
+                counts.High,
+                counts.Medium,
+                counts.Low,
+            },
+            ["Issues"] = report.Issues,
+            ["Manifest"] = CreateManifestJson(report),
+        };
+
+        if (report.Baseline is not null)
+        {
+            BaselineComparison baseline = report.Baseline;
+            document["Baseline"] = new
+            {
+                Ref = baseline.Ref,
+                New = CountIssues(baseline.NewIssues),
+                Resolved = CountIssues(baseline.ResolvedIssues),
+                Unchanged = CountIssues(baseline.UnchangedIssues),
+                NewIssues = baseline.NewIssues,
+                ResolvedIssues = baseline.ResolvedIssues,
+                UnchangedIssues = baseline.UnchangedIssues,
+            };
+        }
+
+        if (report.ProjectMetadata is not null)
+        {
+            document["ProjectModel"] = CreateProjectModelJson(report.ProjectMetadata);
+        }
+
+        if (report.Hotspots is not null)
+        {
+            document["Hotspots"] = report.Hotspots;
+        }
+
+        if (report.SuppressedIssues is { Count: > 0 })
+        {
+            document["SuppressedIssues"] = report.SuppressedIssues;
         }
 
         return document;
@@ -273,6 +366,16 @@ public static class ReportRenderer
         }
 
         builder.AppendLine(CultureInfo.InvariantCulture, $"Diagnostics: {report.Diagnostics.Count} recoverable warning(s)");
+    }
+
+    private static void AppendSuppressedSummary(StringBuilder builder, AnalysisReport report)
+    {
+        if (report.SuppressedIssues is not { Count: > 0 })
+        {
+            return;
+        }
+
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Suppressed Issues: {report.SuppressedIssues.Count}");
     }
 
     private static void AppendBaselineText(StringBuilder builder, AnalysisReport report)

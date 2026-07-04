@@ -37,6 +37,7 @@
     <ProjectReference Include="..\DotnetCoupling.Core\DotnetCoupling.Core.csproj" />
     <ProjectReference Include="..\DotnetCoupling.Git\DotnetCoupling.Git.csproj" />
     <ProjectReference Include="..\DotnetCoupling.Roslyn\DotnetCoupling.Roslyn.csproj" />
+    <ProjectReference Include="..\DotnetCoupling.Sarif\DotnetCoupling.Sarif.csproj" />
   </ItemGroup>
 
   <ItemGroup>

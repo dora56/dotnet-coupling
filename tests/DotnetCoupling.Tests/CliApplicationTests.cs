@@ -29,6 +29,72 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_Sarif_ReturnsSarifOutput()
+    {
+        CommandResult result = await RunCliAsync("--sarif", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        Assert.Equal("2.1.0", document.RootElement.GetProperty("version").GetString());
+        Assert.Equal("dotnet-coupling", document.RootElement.GetProperty("runs")[0].GetProperty("tool").GetProperty("driver").GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task RunAsync_CheckSarif_ReturnsSarifOutputAndCheckExitCode()
+    {
+        CommandResult result = await RunCliAsync("--check", "--min-grade", "B", "--sarif", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.StartsWith("{", result.Output.TrimStart(), StringComparison.Ordinal);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        Assert.Equal("2.1.0", document.RootElement.GetProperty("version").GetString());
+    }
+
+    [Fact]
+    public async Task RunAsync_SarifOutput_WritesFile()
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"), "report.sarif");
+
+        CommandResult result = await RunCliAsync("--sarif", "--output", outputPath, "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(string.Empty, result.Output);
+        Assert.True(File.Exists(outputPath));
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(outputPath));
+        Assert.Equal("2.1.0", document.RootElement.GetProperty("version").GetString());
+    }
+
+    [Fact]
+    public async Task RunAsync_Hotspots_ReturnsHotspotOutput()
+    {
+        CommandResult result = await RunCliAsync("--hotspots", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Hotspots", result.Output);
+        Assert.Contains("Fixture.Global.Api.Handler", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_JsonHotspots_IncludesHotspotsInExtendedJson()
+    {
+        CommandResult result = await RunCliAsync("--json", "--hotspots", "1", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        Assert.Equal("0.3", document.RootElement.GetProperty("schemaVersion").GetString());
+        Assert.Single(document.RootElement.GetProperty("hotspots").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task RunAsync_InvalidHotspots_ReturnsCliArgumentError()
+    {
+        CommandResult result = await RunCliAsync("--hotspots", "0", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Invalid value for --hotspots", result.Error);
+    }
+
+    [Fact]
     public async Task RunAsync_CheckMinGrade_ReturnsFailureWhenGradeIsTooLow()
     {
         CommandResult result = await RunCliAsync("--check", "--min-grade", "B", "--no-git", TestPaths.Fixture("global-complexity"));
@@ -76,6 +142,56 @@ public sealed class CliApplicationTests
 
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Unknown configuration property", result.Error);
+    }
+
+    [Fact]
+    public async Task RunAsync_ConfigIssueSuppression_RemovesIssueFromCheckAndReportsSuppressedCount()
+    {
+        string directory = CreateDirectory();
+        WriteFile(
+            Path.Combine(directory, "Api.cs"),
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    _ = new Repository();
+                }
+            }
+            """);
+        WriteFile(
+            Path.Combine(directory, "Repository.cs"),
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """);
+        string configPath = Path.Combine(directory, ".coupling.json");
+        WriteFile(
+            configPath,
+            """
+            {
+              "ignore": {
+                "issues": [
+                  {
+                    "type": "GlobalComplexity",
+                    "source": "Sample.App.Api.Handler",
+                    "target": "Sample.App.Infrastructure.Repository",
+                    "reason": "Accepted legacy dependency"
+                  }
+                ]
+              }
+            }
+            """);
+
+        CommandResult result = await RunCliAsync("--check", "--min-grade", "B", "--config", configPath, "--no-git", directory);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Suppressed Issues: 1", result.Output);
     }
 
     [Fact]

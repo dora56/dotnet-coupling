@@ -4,22 +4,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="10.*">
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.1.0">
       <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="FsCheck" Version="3.*" />
     <PackageReference Include="Microsoft.Build.Framework" Version="17.11.48">
       <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.*" />
     <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" Version="0.13.3" />
-    <PackageReference Include="xunit.v3" Version="3.*" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.*" />
+    <PackageReference Include="xunit.v3.mtp-v2" Version="3.*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,5 +26,6 @@
     <ProjectReference Include="..\..\src\DotnetCoupling.Core\DotnetCoupling.Core.csproj" />
     <ProjectReference Include="..\..\src\DotnetCoupling.Git\DotnetCoupling.Git.csproj" />
     <ProjectReference Include="..\..\src\DotnetCoupling.Roslyn\DotnetCoupling.Roslyn.csproj" />
+    <ProjectReference Include="..\..\src\DotnetCoupling.Sarif\DotnetCoupling.Sarif.csproj" />
   </ItemGroup>
 </Project>

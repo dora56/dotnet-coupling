@@ -78,6 +78,46 @@
               "ScatteredExternalCoupling"
             ]
           }
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "source",
+              "target",
+              "reason"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "GlobalComplexity",
+                  "CascadingChangeRisk",
+                  "InappropriateIntimacy",
+                  "HighEfferentCoupling",
+                  "HighAfferentCoupling",
+                  "CircularDependency",
+                  "HiddenCoupling",
+                  "AccidentalVolatility",
+                  "ScatteredExternalCoupling"
+                ]
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

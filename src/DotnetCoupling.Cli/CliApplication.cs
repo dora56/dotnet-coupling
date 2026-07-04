@@ -1,6 +1,7 @@
 using DotnetCoupling.Core;
 using DotnetCoupling.Git;
 using DotnetCoupling.Roslyn;
+using DotnetCoupling.Sarif;
 using System.CommandLine;
 
 namespace DotnetCoupling.Cli;
@@ -25,6 +26,17 @@ public static class CliApplication
         Option<bool> jsonOption = new("--json")
         {
             Description = "Render JSON output.",
+        };
+
+        Option<bool> sarifOption = new("--sarif")
+        {
+            Description = "Render SARIF 2.1.0 output for GitHub code scanning.",
+        };
+
+        Option<int?> hotspotsOption = new("--hotspots")
+        {
+            Description = "Render the top coupling hotspots. Defaults to 10 when no count is provided.",
+            Arity = ArgumentArity.ZeroOrOne,
         };
 
         Option<FileInfo?> outputOption = new("--output")
@@ -78,6 +90,8 @@ public static class CliApplication
         rootCommand.Arguments.Add(pathArgument);
         rootCommand.Options.Add(summaryOption);
         rootCommand.Options.Add(jsonOption);
+        rootCommand.Options.Add(sarifOption);
+        rootCommand.Options.Add(hotspotsOption);
         rootCommand.Options.Add(outputOption);
         rootCommand.Options.Add(checkOption);
         rootCommand.Options.Add(minGradeOption);
@@ -93,6 +107,9 @@ public static class CliApplication
             string targetPath = parseResult.GetValue(pathArgument) ?? ".";
             bool summary = parseResult.GetValue(summaryOption);
             bool json = parseResult.GetValue(jsonOption);
+            bool sarif = parseResult.GetValue(sarifOption);
+            int? hotspotsValue = parseResult.GetValue(hotspotsOption);
+            bool hotspotsRequested = parseResult.GetResult(hotspotsOption) is not null;
             FileInfo? output = parseResult.GetValue(outputOption);
             bool check = parseResult.GetValue(checkOption);
             string minGrade = parseResult.GetValue(minGradeOption) ?? "C";
@@ -112,6 +129,12 @@ public static class CliApplication
             if (!TryParseMode(mode, out AnalysisMode analysisMode))
             {
                 Console.Error.WriteLine($"Invalid value for --mode: {mode}");
+                return 2;
+            }
+
+            if (hotspotsRequested && hotspotsValue is <= 0)
+            {
+                Console.Error.WriteLine("Invalid value for --hotspots: value must be a positive integer.");
                 return 2;
             }
 
@@ -148,13 +171,32 @@ public static class CliApplication
                         BaselineComparer.Compare(baselineRef, report, baselineReport));
                 }
 
-                ReportFormat format = json
-                    ? ReportFormat.Json
-                    : summary || check
-                        ? ReportFormat.Summary
-                        : ReportFormat.Text;
+                if (hotspotsRequested)
+                {
+                    int hotspotCount = hotspotsValue ?? HotspotAnalyzer.DefaultCount;
+                    report = report with { Hotspots = HotspotAnalyzer.Calculate(report, hotspotCount) };
+                }
 
-                string rendered = ReportRenderer.Render(report, format);
+                string rendered;
+                if (json)
+                {
+                    rendered = ReportRenderer.Render(report, ReportFormat.Json);
+                }
+                else if (sarif)
+                {
+                    string repositoryRoot = FindGitRepositoryRoot(fullTargetPath) ?? ResolveOutputRoot(fullTargetPath);
+                    rendered = SarifReportRenderer.Render(report, repositoryRoot);
+                }
+                else
+                {
+                    ReportFormat format = hotspotsRequested
+                        ? ReportFormat.Hotspots
+                        : summary || check
+                            ? ReportFormat.Summary
+                            : ReportFormat.Text;
+                    rendered = ReportRenderer.Render(report, format);
+                }
+
                 if (output is not null)
                 {
                     DirectoryInfo? outputDirectory = output.Directory;
@@ -290,5 +332,12 @@ public static class CliApplication
         }
 
         return null;
+    }
+
+    private static string ResolveOutputRoot(string targetPath)
+    {
+        return Directory.Exists(targetPath)
+            ? targetPath
+            : Path.GetDirectoryName(targetPath) ?? targetPath;
     }
 }

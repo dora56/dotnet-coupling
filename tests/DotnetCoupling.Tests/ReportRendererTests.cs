@@ -83,6 +83,52 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void Render_JsonOutputWithHotspots_UsesExtendedSchemaContract()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        report = report with { Hotspots = HotspotAnalyzer.Calculate(report, count: 1) };
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestPaths.RepositoryRoot, "schemas", "dotnet-coupling-report-0.3.schema.json")));
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        AssertRequiredProperties(schema.RootElement, document.RootElement);
+        Assert.Equal("0.3", document.RootElement.GetProperty("schemaVersion").GetString());
+        JsonElement hotspot = Assert.Single(document.RootElement.GetProperty("hotspots").EnumerateArray());
+        Assert.Equal(1, hotspot.GetProperty("rank").GetInt32());
+        Assert.Equal("Fixture.Global.Api.Handler", hotspot.GetProperty("component").GetString());
+    }
+
+    [Fact]
+    public void Render_JsonOutputWithSuppressedIssues_UsesExtendedSchemaContract()
+    {
+        CouplingIssue issue = new(
+            IssueType.GlobalComplexity,
+            Severity.Medium,
+            "Sample.Api.Handler",
+            "Sample.Infrastructure.Repository",
+            0.50,
+            "Problem",
+            "Recommendation",
+            new SourceLocation("/tmp/sample/Api.cs", 1));
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, false, false, 6),
+            new GradeResult("B", "Balanced", "issue-density", "Test"),
+            1.0,
+            [],
+            [],
+            [],
+            [],
+            [],
+            SuppressedIssues: [new SuppressedIssue(issue, "Tracked in ARCH-42")]);
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        Assert.Equal("0.3", document.RootElement.GetProperty("schemaVersion").GetString());
+        JsonElement suppressedIssue = Assert.Single(document.RootElement.GetProperty("suppressedIssues").EnumerateArray());
+        Assert.Equal("Tracked in ARCH-42", suppressedIssue.GetProperty("reason").GetString());
+        Assert.Equal("GlobalComplexity", suppressedIssue.GetProperty("issue").GetProperty("type").GetString());
+    }
+
+    [Fact]
     public void Render_SummaryOutput_IncludesSGradeWarning()
     {
         AnalysisReport report = new(
