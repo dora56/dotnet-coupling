@@ -568,6 +568,53 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_ModeSemanticCsprojWithGit_UsesGitVolatility()
+    {
+        string repository = CreateGitRepository();
+        string projectPath = Path.Combine(repository, "Sample.App.csproj");
+        string samplePath = Path.Combine(repository, "Sample.cs");
+        WriteFile(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            samplePath,
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+                public int Version => 0;
+            }
+            """);
+        Commit(repository, "initial");
+
+        WriteFile(
+            samplePath,
+            """
+            namespace Sample.App;
+
+            public sealed class Sample
+            {
+                public int Version => 1;
+            }
+            """);
+        Commit(repository, "change sample");
+
+        CommandResult result = await RunCliAsync("--mode", "semantic", "--json", projectPath);
+
+        Assert.Equal(0, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        Assert.Equal("semantic-preview", document.RootElement.GetProperty("analysis").GetProperty("mode").GetString());
+        Assert.True(document.RootElement.GetProperty("analysis").GetProperty("gitUsed").GetBoolean());
+    }
+
+    [Fact]
     public async Task RunAsync_ModeSemanticSummary_CharacterizesSemanticOnlyDynamicDispatchDifference()
     {
         string directory = CreateDirectory();
