@@ -31,6 +31,9 @@ TOML を使いたい場合は `--config .coupling.toml` で明示指定できる
       "**/Generated/**",
       "**/*.g.cs",
       "**/*.generated.cs"
+    ],
+    "testProjects": [
+      "**/tests/**"
     ]
   },
   "thresholds": {
@@ -99,6 +102,9 @@ exclude = [
   "**/*.g.cs",
   "**/*.generated.cs"
 ]
+test_projects = [
+  "**/tests/**"
+]
 
 [thresholds]
 max_dependencies = 20
@@ -130,6 +136,12 @@ category = "supporting"
 paths = ["src/MyApp.Reporting/**"]
 expected_volatility = "low"
 ```
+
+`analysis.testProjects` / `analysis.test_projects` は test project を明示指定する。
+該当する source file から出る coupling は観測データとして残すが、active issue 検出
+から除外する。テストコードの検証用依存で `GlobalComplexity` /
+`InappropriateIntimacy` / `HiddenCoupling` などが増え、production code の設計リスクが
+読みにくくなるケースを避けるための設定である。
 
 ### 21.5 Domain Context Config
 
@@ -173,6 +185,9 @@ Semantics:
 - `supporting` / `generic` の high observed churn は、`expectedVolatility` が
   `low` / `medium` の場合に `AccidentalVolatility` として報告する
 - Balance Score / Grade の主計算式は変えない。domain context は追加 issue と説明に使う
+- 設定がある場合は summary に `Domain Context: ...` 行を出し、JSON では
+  `manifest.domainContext` に subdomain 数、matched / unmatched component 数、
+  `AccidentalVolatility` issue 数、subdomain 別 match 数を出す
 - 設定がない repository では従来の Git 履歴ベース volatility のみで解析する
 
 ### 21.6 Generated code の既定除外

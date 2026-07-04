@@ -125,6 +125,7 @@ public enum Severity
 
 public sealed record AnalysisOptions(
     IReadOnlyList<string> ExcludePathPatterns,
+    IReadOnlyList<string> TestProjectPathPatterns,
     IReadOnlyList<string> IgnorePathPatterns,
     IReadOnlyList<string> IgnoreNamespaces,
     IReadOnlySet<IssueType> IgnoreIssueTypes,
@@ -133,6 +134,7 @@ public sealed record AnalysisOptions(
     DomainContext DomainContext)
 {
     public static AnalysisOptions Default { get; } = new(
+        [],
         [],
         [],
         [],
@@ -167,6 +169,19 @@ public sealed record DomainSubdomain(
     SubdomainCategory Category,
     IReadOnlyList<string> PathPatterns,
     Volatility ExpectedVolatility);
+
+public sealed record DomainContextSummary(
+    int SubdomainCount,
+    int MatchedComponents,
+    int UnmatchedComponents,
+    int AccidentalVolatilityIssues,
+    IReadOnlyList<DomainSubdomainUsage> Subdomains);
+
+public sealed record DomainSubdomainUsage(
+    string Name,
+    SubdomainCategory Category,
+    Volatility ExpectedVolatility,
+    int MatchedComponents);
 
 public sealed record SourceLocation(string File, int Line);
 
@@ -282,7 +297,8 @@ public sealed record AnalysisReport(
     IReadOnlyList<AnalysisDiagnostic>? Diagnostics = null,
     ProjectMetadata? ProjectMetadata = null,
     IReadOnlyList<SuppressedIssue>? SuppressedIssues = null,
-    IReadOnlyList<Hotspot>? Hotspots = null);
+    IReadOnlyList<Hotspot>? Hotspots = null,
+    DomainContextSummary? DomainContext = null);
 
 public sealed record BaselineComparison(
     string Ref,

@@ -16,6 +16,14 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "testProjects": {
+          "type": "array",
+          "description": "Path patterns for test projects. Couplings whose source file matches these patterns are kept in observed coupling data but excluded from active issue detection.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "additionalProperties": false

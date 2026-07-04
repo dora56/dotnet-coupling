@@ -208,6 +208,77 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void Render_SummaryOutput_IncludesDomainContextSummary()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 1,
+                UnmatchedComponents: 1,
+                AccidentalVolatilityIssues: 1,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Reporting",
+                        SubdomainCategory.Supporting,
+                        Volatility.Low,
+                        MatchedComponents: 1),
+                ]));
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Summary);
+
+        Assert.Contains("Domain Context: 1 subdomain configured, 1 matched component, 1 unmatched component, 1 AccidentalVolatility issue", rendered);
+    }
+
+    [Fact]
+    public void Render_JsonOutput_IncludesDomainContextManifest()
+    {
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 1, 0, true, true, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            [],
+            DomainContext: new DomainContextSummary(
+                SubdomainCount: 1,
+                MatchedComponents: 1,
+                UnmatchedComponents: 1,
+                AccidentalVolatilityIssues: 1,
+                Subdomains:
+                [
+                    new DomainSubdomainUsage(
+                        "Reporting",
+                        SubdomainCategory.Supporting,
+                        Volatility.Low,
+                        MatchedComponents: 1),
+                ]));
+
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        JsonElement domainContext = document.RootElement.GetProperty("manifest").GetProperty("domainContext");
+        Assert.Equal(1, domainContext.GetProperty("subdomainCount").GetInt32());
+        Assert.Equal(1, domainContext.GetProperty("matchedComponents").GetInt32());
+        Assert.Equal(1, domainContext.GetProperty("unmatchedComponents").GetInt32());
+        Assert.Equal(1, domainContext.GetProperty("accidentalVolatilityIssues").GetInt32());
+        JsonElement reporting = Assert.Single(domainContext.GetProperty("subdomains").EnumerateArray());
+        Assert.Equal("Reporting", reporting.GetProperty("name").GetString());
+        Assert.Equal("Supporting", reporting.GetProperty("category").GetString());
+        Assert.Equal("Low", reporting.GetProperty("expectedVolatility").GetString());
+        Assert.Equal(1, reporting.GetProperty("matchedComponents").GetInt32());
+    }
+
+    [Fact]
     public void Render_JsonOutput_UsesSemanticPreviewRunNotesWhenModeIsSemanticPreview()
     {
         AnalysisReport report = new(

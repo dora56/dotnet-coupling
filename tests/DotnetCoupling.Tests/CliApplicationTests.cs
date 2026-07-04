@@ -211,6 +211,64 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_TomlConfigTestProjects_RemovesTestSourceIssues()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        WriteFile(
+            Path.Combine(directory, "src", "Api", "Handler.cs"),
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                private readonly FirstDependency _first;
+                private readonly SecondDependency _second;
+            }
+
+            public sealed class FirstDependency { }
+            public sealed class SecondDependency { }
+            """);
+        WriteFile(
+            Path.Combine(directory, "tests", "Sample.App.Tests", "HandlerTests.cs"),
+            """
+            namespace Sample.App.Tests;
+
+            public sealed class HandlerTests
+            {
+                private readonly FirstDependency _first;
+                private readonly SecondDependency _second;
+            }
+
+            public sealed class FirstDependency { }
+            public sealed class SecondDependency { }
+            """);
+        WriteFile(
+            configPath,
+            """
+            [analysis]
+            test_projects = ["**/tests/**"]
+
+            [thresholds]
+            max_dependencies = 1
+            """);
+
+        CommandResult result = await RunCliAsync("--json", "--config", configPath, "--no-git", directory);
+
+        Assert.Equal(0, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        JsonElement.ArrayEnumerator issues = document.RootElement.GetProperty("issues").EnumerateArray();
+        Assert.DoesNotContain(
+            issues,
+            issue => issue.GetProperty("source").GetString() == "Sample.App.Tests.HandlerTests");
+        Assert.Contains(
+            document.RootElement.GetProperty("issues").EnumerateArray(),
+            issue =>
+                issue.GetProperty("type").GetString() == "HighEfferentCoupling"
+                && issue.GetProperty("source").GetString() == "Sample.App.Api.Handler");
+    }
+
+    [Fact]
     public async Task RunAsync_InvalidTomlConfig_ReturnsCliArgumentError()
     {
         string directory = CreateDirectory();

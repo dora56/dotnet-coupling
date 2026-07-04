@@ -17,7 +17,8 @@ public sealed class ConfigurationLoaderTests
             """
             {
               "analysis": {
-                "exclude": ["**/Generated/**"]
+                "exclude": ["**/Generated/**"],
+                "testProjects": ["**/tests/**"]
               },
               "thresholds": {
                 "maxDependencies": 3,
@@ -48,6 +49,7 @@ public sealed class ConfigurationLoaderTests
         Assert.Equal(3, result.Options.Thresholds.MaxDependencies);
         Assert.Equal(2, result.Options.Thresholds.MinTemporalCoupling);
         Assert.Contains("**/Generated/**", result.Options.ExcludePathPatterns);
+        Assert.Contains("**/tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains("Sample.Legacy", result.Options.IgnoreNamespaces);
         Assert.Contains(IssueType.GlobalComplexity, result.Options.IgnoreIssueTypes);
         IssueSuppression suppression = Assert.Single(result.Options.IssueSuppressions);
@@ -79,6 +81,7 @@ public sealed class ConfigurationLoaderTests
             """
             [analysis]
             exclude = ["**/Generated/**"]
+            test_projects = ["**/tests/**"]
 
             [thresholds]
             max_dependencies = 3
@@ -105,6 +108,7 @@ public sealed class ConfigurationLoaderTests
         Assert.Equal(3, result.Options.Thresholds.MaxDependencies);
         Assert.Equal(2, result.Options.Thresholds.MinTemporalCoupling);
         Assert.Contains("**/Generated/**", result.Options.ExcludePathPatterns);
+        Assert.Contains("**/tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains("Sample.Legacy", result.Options.IgnoreNamespaces);
         Assert.Contains(IssueType.GlobalComplexity, result.Options.IgnoreIssueTypes);
         IssueSuppression suppression = Assert.Single(result.Options.IssueSuppressions);
@@ -487,6 +491,7 @@ public sealed class ConfigurationLoaderTests
         ConfigurationLoadResult result = ConfigurationLoader.Load(TestPaths.RepositoryRoot, new FileInfo(configPath));
 
         Assert.Equal(20, result.Options.Thresholds.MaxDependencies);
+        Assert.Contains("**/tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
     }
@@ -499,6 +504,7 @@ public sealed class ConfigurationLoaderTests
         ConfigurationLoadResult result = ConfigurationLoader.Load(TestPaths.RepositoryRoot, new FileInfo(configPath));
 
         Assert.Equal(20, result.Options.Thresholds.MaxDependencies);
+        Assert.Contains("**/tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
     }
@@ -511,6 +517,7 @@ public sealed class ConfigurationLoaderTests
         ConfigurationLoadResult result = ConfigurationLoader.Load(TestPaths.RepositoryRoot, new FileInfo(configPath));
 
         Assert.Equal(20, result.Options.Thresholds.MaxDependencies);
+        Assert.Contains("**/tests/DotnetCoupling.Tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Core");
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Roslyn");

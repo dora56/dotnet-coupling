@@ -44,6 +44,7 @@ public static class ReportRenderer
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade: {report.Grade.Letter} ({report.Grade.Display}) | Avg Score: {report.AverageBalanceScore:0.00} | Issues: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
         builder.AppendLine(CultureInfo.InvariantCulture, $"Grade basis: {report.Grade.Basis} across {report.Summary.InternalCouplings} internal couplings");
         builder.AppendLine(DescribeGit(report));
+        AppendDomainContextSummary(builder, report);
         AppendSuppressedSummary(builder, report);
         builder.AppendLine("Analysis confidence: syntax-only");
         AppendBaselineText(builder, report);
@@ -82,6 +83,7 @@ public static class ReportRenderer
             builder.AppendLine(CultureInfo.InvariantCulture, $"Mode: {report.Summary.Mode}");
         }
         builder.AppendLine(DescribeGit(report));
+        AppendDomainContextSummary(builder, report);
         AppendDiagnosticsSummary(builder, report);
         AppendSuppressedSummary(builder, report);
         AppendBaselineSummary(builder, report);
@@ -324,6 +326,11 @@ public static class ReportRenderer
             manifest["diagnostics"] = report.Diagnostics;
         }
 
+        if (report.DomainContext is not null)
+        {
+            manifest["domainContext"] = report.DomainContext;
+        }
+
         return manifest;
     }
 
@@ -376,6 +383,22 @@ public static class ReportRenderer
         }
 
         builder.AppendLine(CultureInfo.InvariantCulture, $"Suppressed Issues: {report.SuppressedIssues.Count}");
+    }
+
+    private static void AppendDomainContextSummary(StringBuilder builder, AnalysisReport report)
+    {
+        if (report.DomainContext is null)
+        {
+            return;
+        }
+
+        DomainContextSummary domainContext = report.DomainContext;
+        builder.AppendLine(CultureInfo.InvariantCulture, $"Domain Context: {domainContext.SubdomainCount} {Pluralize(domainContext.SubdomainCount, "subdomain")} configured, {domainContext.MatchedComponents} {Pluralize(domainContext.MatchedComponents, "matched component")}, {domainContext.UnmatchedComponents} {Pluralize(domainContext.UnmatchedComponents, "unmatched component")}, {domainContext.AccidentalVolatilityIssues} {Pluralize(domainContext.AccidentalVolatilityIssues, "AccidentalVolatility issue")}");
+    }
+
+    private static string Pluralize(int count, string singular)
+    {
+        return count == 1 ? singular : singular + "s";
     }
 
     private static void AppendBaselineText(StringBuilder builder, AnalysisReport report)

@@ -19,8 +19,10 @@ internal static class TomlConfigurationReader
         if (root.TryGetValue("analysis", out object? analysisValue))
         {
             TomlTable analysisTable = ConfigurationValueReader.ReadTable(analysisValue, "analysis");
-            ConfigurationValueReader.AssertKnownProperties(analysisTable, "analysis", ["exclude"]);
-            analysis = new RawAnalysis(ConfigurationValueReader.ReadStringArray(analysisTable, "exclude", "analysis.exclude"));
+            ConfigurationValueReader.AssertKnownProperties(analysisTable, "analysis", ["exclude", "test_projects"]);
+            analysis = new RawAnalysis(
+                ConfigurationValueReader.ReadStringArray(analysisTable, "exclude", "analysis.exclude"),
+                ConfigurationValueReader.ReadStringArray(analysisTable, "test_projects", "analysis.test_projects"));
         }
 
         if (root.TryGetValue("thresholds", out object? thresholdsValue))

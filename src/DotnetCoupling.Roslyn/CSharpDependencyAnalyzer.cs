@@ -142,7 +142,8 @@ public sealed class CSharpDependencyAnalyzer
             CreateBlindSpots(mode),
             Diagnostics: diagnostics,
             ProjectMetadata: projectMetadata,
-            SuppressedIssues: issueDetection.SuppressedIssues.Count == 0 ? null : issueDetection.SuppressedIssues);
+            SuppressedIssues: issueDetection.SuppressedIssues.Count == 0 ? null : issueDetection.SuppressedIssues,
+            DomainContext: issueDetection.DomainContext);
     }
 
     private sealed record ProjectFile(string FilePath, string? ProjectName);

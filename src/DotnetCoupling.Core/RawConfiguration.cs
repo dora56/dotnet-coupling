@@ -6,7 +6,9 @@ internal sealed record RawConfiguration(
     RawIgnore? Ignore,
     RawDomain? Domain);
 
-internal sealed record RawAnalysis(IReadOnlyList<string>? ExcludePathPatterns);
+internal sealed record RawAnalysis(
+    IReadOnlyList<string>? ExcludePathPatterns,
+    IReadOnlyList<string>? TestProjectPathPatterns);
 
 internal sealed record RawThresholds(
     int? MaxDependencies,

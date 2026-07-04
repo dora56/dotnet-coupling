@@ -4,6 +4,9 @@ exclude = [
   "**/*.g.cs",
   "**/*.generated.cs",
 ]
+test_projects = [
+  "**/tests/**",
+]
 
 [thresholds]
 max_dependencies = 20

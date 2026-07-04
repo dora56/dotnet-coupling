@@ -5,6 +5,9 @@
       "**/Generated/**",
       "**/*.g.cs",
       "**/*.generated.cs"
+    ],
+    "testProjects": [
+      "**/tests/**"
     ]
   },
   "thresholds": {

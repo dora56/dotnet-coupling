@@ -676,6 +676,51 @@ public sealed class CSharpDependencyAnalyzerTests
         Assert.Equal("Sample.App.Reporting.ReportBuilder", issue.Source);
         Assert.Equal("Reporting", issue.Target);
         Assert.Equal(Severity.Medium, issue.Severity);
+        Assert.NotNull(report.DomainContext);
+        Assert.Equal(1, report.DomainContext.SubdomainCount);
+        Assert.Equal(1, report.DomainContext.MatchedComponents);
+        Assert.Equal(1, report.DomainContext.AccidentalVolatilityIssues);
+        DomainSubdomainUsage reporting = Assert.Single(report.DomainContext.Subdomains);
+        Assert.Equal("Reporting", reporting.Name);
+        Assert.Equal(1, reporting.MatchedComponents);
+    }
+
+    [Fact]
+    public void Analyze_DomainContextSummary_ExcludesConfiguredTestProjects()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        WriteFile(
+            Path.Combine(directory, "src", "Reporting", "ReportBuilder.cs"),
+            """
+            namespace Sample.App.Reporting;
+
+            public sealed class ReportBuilder
+            {
+            }
+            """);
+        WriteFile(
+            Path.Combine(directory, "tests", "Sample.App.Tests", "ReportBuilderTests.cs"),
+            """
+            namespace Sample.App.Tests;
+
+            public sealed class ReportBuilderTests
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            TestProjectPathPatterns = ["**/tests/**"],
+            DomainContext = new DomainContext(
+            [
+                new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Low),
+            ]),
+        };
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.NotNull(report.DomainContext);
+        Assert.Equal(1, report.DomainContext.MatchedComponents);
+        Assert.Equal(0, report.DomainContext.UnmatchedComponents);
     }
 
     [Fact]

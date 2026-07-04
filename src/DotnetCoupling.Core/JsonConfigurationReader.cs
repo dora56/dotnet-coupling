@@ -18,10 +18,13 @@ internal static class JsonConfigurationReader
 
         if (root.TryGetProperty("analysis", out JsonElement analysisElement))
         {
-            ConfigurationValueReader.AssertKnownProperties(analysisElement, "analysis", ["exclude"]);
+            ConfigurationValueReader.AssertKnownProperties(analysisElement, "analysis", ["exclude", "testProjects"]);
             analysis = new RawAnalysis(
                 analysisElement.TryGetProperty("exclude", out JsonElement exclude)
                     ? ConfigurationValueReader.ReadStringArray(exclude, "analysis.exclude")
+                    : null,
+                analysisElement.TryGetProperty("testProjects", out JsonElement testProjects)
+                    ? ConfigurationValueReader.ReadStringArray(testProjects, "analysis.testProjects")
                     : null);
         }
 

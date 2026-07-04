@@ -1,3 +1,6 @@
+using System.Text;
+using System.Text.RegularExpressions;
+
 namespace DotnetCoupling.Core;
 
 internal static class PathPatternMatcher
@@ -19,36 +22,54 @@ internal static class PathPatternMatcher
 
     private static bool MatchesPattern(string normalizedFile, string normalizedPattern)
     {
-        if (normalizedPattern.StartsWith("**/", StringComparison.Ordinal))
+        if (!ContainsWildcard(normalizedPattern))
         {
-            string suffix = normalizedPattern[3..];
-            if (suffix.StartsWith("*.", StringComparison.Ordinal))
-            {
-                return normalizedFile.EndsWith(suffix[1..], StringComparison.OrdinalIgnoreCase);
-            }
-
-            return normalizedFile.Contains("/" + suffix.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
-                || normalizedFile.EndsWith(suffix.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+            return normalizedFile.Contains(normalizedPattern, StringComparison.OrdinalIgnoreCase);
         }
 
-        if (normalizedPattern.Contains('*', StringComparison.Ordinal))
+        string regex = CreateGlobRegex(normalizedPattern);
+        return Regex.IsMatch(normalizedFile, regex, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static bool ContainsWildcard(string normalizedPattern)
+    {
+        return normalizedPattern.Contains('*', StringComparison.Ordinal)
+            || normalizedPattern.Contains('?', StringComparison.Ordinal);
+    }
+
+    private static string CreateGlobRegex(string normalizedPattern)
+    {
+        StringBuilder builder = new();
+        builder.Append('^');
+        if (!normalizedPattern.StartsWith('/')
+            && !normalizedPattern.StartsWith("**/", StringComparison.Ordinal)
+            && normalizedPattern.Contains('/', StringComparison.Ordinal))
         {
-            string[] parts = normalizedPattern.Split('*', StringSplitOptions.RemoveEmptyEntries);
-            int index = 0;
-            foreach (string part in parts)
+            builder.Append("(?:.*/)?");
+        }
+
+        for (int index = 0; index < normalizedPattern.Length; index++)
+        {
+            char current = normalizedPattern[index];
+            if (current == '*')
             {
-                int found = normalizedFile.IndexOf(part, index, StringComparison.OrdinalIgnoreCase);
-                if (found < 0)
+                bool isRecursive = index + 1 < normalizedPattern.Length && normalizedPattern[index + 1] == '*';
+                if (isRecursive)
                 {
-                    return false;
+                    bool consumesSlash = index + 2 < normalizedPattern.Length && normalizedPattern[index + 2] == '/';
+                    builder.Append(consumesSlash ? "(?:.*/)?" : ".*");
+                    index += consumesSlash ? 2 : 1;
+                    continue;
                 }
 
-                index = found + part.Length;
+                builder.Append("[^/]*");
+                continue;
             }
 
-            return true;
+            builder.Append(current == '?' ? "[^/]" : Regex.Escape(current.ToString()));
         }
 
-        return normalizedFile.Contains(normalizedPattern, StringComparison.OrdinalIgnoreCase);
+        builder.Append('$');
+        return builder.ToString();
     }
 }

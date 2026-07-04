@@ -180,6 +180,67 @@ public sealed class IssueDetectorTests
     }
 
     [Fact]
+    public void DetectIssues_TestProjectSource_SkipsSourceDrivenIssues()
+    {
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            TestProjectPathPatterns = ["**/tests/**"],
+        };
+        CouplingMetrics testCoupling = Coupling(
+            "Sample.Tests.HandlerTests",
+            "Sample.Core.Handler",
+            IntegrationStrength.Intrusive,
+            Distance.DifferentProject) with
+        {
+            Location = new SourceLocation("/repo/tests/Sample.Tests/HandlerTests.cs", 1),
+        };
+        CouplingMetrics productionCoupling = Coupling(
+            "Sample.Api.Handler",
+            "Sample.Infrastructure.Repository",
+            IntegrationStrength.Functional,
+            Distance.DifferentProject) with
+        {
+            Location = new SourceLocation("/repo/src/Sample.Api/Handler.cs", 1),
+        };
+
+        List<CouplingIssue> issues = IssueDetector.DetectIssues(
+            [CouplingScoring.Calculate(testCoupling), CouplingScoring.Calculate(productionCoupling)],
+            [],
+            new Dictionary<string, Component>(StringComparer.Ordinal),
+            options);
+
+        Assert.DoesNotContain(issues, issue => issue.Source == "Sample.Tests.HandlerTests");
+        Assert.Contains(issues, issue =>
+            issue.Type == IssueType.GlobalComplexity
+            && issue.Source == "Sample.Api.Handler"
+            && issue.Target == "Sample.Infrastructure.Repository");
+    }
+
+    [Fact]
+    public void DetectIssues_TestProjectTemporalCoupling_SkipsHiddenCoupling()
+    {
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            TestProjectPathPatterns = ["**/tests/**"],
+        };
+
+        List<CouplingIssue> issues = IssueDetector.DetectIssues(
+            [],
+            [
+                new TemporalCoupling("/repo/tests/Sample.Tests/HandlerTests.cs", "/repo/src/Sample.Api/Handler.cs", 3),
+                new TemporalCoupling("/repo/src/Sample.Api/Controller.cs", "/repo/src/Sample.Api/Handler.cs", 3),
+            ],
+            new Dictionary<string, Component>(StringComparer.Ordinal),
+            options);
+
+        Assert.DoesNotContain(issues, issue => issue.Source.Contains("/tests/", StringComparison.Ordinal));
+        Assert.Contains(issues, issue =>
+            issue.Type == IssueType.HiddenCoupling
+            && issue.Source == "/repo/src/Sample.Api/Controller.cs"
+            && issue.Target == "/repo/src/Sample.Api/Handler.cs");
+    }
+
+    [Fact]
     public void DetectIssues_DuplicateIssueKeys_ReturnsSingleIssue()
     {
         CouplingMetrics first = Coupling("A.Api.Source", "A.Infrastructure.Target", IntegrationStrength.Functional, Distance.DifferentNamespace);

@@ -17,6 +17,7 @@ internal static class ConfigurationOptionsFactory
         RawIgnore? rawIgnore = configuration.Ignore;
         return new AnalysisOptions(
             configuration.Analysis?.ExcludePathPatterns ?? defaults.ExcludePathPatterns,
+            configuration.Analysis?.TestProjectPathPatterns ?? defaults.TestProjectPathPatterns,
             rawIgnore?.PathPatterns ?? defaults.IgnorePathPatterns,
             rawIgnore?.Namespaces ?? defaults.IgnoreNamespaces,
             rawIgnore?.IssueTypes is null ? defaults.IgnoreIssueTypes : ReadIssueTypes(rawIgnore.IssueTypes),

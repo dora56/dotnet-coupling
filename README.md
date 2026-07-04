@@ -148,6 +148,7 @@ discovery checks `.coupling.json` and `coupling.json` first, then
 Current supported settings include:
 
 - analysis excludes
+- test project path patterns for issue-noise reduction
 - fan-in and fan-out thresholds
 - temporal coupling thresholds
 - scattered external breadth thresholds
@@ -157,13 +158,19 @@ Current supported settings include:
   and expected volatility
 
 TOML keys use `snake_case`; JSON keeps the existing `camelCase` schema shape.
+`analysis.test_projects` / `analysis.testProjects` marks test project files.
+Those couplings remain visible as observed data, but couplings whose source file
+matches a test project pattern are excluded from active issue detection and
+grade calculation.
 Domain context does not infer subdomain categories; it uses only the paths and
 categories provided in config. Supporting or generic subdomains with high
 observed Git churn and lower expected volatility are reported as
 `AccidentalVolatility`. Subdomain names must be unique. If multiple path
 patterns match the same component, the first matching subdomain in the config
 is used. Domain paths are repository/workspace-relative, so moving the config
-file or passing it with `--config` does not change their meaning.
+file or passing it with `--config` does not change their meaning. Summary output
+and JSON `manifest.domainContext` show how many components matched configured
+subdomains and how many `AccidentalVolatility` issues were produced.
 
 See [`.coupling.example.json`](.coupling.example.json),
 [`.coupling.example.toml`](.coupling.example.toml),
