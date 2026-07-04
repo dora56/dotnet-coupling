@@ -28,29 +28,12 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_SupportingSubdomainWithHighObservedChurn_AddsAccidentalVolatility()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.Reporting.ReportBuilder",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
-        {
-            [coupling.Target] = Component(coupling.Target, "/repo/src/Reporting/ReportBuilder.cs"),
-        };
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Low),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.Reporting.ReportBuilder");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            componentsById,
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            "/repo/src/Reporting/ReportBuilder.cs",
+            Subdomain("Reporting", SubdomainCategory.Supporting, "src/Reporting/**", Volatility.Low));
 
         CouplingIssue issue = Assert.Single(issues, issue => issue.Type == IssueType.AccidentalVolatility);
         Assert.Equal(Severity.Medium, issue.Severity);
@@ -62,29 +45,12 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_GenericSubdomainWithHighObservedChurn_AddsAccidentalVolatility()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.IdentityProvider.TokenClient",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
-        {
-            [coupling.Target] = Component(coupling.Target, "/repo/src/IdentityProvider/TokenClient.cs"),
-        };
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("IdentityProvider", SubdomainCategory.Generic, ["src/IdentityProvider/**"], Volatility.Low),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.IdentityProvider.TokenClient");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            componentsById,
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            "/repo/src/IdentityProvider/TokenClient.cs",
+            Subdomain("IdentityProvider", SubdomainCategory.Generic, "src/IdentityProvider/**", Volatility.Low));
 
         CouplingIssue issue = Assert.Single(issues, issue => issue.Type == IssueType.AccidentalVolatility);
         Assert.Equal(Severity.Medium, issue.Severity);
@@ -96,29 +62,12 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_SupportingSubdomainWithMediumExpectedVolatility_AddsAccidentalVolatility()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.Reporting.ReportBuilder",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
-        {
-            [coupling.Target] = Component(coupling.Target, "/repo/src/Reporting/ReportBuilder.cs"),
-        };
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Medium),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.Reporting.ReportBuilder");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            componentsById,
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            "/repo/src/Reporting/ReportBuilder.cs",
+            Subdomain("Reporting", SubdomainCategory.Supporting, "src/Reporting/**", Volatility.Medium));
 
         CouplingIssue issue = Assert.Single(issues, issue => issue.Type == IssueType.AccidentalVolatility);
         Assert.Equal("Reporting", issue.Target);
@@ -131,29 +80,12 @@ public sealed class IssueDetectorTests
     public void DetectIssues_NonCoreSubdomainWithHighExpectedVolatility_DoesNotAddAccidentalVolatility(
         SubdomainCategory category)
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.Reporting.ReportBuilder",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
-        {
-            [coupling.Target] = Component(coupling.Target, "/repo/src/Reporting/ReportBuilder.cs"),
-        };
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("Reporting", category, ["src/Reporting/**"], Volatility.High),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.Reporting.ReportBuilder");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            componentsById,
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            "/repo/src/Reporting/ReportBuilder.cs",
+            Subdomain("Reporting", category, "src/Reporting/**", Volatility.High));
 
         Assert.DoesNotContain(issues, issue => issue.Type == IssueType.AccidentalVolatility);
     }
@@ -161,29 +93,12 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_CoreSubdomainWithHighObservedChurn_DoesNotAddAccidentalVolatility()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.Billing.Invoice",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
-        {
-            [coupling.Target] = Component(coupling.Target, "/repo/src/Billing/Invoice.cs"),
-        };
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("Billing", SubdomainCategory.Core, ["src/Billing/**"], Volatility.High),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.Billing.Invoice");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            componentsById,
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            "/repo/src/Billing/Invoice.cs",
+            Subdomain("Billing", SubdomainCategory.Core, "src/Billing/**", Volatility.High));
 
         Assert.DoesNotContain(issues, issue => issue.Type == IssueType.AccidentalVolatility);
     }
@@ -191,29 +106,12 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_CoreSubdomainWithLowExpectedVolatility_DoesNotAddAccidentalVolatility()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.Billing.Invoice",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
-        {
-            [coupling.Target] = Component(coupling.Target, "/repo/src/Billing/Invoice.cs"),
-        };
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("Billing", SubdomainCategory.Core, ["src/Billing/**"], Volatility.Low),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.Billing.Invoice");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            componentsById,
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            "/repo/src/Billing/Invoice.cs",
+            Subdomain("Billing", SubdomainCategory.Core, "src/Billing/**", Volatility.Low));
 
         Assert.DoesNotContain(issues, issue => issue.Type == IssueType.AccidentalVolatility);
     }
@@ -221,30 +119,13 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_OverlappingDomainPathPatterns_UsesFirstMatchingSubdomain()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.Reporting.ReportBuilder",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
-        {
-            [coupling.Target] = Component(coupling.Target, "/repo/src/Reporting/ReportBuilder.cs"),
-        };
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("AllSource", SubdomainCategory.Supporting, ["src/**"], Volatility.Low),
-                new DomainSubdomain("Reporting", SubdomainCategory.Generic, ["src/Reporting/**"], Volatility.Low),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.Reporting.ReportBuilder");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            componentsById,
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            "/repo/src/Reporting/ReportBuilder.cs",
+            Subdomain("AllSource", SubdomainCategory.Supporting, "src/**", Volatility.Low),
+            Subdomain("Reporting", SubdomainCategory.Generic, "src/Reporting/**", Volatility.Low));
 
         CouplingIssue issue = Assert.Single(issues, issue => issue.Type == IssueType.AccidentalVolatility);
         Assert.Equal("AllSource", issue.Target);
@@ -254,29 +135,12 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_DomainContextPathDoesNotMatchTarget_DoesNotAddAccidentalVolatility()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.Reporting.ReportBuilder",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
-        {
-            [coupling.Target] = Component(coupling.Target, "/repo/src/Reporting/ReportBuilder.cs"),
-        };
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("Billing", SubdomainCategory.Supporting, ["src/Billing/**"], Volatility.Low),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.Reporting.ReportBuilder");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            componentsById,
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            "/repo/src/Reporting/ReportBuilder.cs",
+            Subdomain("Billing", SubdomainCategory.Supporting, "src/Billing/**", Volatility.Low));
 
         Assert.DoesNotContain(issues, issue => issue.Type == IssueType.AccidentalVolatility);
     }
@@ -284,25 +148,12 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_HighVolatilityTargetNotParsedAsComponent_DoesNotAddAccidentalVolatility()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Sample.Reporting.ReportBuilder",
-            IntegrationStrength.Model,
-            Distance.DifferentNamespace,
-            Volatility.High);
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Low),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Sample.Reporting.ReportBuilder");
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            new Dictionary<string, Component>(StringComparer.Ordinal),
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            targetFilePath: null,
+            Subdomain("Reporting", SubdomainCategory.Supporting, "src/Reporting/**", Volatility.Low));
 
         Assert.DoesNotContain(issues, issue => issue.Type == IssueType.AccidentalVolatility);
     }
@@ -310,25 +161,12 @@ public sealed class IssueDetectorTests
     [Fact]
     public void DetectIssues_ExternalPackageTargetWithoutParsedComponent_DoesNotAddAccidentalVolatility()
     {
-        CouplingMetrics coupling = Coupling(
-            "Sample.Api.Handler",
-            "Newtonsoft.Json",
-            IntegrationStrength.Model,
-            Distance.ExternalPackage,
-            Volatility.High);
-        AnalysisOptions options = AnalysisOptions.Default with
-        {
-            DomainContext = new DomainContext(
-            [
-                new DomainSubdomain("Reporting", SubdomainCategory.Supporting, ["src/Reporting/**"], Volatility.Low),
-            ]),
-        };
+        CouplingMetrics coupling = HighVolatilityCoupling("Newtonsoft.Json", Distance.ExternalPackage);
 
-        List<CouplingIssue> issues = IssueDetector.DetectIssues(
-            [CouplingScoring.Calculate(coupling)],
-            [],
-            new Dictionary<string, Component>(StringComparer.Ordinal),
-            options);
+        List<CouplingIssue> issues = DetectWithDomain(
+            coupling,
+            targetFilePath: null,
+            Subdomain("Reporting", SubdomainCategory.Supporting, "src/Reporting/**", Volatility.Low));
 
         Assert.DoesNotContain(issues, issue => issue.Type == IssueType.AccidentalVolatility);
     }
@@ -447,6 +285,45 @@ public sealed class IssueDetectorTests
         IssueDetector.AddScatteredExternalCouplingIssues(couplings, issues);
 
         Assert.Contains(issues, issue => issue.Type == IssueType.ScatteredExternalCoupling && issue.Target == "Newtonsoft.Json");
+    }
+
+    private static CouplingMetrics HighVolatilityCoupling(
+        string target,
+        Distance distance = Distance.DifferentNamespace)
+    {
+        return Coupling("Sample.Api.Handler", target, IntegrationStrength.Model, distance, Volatility.High);
+    }
+
+    private static List<CouplingIssue> DetectWithDomain(
+        CouplingMetrics coupling,
+        string? targetFilePath,
+        params DomainSubdomain[] subdomains)
+    {
+        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal);
+        if (targetFilePath is not null)
+        {
+            componentsById[coupling.Target] = Component(coupling.Target, targetFilePath);
+        }
+
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(subdomains),
+        };
+
+        return IssueDetector.DetectIssues(
+            [CouplingScoring.Calculate(coupling)],
+            [],
+            componentsById,
+            options);
+    }
+
+    private static DomainSubdomain Subdomain(
+        string name,
+        SubdomainCategory category,
+        string pathPattern,
+        Volatility expectedVolatility)
+    {
+        return new DomainSubdomain(name, category, [pathPattern], expectedVolatility);
     }
 
     private static List<CouplingIssue> Detect(CouplingMetrics coupling)
