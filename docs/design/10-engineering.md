@@ -247,16 +247,20 @@ Coverage は補助指標として扱う。line / branch coverage は「未実行
 
 ```bash
 dotnet test --configuration Release \
-  --settings coverage.runsettings \
-  --collect:"XPlat Code Coverage" \
-  --results-directory TestResults/Coverage
+  --results-directory TestResults/Coverage \
+  --coverage \
+  --coverage-output coverage.cobertura.xml \
+  --coverage-output-format cobertura
 ```
 
-Phase 1 の coverage 設定は `coverage.runsettings` に置き、Cobertura XML を出力する。
-対象は `DotnetCoupling.Core` assembly の scoring / issue detection に絞り、
-CLI entrypoint の `Program.cs` と test assembly は除外する。
+Phase 4 以降の test runner は Microsoft Testing Platform (MTP) に統一する。
+`.NET 10` の native MTP mode は `global.json` の `test.runner` で有効化し、
+xUnit v3 test project は `<UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>`
+を使う。Coverage は VSTest data collector ではなく
+`Microsoft.Testing.Extensions.CodeCoverage` で Cobertura XML を出力する。
+test assembly は既定で除外される。
 
-CI では mutation testing を独立した必須 job として実行し、`stryker-config.json`
+PR CI では mutation testing を独立した job として実行し、`stryker-config.json`
 の `break` threshold で失敗させる。Coverage は同じ CI 内で収集するが、Phase 1
 では threshold gate にしない。CI は `coverage-report` と `mutation-report` を
 artifact として保存し、coverage は Cobertura XML、mutation は Stryker HTML/JSON
@@ -337,7 +341,8 @@ report を確認できるようにする。
 | Suite | Stryker 実行 | 理由 |
 |---|---|---|
 | PR gate | Yes (`since`) | 変更差分だけを mutation して feedback loop を維持する |
-| Main branch | Yes (full) | merge 後の回帰を full scope で検知する |
+| Branch / manual | Yes (`workflow_dispatch` or local) | 大きめの refactor で事前検証する |
+| Main branch | No by default | main push は build / test / format / package smoke を優先し、feedback loop を重くしない |
 | Nightly | Optional | 長期 trend や heavy な構成に広げる場合に使う |
 | Release gate | No | 公開フローの責務を pack/publish/release に限定する |
 
@@ -346,11 +351,9 @@ report を確認できるようにする。
 ```xml
 <!-- tests/DotnetCoupling.Tests/DotnetCoupling.Tests.csproj -->
 <ItemGroup>
-  <PackageReference Include="xunit" Version="2.*" />
-  <PackageReference Include="xunit.runner.visualstudio" Version="2.*" />
+  <PackageReference Include="xunit.v3.mtp-v2" Version="3.*" />
   <PackageReference Include="FsCheck" Version="3.*" />
-  <PackageReference Include="FsCheck.Xunit" Version="3.*" />
-  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+  <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.1.*" />
 </ItemGroup>
 ```
 
@@ -365,13 +368,14 @@ dotnet tool install --global dotnet-stryker
 | Suite | Trigger | 含むテスト | 目標時間 |
 |---|---|---|---|
 | PR gate | `pull_request` | Static + Unit (small) + Integration (medium) + diff-scoped mutation | < 5 min |
-| Main push | `main` への push | Static + Unit + Integration + full mutation | < 15 min |
+| Main push | `main` への push | Static + Unit + Integration + package smoke + report aggregation | < 10 min |
 | Nightly | schedule | Optional: full mutation + extended diagnostics | < 20 min |
 | Release | tag push | All + E2E + pack/publish/release | < 10 min |
 
 PR の mutation job では Stryker.NET の `since` を使い、`pull_request.base.sha`
-以降の差分に限定して実行する。`main` への push では full mutation を実行し、
-公開前の最終 mutation gate は release workflow ではなく通常 CI に置く。
+以降の差分に限定して実行する。`main` への push では full mutation を既定では
+実行しない。公開前に必要な mutation 確認は PR / branch / manual / nightly の
+いずれかで実施し、release workflow からは外す。
 
 ---
 

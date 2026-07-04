@@ -35,6 +35,7 @@ inspected without changing the default contract.
 - [Syntax and Semantic Modes](#syntax-and-semantic-modes)
 - [Configuration](#configuration)
 - [Baseline Gate](#baseline-gate)
+- [SARIF and Hotspots](#sarif-and-hotspots)
 - [Output and Schema](#output-and-schema)
 - [CI and Quality Gates](#ci-and-quality-gates)
 - [Current Blind Spots](#current-blind-spots)
@@ -62,6 +63,7 @@ dotnet-coupling --json ./src
 ```bash
 dotnet-coupling --check --min-grade B ./src
 dotnet-coupling --check --baseline main --fail-on High ./src
+dotnet-coupling --sarif --output dotnet-coupling.sarif ./src
 ```
 
 Example summary:
@@ -97,6 +99,12 @@ dotnet-coupling --summary ./src
 
 # Machine-readable JSON
 dotnet-coupling --json ./src
+
+# GitHub Code Scanning compatible SARIF
+dotnet-coupling --sarif --output dotnet-coupling.sarif ./src
+
+# Top refactoring candidates
+dotnet-coupling --hotspots 10 ./src
 
 # Skip Git history for faster local runs
 dotnet-coupling --no-git ./src
@@ -141,7 +149,8 @@ Current supported settings include:
 - fan-in and fan-out thresholds
 - temporal coupling thresholds
 - scattered external breadth thresholds
-- ignore rules for paths, namespaces, and issue types
+- ignore rules for paths, namespaces, issue types, and precise issue
+  suppressions
 
 See [`.coupling.example.json`](.coupling.example.json)
 and [`schemas/dotnet-coupling-config-0.2.schema.json`](schemas/dotnet-coupling-config-0.2.schema.json).
@@ -157,6 +166,25 @@ severity or higher. If `--fail-on` is omitted, the baseline gate uses `High`.
 This makes it practical to adopt in an existing codebase without forcing a
 one-shot cleanup of all historical debt.
 
+## SARIF and Hotspots
+
+`--sarif` emits SARIF 2.1.0 using Microsoft's `Sarif.Sdk`, with issue types
+mapped to SARIF rules and source locations normalized to repository-relative
+URIs for GitHub Code Scanning.
+
+```bash
+dotnet-coupling --sarif --output dotnet-coupling.sarif --no-git ./src
+```
+
+`--hotspots [N]` ranks the top coupling repair candidates from active issues,
+fan-in, fan-out, volatility, boundary crossing, and cycle participation. The
+default count is `10`.
+
+```bash
+dotnet-coupling --hotspots ./src
+dotnet-coupling --json --hotspots 5 ./src
+```
+
 ## Output and Schema
 
 JSON output includes:
@@ -167,6 +195,7 @@ JSON output includes:
 - issue counts and issue details
 - manifest run notes and blind spots
 - optional project-model metadata for project / assembly / package boundaries
+- optional hotspots and suppressed issues when requested
 
 Schema files live under [`schemas/`](schemas/).
 
@@ -178,11 +207,11 @@ supporting signal to find unexercised areas, not as the main quality gate.
 Current CI posture:
 
 - `pull_request`: diff-scoped mutation with Stryker `since`
-- `main` push: full mutation
+- `main` push: build, test, format, package smoke, and report aggregation
 - `release`: build, test, format, pack, local tool smoke, publish
 
-CI uploads `coverage-report`, `mutation-report`, and dogfood artifacts for
-inspection.
+CI uploads `coverage-report`, `mutation-report`, SARIF dogfood output, and
+dogfood artifacts for inspection.
 
 ## Current Blind Spots
 
@@ -202,7 +231,7 @@ dotnet restore dotnet-coupling.slnx --locked-mode
 dotnet build dotnet-coupling.slnx --configuration Release --no-restore
 dotnet test dotnet-coupling.slnx --configuration Release --no-restore
 dotnet format dotnet-coupling.slnx --verify-no-changes --no-restore
-dotnet test dotnet-coupling.slnx --configuration Release --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/Coverage
+dotnet test dotnet-coupling.slnx --configuration Release --results-directory TestResults/Coverage --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 dotnet tool restore
 dotnet tool run dotnet-stryker -- --config-file stryker-config.json
 ```

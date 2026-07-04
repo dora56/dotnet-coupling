@@ -24,7 +24,7 @@
 | [06-issue-detection.md](06-issue-detection.md) | Issue 検出・Severity・循環依存 | §17-18, §23 |
 | [07-output-formats.md](07-output-formats.md) | レポート出力 (Text / Summary / JSON) | §19 |
 | [08-config.md](08-config.md) | 設定ファイル・外部依存の扱い | §21-22 |
-| [09-future-features.md](09-future-features.md) | Baseline / Hotspots / AI / SARIF | §24-27 |
+| [09-future-features.md](09-future-features.md) | Baseline / Hotspots / AI / SARIF / Complexity | §24-28 |
 | [10-engineering.md](10-engineering.md) | パフォーマンス・セキュリティ・テスト・CI | §28-31 |
 | [11-roadmap.md](11-roadmap.md) | バージョニング・実装ロードマップ | §32-33 |
 | [12-reference.md](12-reference.md) | 元ツール対応表・Blind Spots・リスク・原則・レビュー履歴 | §34-41 |

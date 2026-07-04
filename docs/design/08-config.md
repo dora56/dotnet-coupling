@@ -39,10 +39,23 @@ Phase 2 では `.coupling.toml` / `coupling.toml` は未対応である。明示
   "ignore": {
     "paths": ["**/Legacy/**"],
     "namespaces": ["MyApp.Legacy"],
-    "issueTypes": ["ScatteredExternalCoupling"]
+    "issueTypes": ["ScatteredExternalCoupling"],
+    "issues": [
+      {
+        "type": "GlobalComplexity",
+        "source": "MyApp.Legacy.LegacyFacade",
+        "target": "MyApp.Infrastructure.LegacyRepository",
+        "reason": "Accepted legacy adapter until the replacement service ships."
+      }
+    ]
   }
 }
 ```
+
+`ignore.issues` は baseline と同じ安定キー `(type, source, target)` で特定する。
+suppressed issue は grade / issue count / `--check` から除外するが、summary と
+JSON には suppressed count と reason を残す。`reason` は必須で、意図しない
+負債隠しを避ける。
 
 ### 21.4 TOML 例 v0.2+
 
