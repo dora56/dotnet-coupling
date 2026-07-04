@@ -101,6 +101,7 @@ public static class ReportRenderer
         IReadOnlyList<Hotspot> hotspots = report.Hotspots ?? [];
         StringBuilder builder = new();
         builder.AppendLine("Hotspots");
+        builder.AppendLine("Priority ranking for remediation; Grade remains the project health gate.");
         builder.AppendLine("------------------------------------------------------------");
         if (hotspots.Count == 0)
         {

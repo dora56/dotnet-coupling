@@ -253,6 +253,12 @@ generic = ["src/MyApp.Infrastructure/**"]
 実際に見つかった依存を保持し、Balance Score / GlobalComplexity / Grade だけ補正後の
 effective coupling を使う。
 
+GlobalComplexity の severity は、effective coupling の score に加えて target の
+Domain Context を見る。`technicalRole = domainModel` や `expectedVolatility = high`
+の core rules は低 score を High のまま扱うが、stable な supporting / generic target
+への遠い functional 依存は Medium に留める。これにより「本当に優先すべき設計リスク」と
+「許容可能だが見直し候補の依存」を分ける。
+
 ---
 
 ## 15. Balance Score 設計

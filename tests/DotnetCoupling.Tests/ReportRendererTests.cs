@@ -99,6 +99,19 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void Render_HotspotsOutput_SeparatesRemediationPriorityFromHealthGrade()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        report = report with { Hotspots = HotspotAnalyzer.Calculate(report, count: 1) };
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Hotspots);
+
+        Assert.Contains("Priority ranking for remediation;", rendered);
+        Assert.Contains("Grade remains the project health gate.", rendered);
+    }
+
+    [Fact]
     public void Render_JsonOutputWithHotspotsAndRoleContext_KeepsRoleContextInExtendedManifest()
     {
         AnalysisReport report = new(

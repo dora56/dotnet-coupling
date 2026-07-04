@@ -6,7 +6,9 @@ Quick reference for AI agents implementing issue detection in `dotnet-coupling`.
 
 ### GlobalComplexity
 - **Trigger**: `strength >= 0.75 && distance >= 0.50`
-- **Severity**: High (if score < 0.40), Medium otherwise
+- **Severity**: High when score is below `0.40` and the target is high-volatility
+  or `technicalRole = domainModel`; Medium for stable supporting/generic targets
+  and for score `>= 0.40`
 - **Meaning**: Strong coupling spanning a far distance
 - **Fix**: Introduce interface, move closer, or add port/adapter
 

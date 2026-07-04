@@ -44,7 +44,7 @@ internal static class IssueDetector
             {
                 issues.Add(new CouplingIssue(
                     IssueType.GlobalComplexity,
-                    score.Score < 0.40 ? Severity.High : Severity.Medium,
+                    DetermineGlobalComplexitySeverity(score, componentsById, options.DomainContext),
                     coupling.Source,
                     coupling.Target,
                     score.Score,
@@ -192,6 +192,36 @@ internal static class IssueDetector
                 "Invert one direction via an interface, extract a shared contract, or use events.",
                 null));
         }
+    }
+
+    private static Severity DetermineGlobalComplexitySeverity(
+        BalanceScore score,
+        IReadOnlyDictionary<string, Component> componentsById,
+        DomainContext domainContext)
+    {
+        if (score.Score >= 0.40)
+        {
+            return Severity.Medium;
+        }
+
+        if (!componentsById.TryGetValue(score.Coupling.Target, out Component? target))
+        {
+            return Severity.High;
+        }
+
+        DomainArea? targetArea = DomainContextMatcher.FindArea(target.FilePath, domainContext);
+        if (targetArea?.TechnicalRole == TechnicalRole.DomainModel)
+        {
+            return Severity.High;
+        }
+
+        DomainSubdomain? targetSubdomain = DomainContextMatcher.FindSubdomain(target.FilePath, domainContext);
+        if (targetSubdomain is null)
+        {
+            return Severity.High;
+        }
+
+        return targetSubdomain.ExpectedVolatility == Volatility.High ? Severity.High : Severity.Medium;
     }
 
     internal static void AddHiddenCouplingIssues(

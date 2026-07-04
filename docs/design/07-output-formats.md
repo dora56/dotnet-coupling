@@ -212,8 +212,9 @@ SARIF upload 対象には出さず、summary / JSON 側で可視化する。
 
 ### 19.6 Hotspots 出力
 
-`--hotspots [N]` は coupling issue の修正候補をランキングする。Phase 4 では
-complexity 指標を使わず、以下を入力にする。
+`--hotspots [N]` は coupling issue の修正候補をランキングする。これは
+remediation priority であり、project health gate は §16 の issue density Grade
+に残す。Phase 4 では complexity 指標を使わず、以下を入力にする。
 
 - active issue count / severity / balance score
 - fan-in / fan-out

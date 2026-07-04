@@ -215,7 +215,8 @@ dotnet-coupling --sarif --output dotnet-coupling.sarif --no-git ./src
 
 `--hotspots [N]` ranks the top coupling repair candidates from active issues,
 fan-in, fan-out, volatility, boundary crossing, and cycle participation. The
-default count is `10`.
+default count is `10`. Treat hotspots as a remediation priority list; the
+project Grade remains the health gate based on issue density.
 
 ```bash
 dotnet-coupling --hotspots ./src

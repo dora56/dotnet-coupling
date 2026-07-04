@@ -126,6 +126,8 @@ Generic の分類は組織戦略、競争優位、時期によって変わるた
 ### 25.2 Hotspots
 
 Phase 4 で `--hotspots [N]` として実装する。リファクタリング候補をランキングする。
+Hotspots は remediation priority であり、Grade は issue density による project
+health gate として分離する。
 
 ```bash
 dotnet-coupling --hotspots 10 ./src
