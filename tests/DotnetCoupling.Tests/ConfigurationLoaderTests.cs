@@ -1,6 +1,7 @@
 using DotnetCoupling.Core;
 using DotnetCoupling.Git;
 using DotnetCoupling.Roslyn;
+using System.Text.Json;
 using Xunit;
 
 namespace DotnetCoupling.Tests;
@@ -208,6 +209,88 @@ public sealed class ConfigurationLoaderTests
     }
 
     [Fact]
+    public void Load_ExplicitConfig_ReadsDomainRolesAndAreas()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "domain": {
+                "subdomains": [
+                  {
+                    "name": "Common",
+                    "category": "supporting",
+                    "paths": ["src/Common/**"],
+                    "expectedVolatility": "low",
+                    "strategicRole": "sharedKernel"
+                  }
+                ],
+                "areas": [
+                  {
+                    "name": "Domain",
+                    "paths": ["src/Common/Domain/**"],
+                    "technicalRole": "domainModel"
+                  },
+                  {
+                    "name": "Composition",
+                    "paths": ["src/App/Program.cs"],
+                    "technicalRole": "compositionRoot"
+                  }
+                ]
+              }
+            }
+            """);
+
+        ConfigurationLoadResult result = ConfigurationLoader.Load(directory, new FileInfo(configPath));
+
+        DomainSubdomain common = Assert.Single(result.Options.DomainContext.Subdomains);
+        Assert.Equal(StrategicRole.SharedKernel, common.StrategicRole);
+        DomainArea domain = Assert.Single(result.Options.DomainContext.Areas, area => area.Name == "Domain");
+        Assert.Equal(TechnicalRole.DomainModel, domain.TechnicalRole);
+        Assert.Contains("src/Common/Domain/**", domain.PathPatterns);
+        DomainArea composition = Assert.Single(result.Options.DomainContext.Areas, area => area.Name == "Composition");
+        Assert.Equal(TechnicalRole.CompositionRoot, composition.TechnicalRole);
+    }
+
+    [Fact]
+    public void Load_ExplicitTomlConfig_ReadsDomainRolesAndAreas()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [[domain.subdomains]]
+            name = "PublicApi"
+            category = "supporting"
+            paths = ["src/PublicApi/**"]
+            expected_volatility = "medium"
+            strategic_role = "open_host_service"
+
+            [[domain.areas]]
+            name = "Contracts"
+            paths = ["src/PublicApi/Contracts/**"]
+            technical_role = "contract"
+
+            [[domain.areas]]
+            name = "Adapters"
+            paths = ["src/PublicApi/Endpoints/**"]
+            technical_role = "adapter"
+            """);
+
+        ConfigurationLoadResult result = ConfigurationLoader.Load(directory, new FileInfo(configPath));
+
+        DomainSubdomain publicApi = Assert.Single(result.Options.DomainContext.Subdomains);
+        Assert.Equal(StrategicRole.OpenHostService, publicApi.StrategicRole);
+        DomainArea contracts = Assert.Single(result.Options.DomainContext.Areas, area => area.Name == "Contracts");
+        Assert.Equal(TechnicalRole.Contract, contracts.TechnicalRole);
+        DomainArea adapters = Assert.Single(result.Options.DomainContext.Areas, area => area.Name == "Adapters");
+        Assert.Equal(TechnicalRole.Adapter, adapters.TechnicalRole);
+    }
+
+    [Fact]
     public void Load_InvalidDomainCategory_ThrowsConfigurationException()
     {
         string directory = CreateDirectory();
@@ -366,6 +449,103 @@ public sealed class ConfigurationLoaderTests
     }
 
     [Fact]
+    public void Load_InvalidStrategicRole_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [[domain.subdomains]]
+            name = "Common"
+            category = "supporting"
+            paths = ["src/Common/**"]
+            expected_volatility = "low"
+            strategic_role = "core_domain"
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("Invalid strategic role", exception.Message);
+        Assert.Contains("domain.subdomains[0].strategic_role", exception.Message);
+    }
+
+    [Fact]
+    public void Load_InvalidTechnicalRole_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "domain": {
+                "areas": [
+                  {
+                    "name": "CoreLogic",
+                    "paths": ["src/Core/**"],
+                    "technicalRole": "coreLogic"
+                  }
+                ]
+              }
+            }
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("Invalid technical role", exception.Message);
+        Assert.Contains("domain.areas[0].technicalRole", exception.Message);
+    }
+
+    [Fact]
+    public void Load_DuplicateDomainAreaName_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [[domain.areas]]
+            name = "Adapters"
+            paths = ["src/Infrastructure/**"]
+            technical_role = "adapter"
+
+            [[domain.areas]]
+            name = "adapters"
+            paths = ["src/Api/**"]
+            technical_role = "adapter"
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("Duplicate domain area name", exception.Message);
+        Assert.Contains("domain.areas[1].name", exception.Message);
+    }
+
+    [Fact]
+    public void Load_DomainAreaWithoutPaths_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [[domain.areas]]
+            name = "Adapters"
+            paths = []
+            technical_role = "adapter"
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("domain.areas[0].paths", exception.Message);
+    }
+
+    [Fact]
     public void Load_DomainWrongShape_ThrowsConfigurationException()
     {
         string directory = CreateDirectory();
@@ -494,6 +674,8 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains("**/tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
+        Assert.Contains(result.Options.DomainContext.Areas, area => area.TechnicalRole == TechnicalRole.DomainModel);
+        Assert.Contains(result.Options.DomainContext.Areas, area => area.TechnicalRole == TechnicalRole.CompositionRoot);
     }
 
     [Fact]
@@ -507,6 +689,8 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains("**/tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
+        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.StrategicRole == StrategicRole.SharedKernel);
+        Assert.Contains(result.Options.DomainContext.Areas, area => area.TechnicalRole == TechnicalRole.ApplicationService);
     }
 
     [Fact]
@@ -521,6 +705,46 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Core");
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Roslyn");
+        Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CliCompositionRoot" && area.TechnicalRole == TechnicalRole.CompositionRoot);
+        Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CoreContracts" && area.TechnicalRole == TechnicalRole.Contract);
+    }
+
+    [Fact]
+    public void ConfigSchema_IncludesAdvisoryRoleProperties()
+    {
+        string schemaPath = Path.Combine(TestPaths.RepositoryRoot, "schemas", "dotnet-coupling-config-0.2.schema.json");
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(schemaPath));
+
+        JsonElement domainProperties = schema.RootElement
+            .GetProperty("properties")
+            .GetProperty("domain")
+            .GetProperty("properties");
+        JsonElement subdomainProperties = domainProperties
+            .GetProperty("subdomains")
+            .GetProperty("items")
+            .GetProperty("properties");
+        JsonElement areaProperties = domainProperties
+            .GetProperty("areas")
+            .GetProperty("items")
+            .GetProperty("properties");
+
+        string[] strategicRoles = subdomainProperties
+            .GetProperty("strategicRole")
+            .GetProperty("enum")
+            .EnumerateArray()
+            .Select(value => value.GetString()!)
+            .ToArray();
+        string[] technicalRoles = areaProperties
+            .GetProperty("technicalRole")
+            .GetProperty("enum")
+            .EnumerateArray()
+            .Select(value => value.GetString()!)
+            .ToArray();
+
+        Assert.Contains("sharedKernel", strategicRoles);
+        Assert.Contains("openHostService", strategicRoles);
+        Assert.Contains("domainModel", technicalRoles);
+        Assert.Contains("compositionRoot", technicalRoles);
     }
 
     private static string CreateDirectory()

@@ -340,7 +340,11 @@
         "matchedComponents",
         "unmatchedComponents",
         "accidentalVolatilityIssues",
-        "subdomains"
+        "subdomains",
+        "areaCount",
+        "matchedAreaComponents",
+        "unmatchedAreaComponents",
+        "areas"
       ],
       "properties": {
         "subdomainCount": {
@@ -363,6 +367,24 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/domainSubdomainUsage"
+          }
+        },
+        "areaCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "matchedAreaComponents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unmatchedAreaComponents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "areas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/domainAreaUsage"
           }
         }
       },
@@ -392,6 +414,43 @@
             "Low",
             "Medium",
             "High"
+          ]
+        },
+        "matchedComponents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "strategicRole": {
+          "enum": [
+            "AnticorruptionLayer",
+            "PublishedLanguage",
+            "SharedKernel",
+            "OpenHostService",
+            null
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "domainAreaUsage": {
+      "type": "object",
+      "required": [
+        "name",
+        "technicalRole",
+        "matchedComponents"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "technicalRole": {
+          "enum": [
+            "DomainModel",
+            "ApplicationService",
+            "Adapter",
+            "CompositionRoot",
+            "Contract",
+            "TestSupport"
           ]
         },
         "matchedComponents": {

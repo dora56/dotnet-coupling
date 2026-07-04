@@ -102,6 +102,24 @@ public enum SubdomainCategory
     Generic,
 }
 
+public enum StrategicRole
+{
+    AnticorruptionLayer,
+    PublishedLanguage,
+    SharedKernel,
+    OpenHostService,
+}
+
+public enum TechnicalRole
+{
+    DomainModel,
+    ApplicationService,
+    Adapter,
+    CompositionRoot,
+    Contract,
+    TestSupport,
+}
+
 public enum IssueType
 {
     GlobalComplexity,
@@ -159,29 +177,71 @@ public sealed record AnalysisThresholds(
         5);
 }
 
-public sealed record DomainContext(IReadOnlyList<DomainSubdomain> Subdomains)
+public sealed record DomainContext(
+    IReadOnlyList<DomainSubdomain> Subdomains,
+    IReadOnlyList<DomainArea> Areas)
 {
-    public static DomainContext Empty { get; } = new([]);
+    public DomainContext(IReadOnlyList<DomainSubdomain> subdomains)
+        : this(subdomains, [])
+    {
+    }
+
+    public static DomainContext Empty { get; } = new([], []);
 }
 
 public sealed record DomainSubdomain(
     string Name,
     SubdomainCategory Category,
     IReadOnlyList<string> PathPatterns,
-    Volatility ExpectedVolatility);
+    Volatility ExpectedVolatility,
+    StrategicRole? StrategicRole = null);
+
+public sealed record DomainArea(
+    string Name,
+    IReadOnlyList<string> PathPatterns,
+    TechnicalRole TechnicalRole);
 
 public sealed record DomainContextSummary(
     int SubdomainCount,
     int MatchedComponents,
     int UnmatchedComponents,
     int AccidentalVolatilityIssues,
-    IReadOnlyList<DomainSubdomainUsage> Subdomains);
+    IReadOnlyList<DomainSubdomainUsage> Subdomains,
+    int AreaCount,
+    int MatchedAreaComponents,
+    int UnmatchedAreaComponents,
+    IReadOnlyList<DomainAreaUsage> Areas)
+{
+    public DomainContextSummary(
+        int SubdomainCount,
+        int MatchedComponents,
+        int UnmatchedComponents,
+        int AccidentalVolatilityIssues,
+        IReadOnlyList<DomainSubdomainUsage> Subdomains)
+        : this(SubdomainCount, MatchedComponents, UnmatchedComponents, AccidentalVolatilityIssues, Subdomains, 0, 0, 0, [])
+    {
+    }
+}
 
 public sealed record DomainSubdomainUsage(
     string Name,
     SubdomainCategory Category,
     Volatility ExpectedVolatility,
+    int MatchedComponents,
+    StrategicRole? StrategicRole = null);
+
+public sealed record DomainAreaUsage(
+    string Name,
+    TechnicalRole TechnicalRole,
     int MatchedComponents);
+
+public sealed record ComponentRoleContext(
+    string ComponentId,
+    string FilePath,
+    string? SubdomainName,
+    StrategicRole? StrategicRole,
+    string? AreaName,
+    TechnicalRole? TechnicalRole);
 
 public sealed record SourceLocation(string File, int Line);
 
@@ -298,7 +358,8 @@ public sealed record AnalysisReport(
     ProjectMetadata? ProjectMetadata = null,
     IReadOnlyList<SuppressedIssue>? SuppressedIssues = null,
     IReadOnlyList<Hotspot>? Hotspots = null,
-    DomainContextSummary? DomainContext = null);
+    DomainContextSummary? DomainContext = null,
+    IReadOnlyList<ComponentRoleContext>? ComponentRoles = null);
 
 public sealed record BaselineComparison(
     string Ref,

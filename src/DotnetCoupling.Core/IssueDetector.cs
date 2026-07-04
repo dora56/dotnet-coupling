@@ -98,6 +98,10 @@ internal static class IssueDetector
                 componentsById.Values,
                 options.TestProjectPathPatterns,
                 result.Issues),
+            ComponentRoles = CreateComponentRoleContexts(
+                options.DomainContext,
+                componentsById.Values,
+                options.TestProjectPathPatterns),
         };
     }
 
@@ -319,6 +323,19 @@ internal static class IssueDetector
         return null;
     }
 
+    private static DomainArea? FindArea(string filePath, DomainContext domainContext)
+    {
+        foreach (DomainArea area in domainContext.Areas)
+        {
+            if (PathPatternMatcher.IsMatch(filePath, area.PathPatterns))
+            {
+                return area;
+            }
+        }
+
+        return null;
+    }
+
     private static IEnumerable<CouplingIssue> ApplyIgnores(IEnumerable<CouplingIssue> issues, AnalysisOptions options)
     {
         foreach (CouplingIssue issue in issues)
@@ -392,7 +409,7 @@ internal static class IssueDetector
         IReadOnlyList<string> testProjectPathPatterns,
         IReadOnlyCollection<CouplingIssue> activeIssues)
     {
-        if (domainContext.Subdomains.Count == 0)
+        if (domainContext.Subdomains.Count == 0 && domainContext.Areas.Count == 0)
         {
             return null;
         }
@@ -401,22 +418,46 @@ internal static class IssueDetector
             subdomain => subdomain.Name,
             _ => 0,
             StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> matchedAreaCountsByName = domainContext.Areas.ToDictionary(
+            area => area.Name,
+            _ => 0,
+            StringComparer.OrdinalIgnoreCase);
         int matchedComponents = 0;
         int unmatchedComponents = 0;
+        int matchedAreaComponents = 0;
+        int unmatchedAreaComponents = 0;
 
         foreach (Component component in components.Where(component =>
             component.Kind != ComponentKind.ExternalPackage
             && !IsTestProjectFile(component.FilePath, testProjectPathPatterns)))
         {
-            DomainSubdomain? subdomain = FindSubdomain(component.FilePath, domainContext);
-            if (subdomain is null)
+            if (domainContext.Subdomains.Count > 0)
             {
-                unmatchedComponents++;
-                continue;
+                DomainSubdomain? subdomain = FindSubdomain(component.FilePath, domainContext);
+                if (subdomain is null)
+                {
+                    unmatchedComponents++;
+                }
+                else
+                {
+                    matchedComponents++;
+                    matchedCountsByName[subdomain.Name]++;
+                }
             }
 
-            matchedComponents++;
-            matchedCountsByName[subdomain.Name]++;
+            if (domainContext.Areas.Count > 0)
+            {
+                DomainArea? area = FindArea(component.FilePath, domainContext);
+                if (area is null)
+                {
+                    unmatchedAreaComponents++;
+                }
+                else
+                {
+                    matchedAreaComponents++;
+                    matchedAreaCountsByName[area.Name]++;
+                }
+            }
         }
 
         DomainSubdomainUsage[] subdomains = domainContext.Subdomains
@@ -424,7 +465,15 @@ internal static class IssueDetector
                 subdomain.Name,
                 subdomain.Category,
                 subdomain.ExpectedVolatility,
-                matchedCountsByName[subdomain.Name]))
+                matchedCountsByName[subdomain.Name],
+                subdomain.StrategicRole))
+            .ToArray();
+
+        DomainAreaUsage[] areas = domainContext.Areas
+            .Select(area => new DomainAreaUsage(
+                area.Name,
+                area.TechnicalRole,
+                matchedAreaCountsByName[area.Name]))
             .ToArray();
 
         return new DomainContextSummary(
@@ -432,7 +481,45 @@ internal static class IssueDetector
             matchedComponents,
             unmatchedComponents,
             activeIssues.Count(issue => issue.Type == IssueType.AccidentalVolatility),
-            subdomains);
+            subdomains,
+            domainContext.Areas.Count,
+            matchedAreaComponents,
+            unmatchedAreaComponents,
+            areas);
+    }
+
+    private static List<ComponentRoleContext>? CreateComponentRoleContexts(
+        DomainContext domainContext,
+        IEnumerable<Component> components,
+        IReadOnlyList<string> testProjectPathPatterns)
+    {
+        if (domainContext.Subdomains.Count == 0 && domainContext.Areas.Count == 0)
+        {
+            return null;
+        }
+
+        List<ComponentRoleContext> contexts = [];
+        foreach (Component component in components.Where(component =>
+            component.Kind != ComponentKind.ExternalPackage
+            && !IsTestProjectFile(component.FilePath, testProjectPathPatterns)))
+        {
+            DomainSubdomain? subdomain = FindSubdomain(component.FilePath, domainContext);
+            DomainArea? area = FindArea(component.FilePath, domainContext);
+            if (subdomain is null && area is null)
+            {
+                continue;
+            }
+
+            contexts.Add(new ComponentRoleContext(
+                component.Id,
+                component.FilePath,
+                subdomain?.Name,
+                subdomain?.StrategicRole,
+                area?.Name,
+                area?.TechnicalRole));
+        }
+
+        return contexts.Count == 0 ? null : contexts;
     }
 
     private static List<IReadOnlyCollection<string>> FindStronglyConnectedComponents(Dictionary<string, HashSet<string>> graph)
@@ -500,4 +587,5 @@ internal static class IssueDetector
 internal sealed record IssueDetectionResult(
     List<CouplingIssue> Issues,
     List<SuppressedIssue> SuppressedIssues,
-    DomainContextSummary? DomainContext = null);
+    DomainContextSummary? DomainContext = null,
+    IReadOnlyList<ComponentRoleContext>? ComponentRoles = null);

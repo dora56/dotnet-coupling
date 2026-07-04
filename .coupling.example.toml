@@ -43,3 +43,30 @@ name = "Reporting"
 category = "supporting"
 paths = ["src/Sample.App.Reporting/**"]
 expected_volatility = "low"
+
+[[domain.subdomains]]
+name = "SharedKernel"
+category = "supporting"
+paths = ["src/Sample.App.SharedKernel/**"]
+expected_volatility = "low"
+strategic_role = "shared_kernel"
+
+[[domain.areas]]
+name = "BillingDomain"
+paths = ["src/Sample.App.Billing/Domain/**"]
+technical_role = "domain_model"
+
+[[domain.areas]]
+name = "BillingApplication"
+paths = ["src/Sample.App.Billing/Application/**"]
+technical_role = "application_service"
+
+[[domain.areas]]
+name = "InfrastructureAdapters"
+paths = ["src/Sample.App.Infrastructure/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "HostCompositionRoot"
+paths = ["src/Sample.App.Web/Program.cs", "src/Sample.App.Web/Startup.cs"]
+technical_role = "composition_root"

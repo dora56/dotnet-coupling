@@ -44,6 +44,9 @@ public static class HotspotAnalyzer
             .Where(issue => issue.Type == IssueType.CircularDependency)
             .SelectMany(issue => SplitCycleComponents(issue.Source).Concat(SplitCycleComponents(issue.Target)))
             .ToHashSet(StringComparer.Ordinal);
+        Dictionary<string, ComponentRoleContext> roleContexts = (report.ComponentRoles ?? [])
+            .GroupBy(context => context.ComponentId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
         return issuesByComponent
             .Select(pair =>
@@ -73,7 +76,14 @@ public static class HotspotAnalyzer
                     Volatility: componentVolatility,
                     CrossesBoundary: crossesBoundary,
                     ParticipatesInCycle: participatesInCycle,
-                    Reasons: CreateReasons(issues, componentFanIn, componentFanOut, componentVolatility, crossesBoundary, participatesInCycle));
+                    Reasons: CreateReasons(
+                        issues,
+                        componentFanIn,
+                        componentFanOut,
+                        componentVolatility,
+                        crossesBoundary,
+                        participatesInCycle,
+                        roleContexts.GetValueOrDefault(component)));
             })
             .OrderByDescending(hotspot => hotspot.Score)
             .ThenByDescending(hotspot => hotspot.IssueCount)
@@ -153,7 +163,8 @@ public static class HotspotAnalyzer
         int fanOut,
         Volatility volatility,
         bool crossesBoundary,
-        bool participatesInCycle)
+        bool participatesInCycle,
+        ComponentRoleContext? roleContext)
     {
         List<string> reasons = [];
         Severity maxSeverity = issues.Count == 0 ? Severity.Low : issues.Max(issue => issue.Severity);
@@ -183,12 +194,44 @@ public static class HotspotAnalyzer
             reasons.Add("participates in a cycle");
         }
 
+        if (roleContext?.TechnicalRole is TechnicalRole technicalRole)
+        {
+            reasons.Add($"technical role: {ToSnakeCase(technicalRole.ToString())}");
+        }
+
+        if (roleContext?.StrategicRole is StrategicRole strategicRole)
+        {
+            reasons.Add($"strategic role: {ToSnakeCase(strategicRole.ToString())}");
+        }
+
         return reasons;
     }
 
     private static string[] SplitCycleComponents(string value)
     {
         return value.Split(" -> ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static string ToSnakeCase(string value)
+    {
+        if (value.Length == 0)
+        {
+            return value;
+        }
+
+        List<char> characters = [];
+        for (int index = 0; index < value.Length; index++)
+        {
+            char character = value[index];
+            if (char.IsUpper(character) && index > 0)
+            {
+                characters.Add('_');
+            }
+
+            characters.Add(char.ToLowerInvariant(character));
+        }
+
+        return new string(characters.ToArray());
     }
 
     private static int SeverityRank(Severity severity)

@@ -165,6 +165,18 @@ volatility の解釈に使うための設定である。
         "paths": ["src/MyApp.Reporting/**"],
         "expectedVolatility": "low"
       }
+    ],
+    "areas": [
+      {
+        "name": "BillingDomain",
+        "paths": ["src/MyApp.Billing/Domain/**"],
+        "technicalRole": "domainModel"
+      },
+      {
+        "name": "InfrastructureAdapters",
+        "paths": ["src/MyApp.Infrastructure/**"],
+        "technicalRole": "adapter"
+      }
     ]
   }
 }
@@ -174,20 +186,31 @@ Semantics:
 
 - `category`: `core` / `supporting` / `generic`
 - `expectedVolatility`: `low` / `medium` / `high`
+- `strategicRole` / `strategic_role`: optional。`anticorruptionLayer` /
+  `anticorruption_layer`, `publishedLanguage` / `published_language`,
+  `sharedKernel` / `shared_kernel`, `openHostService` / `open_host_service`
 - `name`: 同一 config 内で一意。大文字小文字だけが異なる名前も重複として扱う
 - `paths`: repository / workspace root から見た glob。`--config` の場所や config file
   の保存場所では意味を変えない
 - 複数 subdomain の `paths` が同じ component に一致した場合は、設定順で最初に一致した
   subdomain を使う
+- `domain.areas` は code role の advisory context を表す。`technicalRole` /
+  `technical_role` は `domainModel` / `domain_model`, `applicationService` /
+  `application_service`, `adapter`, `compositionRoot` / `composition_root`,
+  `contract`, `testSupport` / `test_support`
+- 複数 area の `paths` が同じ component に一致した場合は、設定順で最初に一致した area を使う
+- `technicalRole` は DDD 専用ではない。非DDD codebase でも broader architecture hint として使う
 - `core` の high churn は essential business volatility として説明できる
 - `core` は `expectedVolatility` が `low` / `medium` でも
   `AccidentalVolatility` としては報告しない
 - `supporting` / `generic` の high observed churn は、`expectedVolatility` が
   `low` / `medium` の場合に `AccidentalVolatility` として報告する
 - Balance Score / Grade の主計算式は変えない。domain context は追加 issue と説明に使う
+- role context は advisory-only。issue 数、grade、`--check` exit code は変更しない
 - 設定がある場合は summary に `Domain Context: ...` 行を出し、JSON では
   `manifest.domainContext` に subdomain 数、matched / unmatched component 数、
-  `AccidentalVolatility` issue 数、subdomain 別 match 数を出す
+  `AccidentalVolatility` issue 数、subdomain 別 match 数、area coverage を出す。
+  Hotspots では `technical role: composition_root` のような reason を追加する
 - 設定がない repository では従来の Git 履歴ベース volatility のみで解析する
 
 ### 21.6 Generated code の既定除外

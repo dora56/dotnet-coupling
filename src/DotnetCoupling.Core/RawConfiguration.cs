@@ -29,10 +29,22 @@ internal sealed record RawIssueSuppression(
     string Target,
     string Reason);
 
-internal sealed record RawDomain(IReadOnlyList<RawDomainSubdomain>? Subdomains);
+internal sealed record RawDomain(
+    IReadOnlyList<RawDomainSubdomain>? Subdomains,
+    IReadOnlyList<RawDomainArea>? Areas);
 
 internal sealed record RawDomainSubdomain(
     string Name,
     string Category,
+    string CategoryPath,
     IReadOnlyList<string> PathPatterns,
-    string ExpectedVolatility);
+    string ExpectedVolatility,
+    string ExpectedVolatilityPath,
+    string? StrategicRole,
+    string? StrategicRolePath);
+
+internal sealed record RawDomainArea(
+    string Name,
+    IReadOnlyList<string> PathPatterns,
+    string TechnicalRole,
+    string TechnicalRolePath);

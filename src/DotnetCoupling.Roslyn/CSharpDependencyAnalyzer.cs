@@ -143,7 +143,8 @@ public sealed class CSharpDependencyAnalyzer
             Diagnostics: diagnostics,
             ProjectMetadata: projectMetadata,
             SuppressedIssues: issueDetection.SuppressedIssues.Count == 0 ? null : issueDetection.SuppressedIssues,
-            DomainContext: issueDetection.DomainContext);
+            DomainContext: issueDetection.DomainContext,
+            ComponentRoles: issueDetection.ComponentRoles);
     }
 
     private sealed record ProjectFile(string FilePath, string? ProjectName);

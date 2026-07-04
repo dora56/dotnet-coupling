@@ -50,3 +50,47 @@ name = "Cli"
 category = "supporting"
 paths = ["src/DotnetCoupling.Cli/**"]
 expected_volatility = "medium"
+
+[[domain.areas]]
+name = "CoreRules"
+paths = [
+  "src/DotnetCoupling.Core/CouplingScoring.cs",
+  "src/DotnetCoupling.Core/IssueDetector.cs",
+  "src/DotnetCoupling.Core/HotspotAnalyzer.cs",
+]
+technical_role = "domain_model"
+
+[[domain.areas]]
+name = "CoreContracts"
+paths = ["src/DotnetCoupling.Core/Models.cs"]
+technical_role = "contract"
+
+[[domain.areas]]
+name = "RoslynAdapter"
+paths = ["src/DotnetCoupling.Roslyn/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "GitAdapter"
+paths = ["src/DotnetCoupling.Git/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "SarifAdapter"
+paths = ["src/DotnetCoupling.Sarif/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "CliCompositionRoot"
+paths = ["src/DotnetCoupling.Cli/CliApplication.cs"]
+technical_role = "composition_root"
+
+[[domain.areas]]
+name = "CliOutputAdapter"
+paths = ["src/DotnetCoupling.Cli/CliReportWriter.cs"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "Tests"
+paths = ["tests/**"]
+technical_role = "test_support"

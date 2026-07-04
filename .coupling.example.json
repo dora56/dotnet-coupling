@@ -53,6 +53,46 @@
           "src/Sample.App.Reporting/**"
         ],
         "expectedVolatility": "low"
+      },
+      {
+        "name": "SharedKernel",
+        "category": "supporting",
+        "paths": [
+          "src/Sample.App.SharedKernel/**"
+        ],
+        "expectedVolatility": "low",
+        "strategicRole": "sharedKernel"
+      }
+    ],
+    "areas": [
+      {
+        "name": "BillingDomain",
+        "paths": [
+          "src/Sample.App.Billing/Domain/**"
+        ],
+        "technicalRole": "domainModel"
+      },
+      {
+        "name": "BillingApplication",
+        "paths": [
+          "src/Sample.App.Billing/Application/**"
+        ],
+        "technicalRole": "applicationService"
+      },
+      {
+        "name": "InfrastructureAdapters",
+        "paths": [
+          "src/Sample.App.Infrastructure/**"
+        ],
+        "technicalRole": "adapter"
+      },
+      {
+        "name": "HostCompositionRoot",
+        "paths": [
+          "src/Sample.App.Web/Program.cs",
+          "src/Sample.App.Web/Startup.cs"
+        ],
+        "technicalRole": "compositionRoot"
       }
     ]
   }

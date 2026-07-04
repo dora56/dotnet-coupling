@@ -46,6 +46,36 @@ public sealed class HotspotAnalyzerTests
     }
 
     [Fact]
+    public void Calculate_ReportWithRoleContext_AddsRoleReasonWithoutChangingScore()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        Hotspot baseline = Assert.Single(
+            HotspotAnalyzer.Calculate(report, count: 10),
+            hotspot => hotspot.Component == "Fixture.Global.Api.Handler");
+        AnalysisReport reportWithRole = report with
+        {
+            ComponentRoles =
+            [
+                new ComponentRoleContext(
+                    "Fixture.Global.Api.Handler",
+                    Path.Combine(fixture, "Api", "Handler.cs"),
+                    SubdomainName: null,
+                    StrategicRole: null,
+                    AreaName: "Application",
+                    TechnicalRole: TechnicalRole.ApplicationService),
+            ],
+        };
+
+        Hotspot hotspotWithRole = Assert.Single(
+            HotspotAnalyzer.Calculate(reportWithRole, count: 10),
+            hotspot => hotspot.Component == "Fixture.Global.Api.Handler");
+
+        Assert.Equal(baseline.Score, hotspotWithRole.Score);
+        Assert.Contains("technical role: application_service", hotspotWithRole.Reasons);
+    }
+
+    [Fact]
     public void Calculate_NonPositiveCount_Throws()
     {
         string fixture = TestPaths.Fixture("global-complexity");

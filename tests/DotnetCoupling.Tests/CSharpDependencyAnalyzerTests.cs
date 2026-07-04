@@ -724,6 +724,74 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_DomainAreas_ReportsCoverageAndUsesFirstMatchingArea()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));
+        WriteFile(
+            Path.Combine(directory, "src", "App", "Handler.cs"),
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+            }
+            """);
+        WriteFile(
+            Path.Combine(directory, "src", "Infrastructure", "Repository.cs"),
+            """
+            namespace Sample.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+                [],
+                [
+                    new DomainArea("AllSource", ["src/**"], TechnicalRole.Adapter),
+                    new DomainArea("Application", ["src/App/**"], TechnicalRole.ApplicationService),
+                ]),
+        };
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.NotNull(report.DomainContext);
+        Assert.Equal(2, report.DomainContext.AreaCount);
+        Assert.Equal(2, report.DomainContext.MatchedAreaComponents);
+        Assert.Equal(0, report.DomainContext.UnmatchedAreaComponents);
+        DomainAreaUsage allSource = Assert.Single(report.DomainContext.Areas, area => area.Name == "AllSource");
+        Assert.Equal(2, allSource.MatchedComponents);
+        DomainAreaUsage application = Assert.Single(report.DomainContext.Areas, area => area.Name == "Application");
+        Assert.Equal(0, application.MatchedComponents);
+        ComponentRoleContext handlerRole = Assert.Single(report.ComponentRoles ?? [], context => context.ComponentId == "Sample.App.Handler");
+        Assert.Equal("AllSource", handlerRole.AreaName);
+        Assert.Equal(TechnicalRole.Adapter, handlerRole.TechnicalRole);
+    }
+
+    [Fact]
+    public void Analyze_DomainAreas_DoNotChangeIssueCountOrGrade()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport baseline = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            DomainContext = new DomainContext(
+                [],
+                [
+                    new DomainArea("Application", ["**/Api/**"], TechnicalRole.ApplicationService),
+                    new DomainArea("Adapters", ["**/Infrastructure/**"], TechnicalRole.Adapter),
+                ]),
+        };
+
+        AnalysisReport withRoles = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6, options);
+
+        Assert.Equal(baseline.Issues.Count, withRoles.Issues.Count);
+        Assert.Equal(baseline.Grade.Letter, withRoles.Grade.Letter);
+    }
+
+    [Fact]
     public void Analyze_SemanticModeDomainContextSupportingHighChurn_ReportsAccidentalVolatility()
     {
         string directory = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"));

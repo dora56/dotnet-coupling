@@ -393,7 +393,15 @@ public static class ReportRenderer
         }
 
         DomainContextSummary domainContext = report.DomainContext;
-        builder.AppendLine(CultureInfo.InvariantCulture, $"Domain Context: {domainContext.SubdomainCount} {Pluralize(domainContext.SubdomainCount, "subdomain")} configured, {domainContext.MatchedComponents} {Pluralize(domainContext.MatchedComponents, "matched component")}, {domainContext.UnmatchedComponents} {Pluralize(domainContext.UnmatchedComponents, "unmatched component")}, {domainContext.AccidentalVolatilityIssues} {Pluralize(domainContext.AccidentalVolatilityIssues, "AccidentalVolatility issue")}");
+        if (domainContext.SubdomainCount > 0)
+        {
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Domain Context: {domainContext.SubdomainCount} {Pluralize(domainContext.SubdomainCount, "subdomain")} configured, {domainContext.MatchedComponents} {Pluralize(domainContext.MatchedComponents, "matched component")}, {domainContext.UnmatchedComponents} {Pluralize(domainContext.UnmatchedComponents, "unmatched component")}, {domainContext.AccidentalVolatilityIssues} {Pluralize(domainContext.AccidentalVolatilityIssues, "AccidentalVolatility issue")}");
+        }
+
+        if (domainContext.AreaCount > 0)
+        {
+            builder.AppendLine(CultureInfo.InvariantCulture, $"Role Context: {domainContext.AreaCount} {Pluralize(domainContext.AreaCount, "area")} configured, {domainContext.MatchedAreaComponents} {Pluralize(domainContext.MatchedAreaComponents, "matched component")}, {domainContext.UnmatchedAreaComponents} {Pluralize(domainContext.UnmatchedAreaComponents, "unmatched component")}");
+        }
     }
 
     private static string Pluralize(int count, string singular)

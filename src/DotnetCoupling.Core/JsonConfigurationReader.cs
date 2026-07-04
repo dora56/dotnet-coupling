@@ -65,10 +65,13 @@ internal static class JsonConfigurationReader
 
         if (root.TryGetProperty("domain", out JsonElement domainElement))
         {
-            ConfigurationValueReader.AssertKnownProperties(domainElement, "domain", ["subdomains"]);
+            ConfigurationValueReader.AssertKnownProperties(domainElement, "domain", ["subdomains", "areas"]);
             domain = new RawDomain(
                 domainElement.TryGetProperty("subdomains", out JsonElement subdomains)
                     ? ReadDomainSubdomains(subdomains)
+                    : null,
+                domainElement.TryGetProperty("areas", out JsonElement areas)
+                    ? ReadDomainAreas(areas)
                     : null);
         }
 
@@ -87,17 +90,51 @@ internal static class JsonConfigurationReader
         foreach (JsonElement item in element.EnumerateArray())
         {
             string path = $"domain.subdomains[{index}]";
-            ConfigurationValueReader.AssertKnownProperties(item, path, ["name", "category", "paths", "expectedVolatility"]);
+            ConfigurationValueReader.AssertKnownProperties(item, path, ["name", "category", "paths", "expectedVolatility", "strategicRole"]);
             subdomains.Add(new RawDomainSubdomain(
                 ConfigurationValueReader.ReadRequiredString(item, path, "name"),
                 ConfigurationValueReader.ReadRequiredString(item, path, "category"),
+                $"{path}.category",
                 item.TryGetProperty("paths", out JsonElement paths)
                     ? ConfigurationValueReader.ReadStringArray(paths, $"{path}.paths")
                     : throw new ConfigurationException($"{path}.paths must be an array."),
-                ConfigurationValueReader.ReadRequiredString(item, path, "expectedVolatility")));
+                ConfigurationValueReader.ReadRequiredString(item, path, "expectedVolatility"),
+                $"{path}.expectedVolatility",
+                item.TryGetProperty("strategicRole", out JsonElement strategicRole)
+                    ? ConfigurationValueReader.ReadRequiredString(item, path, "strategicRole")
+                    : null,
+                item.TryGetProperty("strategicRole", out _)
+                    ? $"{path}.strategicRole"
+                    : null));
             index++;
         }
 
         return subdomains;
+    }
+
+    private static List<RawDomainArea> ReadDomainAreas(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            throw new ConfigurationException("domain.areas must be an array.");
+        }
+
+        List<RawDomainArea> areas = [];
+        int index = 0;
+        foreach (JsonElement item in element.EnumerateArray())
+        {
+            string path = $"domain.areas[{index}]";
+            ConfigurationValueReader.AssertKnownProperties(item, path, ["name", "paths", "technicalRole"]);
+            areas.Add(new RawDomainArea(
+                ConfigurationValueReader.ReadRequiredString(item, path, "name"),
+                item.TryGetProperty("paths", out JsonElement paths)
+                    ? ConfigurationValueReader.ReadStringArray(paths, $"{path}.paths")
+                    : throw new ConfigurationException($"{path}.paths must be an array."),
+                ConfigurationValueReader.ReadRequiredString(item, path, "technicalRole"),
+                $"{path}.technicalRole"));
+            index++;
+        }
+
+        return areas;
     }
 }
