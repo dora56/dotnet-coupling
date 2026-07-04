@@ -86,3 +86,20 @@ jobs:
             dogfood-compare/**
           if-no-files-found: error
           retention-days: 14
+
+      - name: Write GitHub Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Dogfood Report"
+            echo
+            echo "### Summary"
+            cat dogfood-summary.txt
+            echo
+            echo "### No-git Summary"
+            cat dogfood-no-git-summary.txt
+            echo
+            echo "### Syntax vs Semantic Compare"
+            cat dogfood-compare/semantic-compare.md
+          } >> "$GITHUB_STEP_SUMMARY"
