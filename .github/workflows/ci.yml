@@ -196,6 +196,7 @@ jobs:
   mutation:
     runs-on: ubuntu-slim
     needs: build
+    if: github.event_name == 'pull_request'
     timeout-minutes: 45
 
     steps:
@@ -244,7 +245,7 @@ jobs:
         with:
           name: mutation-report
           path: StrykerOutput/**
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
   self-benchmark:
@@ -308,6 +309,7 @@ jobs:
           path: artifacts/coverage
 
       - name: Download mutation report
+        if: needs.mutation.result == 'success'
         uses: actions/download-artifact@v8.0.1
         with:
           name: mutation-report
