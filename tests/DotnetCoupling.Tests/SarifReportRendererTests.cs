@@ -12,8 +12,7 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Render_GlobalComplexityReport_ProducesRoundTrippableSarif()
     {
-        string fixture = TestPaths.Fixture("global-complexity");
-        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        (string fixture, AnalysisReport report) = AnalyzeGlobalComplexityFixture();
         string sarif = SarifReportRenderer.Render(report, fixture);
         string sarifPath = Path.Combine(Path.GetTempPath(), "dotnet-coupling-tests", Guid.NewGuid().ToString("N"), "report.sarif");
         Directory.CreateDirectory(Path.GetDirectoryName(sarifPath)!);
@@ -34,8 +33,7 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Render_GlobalComplexityReport_UsesRepositoryRelativeLocation()
     {
-        string fixture = TestPaths.Fixture("global-complexity");
-        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        (string fixture, AnalysisReport report) = AnalyzeGlobalComplexityFixture();
 
         using JsonDocument document = JsonDocument.Parse(SarifReportRenderer.Render(report, fixture));
 
@@ -54,33 +52,19 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Render_ReportWithUnlocatableIssue_OmitsResultAndRecordsOmittedCount()
     {
-        CouplingIssue locatableIssue = new(
+        CouplingIssue locatableIssue = CreateIssue(
             IssueType.GlobalComplexity,
             Severity.Medium,
             "Sample.Api.Handler",
             "Sample.Infrastructure.Repository",
-            0.50,
-            "Problem",
-            "Recommendation",
             new SourceLocation("/tmp/sample/Api.cs", 1));
-        CouplingIssue unlocatableIssue = new(
+        CouplingIssue unlocatableIssue = CreateIssue(
             IssueType.HighAfferentCoupling,
             Severity.High,
             "",
             "Sample.Shared.Model",
-            1.0,
-            "Problem",
-            "Recommendation",
-            null);
-        AnalysisReport report = new(
-            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 3, 1, 0, false, false, 6),
-            new GradeResult("D", "High risk", "issue-density", "Test"),
-            0.50,
-            [],
-            [],
-            [],
-            [locatableIssue, unlocatableIssue],
-            []);
+            location: null);
+        AnalysisReport report = CreateReport(locatableIssue, unlocatableIssue);
 
         using JsonDocument document = JsonDocument.Parse(SarifReportRenderer.Render(report, "/tmp/sample"));
 
@@ -89,5 +73,42 @@ public sealed class SarifReportRendererTests
         Assert.Equal(
             1,
             run.GetProperty("properties").GetProperty("dotnetCouplingOmittedIssueCount").GetInt32());
+    }
+
+    private static (string Fixture, AnalysisReport Report) AnalyzeGlobalComplexityFixture()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        return (fixture, CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6));
+    }
+
+    private static AnalysisReport CreateReport(params CouplingIssue[] issues)
+    {
+        return new AnalysisReport(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 3, 1, 0, false, false, 6),
+            new GradeResult("D", "High risk", "issue-density", "Test"),
+            0.50,
+            [],
+            [],
+            [],
+            issues,
+            []);
+    }
+
+    private static CouplingIssue CreateIssue(
+        IssueType type,
+        Severity severity,
+        string source,
+        string target,
+        SourceLocation? location)
+    {
+        return new CouplingIssue(
+            type,
+            severity,
+            source,
+            target,
+            0.50,
+            "Problem",
+            "Recommendation",
+            location);
     }
 }

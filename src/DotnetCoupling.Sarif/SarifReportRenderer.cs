@@ -6,6 +6,14 @@ namespace DotnetCoupling.Sarif;
 
 public static class SarifReportRenderer
 {
+    private const string ToolName = "dotnet-coupling";
+    private const string ToolInformationUri = "https://github.com/dora56/dotnet-coupling";
+    private const string SarifSchemaUri = "https://json.schemastore.org/sarif-2.1.0.json";
+    private const string OmittedIssueCountProperty = "dotnetCouplingOmittedIssueCount";
+    private const string IssueKeyFingerprint = "dotnetCouplingIssueKey";
+    private const string SourceFingerprint = "dotnetCouplingSource";
+    private const string TargetFingerprint = "dotnetCouplingTarget";
+
     private static readonly string ToolVersion = typeof(SarifReportRenderer).Assembly
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
         .InformationalVersion
@@ -30,19 +38,33 @@ public static class SarifReportRenderer
             .ToArray();
         int omittedIssueCount = report.Issues.Count - locatableIssues.Length;
         ReportingDescriptor[] rules = CreateRules(report.Issues);
-        Dictionary<string, int> ruleIndexes = rules
-            .Select((rule, index) => (rule.Id, index))
-            .ToDictionary(pair => pair.Id, pair => pair.index, StringComparer.Ordinal);
+        Dictionary<string, int> ruleIndexes = CreateRuleIndexes(rules);
+        Run run = CreateRun(rules, locatableIssues, repositoryRoot, ruleIndexes);
+        AddOmittedIssueCount(run, omittedIssueCount);
 
-        Run run = new()
+        return new SarifLog
+        {
+            SchemaUri = new Uri(SarifSchemaUri),
+            Version = SarifVersion.Current,
+            Runs = [run],
+        };
+    }
+
+    private static Run CreateRun(
+        ReportingDescriptor[] rules,
+        CouplingIssue[] locatableIssues,
+        string repositoryRoot,
+        IReadOnlyDictionary<string, int> ruleIndexes)
+    {
+        return new Run
         {
             Tool = new Tool
             {
                 Driver = new ToolComponent
                 {
-                    Name = "dotnet-coupling",
+                    Name = ToolName,
                     SemanticVersion = ToolVersion,
-                    InformationUri = new Uri("https://github.com/dora56/dotnet-coupling"),
+                    InformationUri = new Uri(ToolInformationUri),
                     Rules = rules,
                 },
             },
@@ -61,17 +83,21 @@ public static class SarifReportRenderer
                 .Select(issue => CreateResult(issue, repositoryRoot, ruleIndexes))
                 .ToArray(),
         };
+    }
+
+    private static Dictionary<string, int> CreateRuleIndexes(ReportingDescriptor[] rules)
+    {
+        return rules
+            .Select((rule, index) => (rule.Id, Index: index))
+            .ToDictionary(pair => pair.Id, pair => pair.Index, StringComparer.Ordinal);
+    }
+
+    private static void AddOmittedIssueCount(Run run, int omittedIssueCount)
+    {
         if (omittedIssueCount > 0)
         {
-            run.SetProperty("dotnetCouplingOmittedIssueCount", omittedIssueCount);
+            run.SetProperty(OmittedIssueCountProperty, omittedIssueCount);
         }
-
-        return new SarifLog
-        {
-            SchemaUri = new Uri("https://json.schemastore.org/sarif-2.1.0.json"),
-            Version = SarifVersion.Current,
-            Runs = [run],
-        };
     }
 
     private static ReportingDescriptor[] CreateRules(IReadOnlyList<CouplingIssue> issues)
@@ -111,7 +137,7 @@ public static class SarifReportRenderer
     private static Result CreateResult(
         CouplingIssue issue,
         string repositoryRoot,
-        Dictionary<string, int> ruleIndexes)
+        IReadOnlyDictionary<string, int> ruleIndexes)
     {
         SourceLocation location = issue.Location ?? throw new InvalidOperationException("SARIF results require a source location.");
         string relativePath = NormalizeRelativePath(repositoryRoot, location.File);
@@ -145,9 +171,9 @@ public static class SarifReportRenderer
             ],
             PartialFingerprints = new Dictionary<string, string>
             {
-                ["dotnetCouplingIssueKey"] = issueKey,
-                ["dotnetCouplingSource"] = issue.Source,
-                ["dotnetCouplingTarget"] = issue.Target,
+                [IssueKeyFingerprint] = issueKey,
+                [SourceFingerprint] = issue.Source,
+                [TargetFingerprint] = issue.Target,
             },
         };
     }
