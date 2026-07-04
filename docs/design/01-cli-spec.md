@@ -21,6 +21,8 @@ project boundary distance を補助する。Phase 3b では明示 `semantic` mod
 | `[path]` | 解析対象パス | `.` |
 | `--summary` | サマリのみ表示 | `false` |
 | `--json` | JSON 出力 | `false` |
+| `--sarif` | SARIF 2.1.0 出力 | `false` |
+| `--hotspots [N]` | リファクタリング候補 Top N を表示 | `10` |
 | `--output <file>` | 出力先ファイル | stdout |
 | `--check` | 品質ゲートを有効化 | `false` |
 | `--min-grade <grade>` | `--check` 時の最低許容グレード | `C` |
@@ -37,15 +39,17 @@ project boundary distance を補助する。Phase 3b では明示 `semantic` mod
 `.csproj` / `.sln` 入力のみを受け付け、summary / JSON には `semantic-preview`
 を出力する。その他の path では CLI 引数エラーとして安定した error message を返す。
 
-### 5.3 v0.2 以降のオプション
+`--sarif` は Phase 4 の PR feedback 用出力で、`--output` と併用できる。
+`--check --sarif` では SARIF を出力しつつ、既存の品質 gate exit code を返す。
+`--hotspots` は値なしなら `10`、値ありなら正の整数のみを受け付ける。
+
+### 5.3 将来オプション
 
 | オプション | 説明 |
 |---|---|
-| `--hotspots[=N]` | リファクタリング候補 Top N を表示 |
 | `--impact <component>` | 指定コンポーネント変更時の影響範囲を見る |
 | `--trace <symbol>` | 指定型・メソッドへの依存を追跡 |
 | `--ai` | AI coding agent 向け出力 |
-| `--sarif` | GitHub code scanning 向け SARIF 出力 |
 | `--jp`, `--japanese` | 日本語説明付き出力 |
 | `--web` | Web UI 起動 |
 

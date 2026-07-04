@@ -121,6 +121,7 @@ public sealed record AnalysisOptions(
     IReadOnlyList<string> IgnorePathPatterns,
     IReadOnlyList<string> IgnoreNamespaces,
     IReadOnlySet<IssueType> IgnoreIssueTypes,
+    IReadOnlyList<IssueSuppression> IssueSuppressions,
     AnalysisThresholds Thresholds)
 {
     public static AnalysisOptions Default { get; } = new(
@@ -128,6 +129,7 @@ public sealed record AnalysisOptions(
         [],
         [],
         new HashSet<IssueType>(),
+        [],
         AnalysisThresholds.Default);
 }
 
@@ -185,6 +187,28 @@ public sealed record CouplingIssue(
     string Recommendation,
     SourceLocation? Location);
 
+public sealed record IssueSuppression(
+    IssueType Type,
+    string Source,
+    string Target,
+    string Reason);
+
+public sealed record SuppressedIssue(
+    CouplingIssue Issue,
+    string Reason);
+
+public sealed record Hotspot(
+    int Rank,
+    string Component,
+    double Score,
+    int IssueCount,
+    int FanIn,
+    int FanOut,
+    Volatility Volatility,
+    bool CrossesBoundary,
+    bool ParticipatesInCycle,
+    IReadOnlyList<string> Reasons);
+
 public sealed record TemporalCoupling(
     string FileA,
     string FileB,
@@ -236,7 +260,9 @@ public sealed record AnalysisReport(
     IReadOnlyList<string> BlindSpots,
     BaselineComparison? Baseline = null,
     IReadOnlyList<AnalysisDiagnostic>? Diagnostics = null,
-    ProjectMetadata? ProjectMetadata = null);
+    ProjectMetadata? ProjectMetadata = null,
+    IReadOnlyList<SuppressedIssue>? SuppressedIssues = null,
+    IReadOnlyList<Hotspot>? Hotspots = null);
 
 public sealed record BaselineComparison(
     string Ref,
@@ -249,6 +275,7 @@ public enum ReportFormat
     Text,
     Summary,
     Json,
+    Hotspots,
 }
 
 public enum AnalysisMode

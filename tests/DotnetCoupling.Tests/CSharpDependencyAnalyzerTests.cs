@@ -587,6 +587,51 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_ConfigIssueSuppression_RemovesIssueFromActiveGradeAndKeepsSuppressedIssue()
+    {
+        string directory = CreateFixture(
+            "Api.cs",
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    _ = new Repository();
+                }
+            }
+            """,
+            "Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """);
+        AnalysisOptions options = AnalysisOptions.Default with
+        {
+            IssueSuppressions =
+            [
+                new IssueSuppression(
+                    IssueType.GlobalComplexity,
+                    "Sample.App.Api.Handler",
+                    "Sample.App.Infrastructure.Repository",
+                    "Existing debt tracked in ARCH-42"),
+            ],
+        };
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6, options);
+
+        Assert.DoesNotContain(report.Issues, issue => issue.Type == IssueType.GlobalComplexity);
+        SuppressedIssue suppressedIssue = Assert.Single(report.SuppressedIssues ?? []);
+        Assert.Equal(IssueType.GlobalComplexity, suppressedIssue.Issue.Type);
+        Assert.Equal("Existing debt tracked in ARCH-42", suppressedIssue.Reason);
+        Assert.Equal("B", report.Grade.Letter);
+    }
+
+    [Fact]
     public void Analyze_NamespaceScopedExternalUsingAcrossManyComponents_ReportsScatteredExternalCoupling()
     {
         string directory = CreateFixture(

@@ -3,14 +3,15 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: scripts/generate-ci-summary.sh --coverage-dir DIR --mutation-dir DIR
+Usage: scripts/generate-ci-summary.sh --coverage-dir DIR --mutation-dir DIR [--coupling-dir DIR]
 
-Prints a GitHub-flavored markdown summary for CI coverage and mutation reports.
+Prints a GitHub-flavored markdown summary for CI coverage, mutation, and coupling feedback reports.
 EOF
 }
 
 coverage_dir=""
 mutation_dir=""
+coupling_dir=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,6 +21,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --mutation-dir)
       mutation_dir="${2:-}"
+      shift 2
+      ;;
+    --coupling-dir)
+      coupling_dir="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -39,7 +44,7 @@ if [[ -z "$coverage_dir" || -z "$mutation_dir" ]]; then
   exit 1
 fi
 
-python3 - "$coverage_dir" "$mutation_dir" <<'PY'
+python3 - "$coverage_dir" "$mutation_dir" "$coupling_dir" <<'PY'
 from __future__ import annotations
 
 import collections
@@ -50,12 +55,30 @@ import xml.etree.ElementTree as ET
 
 coverage_dir = pathlib.Path(sys.argv[1])
 mutation_dir = pathlib.Path(sys.argv[2])
+coupling_dir = pathlib.Path(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else None
 
 coverage_files = sorted(
-    list(coverage_dir.rglob("coverage.cobertura.xml"))
-    + list(coverage_dir.rglob("*.coverage.cobertura.xml"))
+    {
+        path
+        for pattern in (
+            "coverage.cobertura.xml",
+            "coverage-*.cobertura.xml",
+            "*.coverage.cobertura.xml",
+            "coverage.cobertura*.xml",
+            "*.coverage.cobertura*.xml",
+        )
+        for path in coverage_dir.rglob(pattern)
+    }
 )
 mutation_files = sorted(mutation_dir.rglob("mutation-report.json"))
+coupling_sarif_files = sorted(coupling_dir.rglob("*.sarif")) if coupling_dir and coupling_dir.exists() else []
+hotspot_files = sorted(
+    {
+        path
+        for pattern in ("*hotspot*.txt", "*hotspots*.txt")
+        for path in coupling_dir.rglob(pattern)
+    }
+) if coupling_dir and coupling_dir.exists() else []
 
 if not coverage_files:
     raise SystemExit(f"No Cobertura reports found under {coverage_dir}")
@@ -100,6 +123,15 @@ mutation_result = (
     if tracked_score is not None
     else "not available for this run"
 )
+coupling_result = (
+    f"{len(coupling_sarif_files)} SARIF / {len(hotspot_files)} hotspots artifact(s)"
+    if coupling_sarif_files or hotspot_files
+    else "not available for this run"
+)
+
+hotspot_excerpt = []
+if hotspot_files:
+    hotspot_excerpt = hotspot_files[0].read_text().splitlines()[:20]
 
 print("## CI Report")
 print()
@@ -107,6 +139,7 @@ print("| Area | Result |")
 print("| --- | --- |")
 print(f"| Coverage | {pct(line_rate)} line / {pct(branch_rate)} branch |")
 print(f"| Mutation | {mutation_result} |")
+print(f"| Coupling feedback | {coupling_result} |")
 print()
 print("### Coverage")
 print()
@@ -130,11 +163,28 @@ else:
     print(f"- Ignored: {ignored}")
     print(f"- Thresholds: low {mutation_report['thresholds']['low']} / high {mutation_report['thresholds']['high']}")
 print()
+print("### Coupling Feedback")
+print()
+if not coupling_sarif_files and not hotspot_files:
+    print("- Status: not available for this run")
+else:
+    print(f"- SARIF artifacts: {len(coupling_sarif_files)}")
+    print(f"- Hotspots artifacts: {len(hotspot_files)}")
+    if hotspot_excerpt:
+        print()
+        print("```text")
+        print("\n".join(hotspot_excerpt))
+        print("```")
+print()
 print("### Notes")
 print()
-print("- The summary is written from the generated test and mutation artifacts, so it reflects the actual CI run.")
+print("- The summary is written from the generated test, mutation, and coupling feedback artifacts, so it reflects the actual CI run.")
 if mutation_report is None:
     print("- Mutation reporting is skipped when the workflow does not produce a Stryker report.")
 else:
-    print("- The mutation ratio above is a simple killed / tracked-mutants ratio for the report; Stryker still enforces the official gate in the mutation job.")
+    print("- The mutation ratio above is a simple killed / tracked-mutants ratio for the report; Stryker still enforces the official gate in nightly or manual mutation runs.")
+if coupling_sarif_files or hotspot_files:
+    print("- Coupling feedback is generated from the packaged CLI and uploaded as SARIF / hotspots artifacts.")
+else:
+    print("- Coupling feedback is reported as unavailable when the artifact job is skipped, cancelled, or cannot upload artifacts.")
 PY

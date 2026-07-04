@@ -88,6 +88,16 @@
           "System.Composition": "9.0.0"
         }
       },
+      "Microsoft.Diagnostics.Tracing.EventRegister": {
+        "type": "Transitive",
+        "resolved": "1.1.28",
+        "contentHash": "VXTPYySeOmpMFejW2t4uau3t5h92LYKT9zM3kR06qeUNM9vQxG3S5nB6EhuKyf+F7Ze92Y6614MvjkxH14NJkQ=="
+      },
+      "Microsoft.Diagnostics.Tracing.TraceEvent": {
+        "type": "Transitive",
+        "resolved": "3.1.3",
+        "contentHash": "0i45LzMkHfWKcDZxzyGbE0TiRVRNvr8k+Snrgf1OT/8txwBi6opm3G8rCB7OAM6G4m61Jzd+ZaJ6YAyRGlE9TQ=="
+      },
       "Microsoft.Extensions.DependencyInjection": {
         "type": "Transitive",
         "resolved": "9.0.0",
@@ -137,6 +147,21 @@
         "type": "Transitive",
         "resolved": "1.0.52",
         "contentHash": "oNv2JtYXhpdJrX63nibx1JT3uCESOBQ1LAk7Dtz/sr0+laW0KRM6eKp4CZ3MHDR2siIkKsY8MmUkeP5DKkQQ5w=="
+      },
+      "Newtonsoft.Json": {
+        "type": "Transitive",
+        "resolved": "13.0.3",
+        "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
+      },
+      "Sarif.Sdk": {
+        "type": "Transitive",
+        "resolved": "5.0.0",
+        "contentHash": "ErKRDx067ceB24AHnNkTjJH1C2LDPBpt/JePJgd1JhiolhlVq9FhPXHxPDesFd5pMjgWX0hE4Mj/BVatjn/mVA==",
+        "dependencies": {
+          "Microsoft.Diagnostics.Tracing.EventRegister": "1.1.28",
+          "Microsoft.Diagnostics.Tracing.TraceEvent": "3.1.3",
+          "Newtonsoft.Json": "13.0.3"
+        }
       },
       "System.Composition": {
         "type": "Transitive",
@@ -192,17 +217,24 @@
       "dotnetcoupling.git": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[1.0.0, )"
+          "DotnetCoupling.Core": "[0.4.0, )"
         }
       },
       "dotnetcoupling.roslyn": {
         "type": "Project",
         "dependencies": {
-          "DotnetCoupling.Core": "[1.0.0, )",
+          "DotnetCoupling.Core": "[0.4.0, )",
           "Microsoft.Build.Locator": "[1.11.2, )",
-          "Microsoft.CodeAnalysis.CSharp": "[5.*, )",
+          "Microsoft.CodeAnalysis.CSharp": "[5.3.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.3.0, )",
           "Microsoft.CodeAnalysis.Workspaces.MSBuild": "[5.3.0, )"
+        }
+      },
+      "dotnetcoupling.sarif": {
+        "type": "Project",
+        "dependencies": {
+          "DotnetCoupling.Core": "[0.4.0, )",
+          "Sarif.Sdk": "[5.0.0, )"
         }
       }
     }

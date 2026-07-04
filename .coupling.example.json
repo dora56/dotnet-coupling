@@ -23,6 +23,14 @@
     ],
     "issueTypes": [
       "ScatteredExternalCoupling"
+    ],
+    "issues": [
+      {
+        "type": "GlobalComplexity",
+        "source": "Sample.App.Api.LegacyHandler",
+        "target": "Sample.App.Infrastructure.LegacyRepository",
+        "reason": "Accepted legacy dependency tracked in ARCH-42"
+      }
     ]
   }
 }

@@ -13,6 +13,15 @@ internal static class IssueDetector
         IReadOnlyDictionary<string, Component> componentsById,
         AnalysisOptions? options = null)
     {
+        return DetectIssuesWithSuppression(scores, temporalCouplings, componentsById, options).Issues;
+    }
+
+    internal static IssueDetectionResult DetectIssuesWithSuppression(
+        IReadOnlyCollection<BalanceScore> scores,
+        IReadOnlyList<TemporalCoupling> temporalCouplings,
+        IReadOnlyDictionary<string, Component> componentsById,
+        AnalysisOptions? options = null)
+    {
         options ??= AnalysisOptions.Default;
         List<CouplingIssue> issues = [];
 
@@ -63,13 +72,15 @@ internal static class IssueDetector
         AddCircularDependencyIssues(scores.Select(score => score.Coupling), issues);
         AddHiddenCouplingIssues(temporalCouplings, scores.Select(score => score.Coupling), componentsById, issues);
         AddScatteredExternalCouplingIssues(scores.Select(score => score.Coupling), issues, options.Thresholds);
-        return ApplyIgnores(issues, options)
+        List<CouplingIssue> deduplicatedIssues = ApplyIgnores(issues, options)
             .GroupBy(issue => new IssueIdentity(issue.Type, issue.Source, issue.Target))
             .Select(group => group
                 .OrderBy(issue => issue.Location?.File ?? "", StringComparer.Ordinal)
                 .ThenBy(issue => issue.Location?.Line ?? 0)
                 .First())
             .ToList();
+
+        return ApplySuppressions(deduplicatedIssues, options.IssueSuppressions);
     }
 
     internal static void AddFanInFanOutIssues(
@@ -255,6 +266,36 @@ internal static class IssueDetector
         }
     }
 
+    private static IssueDetectionResult ApplySuppressions(
+        IEnumerable<CouplingIssue> issues,
+        IReadOnlyList<IssueSuppression> suppressions)
+    {
+        if (suppressions.Count == 0)
+        {
+            return new IssueDetectionResult(issues.ToList(), []);
+        }
+
+        Dictionary<IssueIdentity, IssueSuppression> suppressionsByIdentity = suppressions
+            .GroupBy(suppression => new IssueIdentity(suppression.Type, suppression.Source, suppression.Target))
+            .ToDictionary(group => group.Key, group => group.First());
+        List<CouplingIssue> activeIssues = [];
+        List<SuppressedIssue> suppressedIssues = [];
+
+        foreach (CouplingIssue issue in issues)
+        {
+            IssueIdentity identity = new(issue.Type, issue.Source, issue.Target);
+            if (suppressionsByIdentity.TryGetValue(identity, out IssueSuppression? suppression))
+            {
+                suppressedIssues.Add(new SuppressedIssue(issue, suppression.Reason));
+                continue;
+            }
+
+            activeIssues.Add(issue);
+        }
+
+        return new IssueDetectionResult(activeIssues, suppressedIssues);
+    }
+
     private static bool MatchesAnyNamespace(string value, IReadOnlyList<string> namespaces)
     {
         return namespaces.Any(namespaceName =>
@@ -328,3 +369,7 @@ internal static class IssueDetector
 
     private sealed record IssueIdentity(IssueType Type, string Source, string Target);
 }
+
+internal sealed record IssueDetectionResult(
+    List<CouplingIssue> Issues,
+    List<SuppressedIssue> SuppressedIssues);

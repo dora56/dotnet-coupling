@@ -259,13 +259,46 @@ Current Phase 3c status:
 
 Goal: チーム開発の PR feedback loop に載せる。
 
-- [ ] SARIF 出力
-- [ ] GitHub code scanning integration
-- [ ] `--hotspots`
-- [ ] issue suppression / baseline update workflow
-- [ ] CI example templates
-- [ ] report artifact examples
-- [ ] JSON schema changelog
+Architecture drivers:
+
+- PR 上で設計リスクを見える化する。
+- 既存 CLI / JSON 契約を壊さない。
+- 導入チームが既存負債で詰まらないように、baseline と suppression を組み合わせる。
+- `syntax` mode は既定のまま維持し、`semantic` は preview 明示オプションに留める。
+- mutation は nightly / manual / local 中心で実行し、PR / release workflow からは外す。
+- complexity 指標は Phase 6 に残し、Phase 4 の `--hotspots` では使わない。
+
+#### Phase 4a: PR Feedback First
+
+- [x] `DotnetCoupling.Sarif` project を追加し、`Sarif.Sdk` 依存をそこに隔離する
+- [x] `--sarif` / `--sarif --output` / `--check --sarif`
+- [x] SARIF 2.1.0 を SDK serializer で書き出し、SDK で再読込する regression test
+- [x] ArchitectureBoundaryTests で `Core` / `Roslyn` / `Git` から SARIF SDK への依存を禁止
+- [x] GitHub Actions SARIF example
+
+#### Phase 4b: Hotspots
+
+- [x] `--hotspots [N]`
+- [x] `--json --hotspots` で schema `0.3` と optional `hotspots`
+- [x] Phase 6 の complexity-assisted prioritization へ接続できる priority model
+
+#### Phase 4c: Suppression
+
+- [x] `.coupling.json` の `ignore.issues`
+- [x] stable key `(type, source, target)` と reason 必須
+- [x] suppressed issue を active counts / grade / `--check` から除外
+- [x] summary / JSON に suppressed count と suppressed issue list を出す
+- [x] suppressed issue は SARIF upload 対象に出さない
+
+#### Phase 4d: CI / team workflow
+
+- [x] dogfood workflow に SARIF artifact を追加
+- [x] CI の coupling feedback job で SARIF / Hotspots artifact を生成
+- [x] GitHub Code Scanning upload を main push / same-repo PR に限定
+- [x] baseline update workflow を Git ref ratchet + suppression 運用として具体化
+- [x] release notes を `CHANGELOG.md` に集約
+- [x] self + OSS 3 repos で SARIF / Hotspots / Suppression を dogfood
+- [ ] GitHub Code Scanning 表示と PR CI green を確認して `0.4.0` RC へ進む
 
 ### Phase 5: Advanced UX
 

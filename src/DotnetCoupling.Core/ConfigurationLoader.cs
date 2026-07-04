@@ -38,6 +38,7 @@ public static class ConfigurationLoader
             List<string> ignorePathPatterns = [.. defaults.IgnorePathPatterns];
             List<string> ignoreNamespaces = [.. defaults.IgnoreNamespaces];
             HashSet<IssueType> ignoreIssueTypes = new(defaults.IgnoreIssueTypes);
+            List<IssueSuppression> issueSuppressions = [.. defaults.IssueSuppressions];
             AnalysisThresholds thresholds = defaults.Thresholds;
 
             if (document.RootElement.TryGetProperty("analysis", out JsonElement analysis))
@@ -68,7 +69,7 @@ public static class ConfigurationLoader
 
             if (document.RootElement.TryGetProperty("ignore", out JsonElement ignore))
             {
-                AssertKnownProperties(ignore, "ignore", ["paths", "namespaces", "issueTypes"]);
+                AssertKnownProperties(ignore, "ignore", ["paths", "namespaces", "issueTypes", "issues"]);
                 if (ignore.TryGetProperty("paths", out JsonElement paths))
                 {
                     ignorePathPatterns = ReadStringArray(paths, "ignore.paths");
@@ -83,6 +84,11 @@ public static class ConfigurationLoader
                 {
                     ignoreIssueTypes = ReadIssueTypes(issueTypes);
                 }
+
+                if (ignore.TryGetProperty("issues", out JsonElement issues))
+                {
+                    issueSuppressions = ReadIssueSuppressions(issues);
+                }
             }
 
             AnalysisOptions loaded = new(
@@ -90,6 +96,7 @@ public static class ConfigurationLoader
                 ignorePathPatterns,
                 ignoreNamespaces,
                 ignoreIssueTypes,
+                issueSuppressions,
                 thresholds);
             return new ConfigurationLoadResult(loaded, configFile.FullName, []);
         }
@@ -192,6 +199,49 @@ public static class ConfigurationLoader
         }
 
         return values;
+    }
+
+    private static List<IssueSuppression> ReadIssueSuppressions(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            throw new ConfigurationException("ignore.issues must be an array.");
+        }
+
+        List<IssueSuppression> suppressions = [];
+        int index = 0;
+        foreach (JsonElement item in element.EnumerateArray())
+        {
+            string path = $"ignore.issues[{index}]";
+            AssertKnownProperties(item, path, ["type", "source", "target", "reason"]);
+
+            string type = ReadRequiredString(item, path, "type");
+            string source = ReadRequiredString(item, path, "source");
+            string target = ReadRequiredString(item, path, "target");
+            string reason = ReadRequiredString(item, path, "reason");
+
+            if (!Enum.TryParse(type, ignoreCase: true, out IssueType issueType))
+            {
+                throw new ConfigurationException($"Invalid issue type in {path}.type: {type}");
+            }
+
+            suppressions.Add(new IssueSuppression(issueType, source, target, reason));
+            index++;
+        }
+
+        return suppressions;
+    }
+
+    private static string ReadRequiredString(JsonElement element, string path, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out JsonElement property)
+            || property.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(property.GetString()))
+        {
+            throw new ConfigurationException($"{path}.{propertyName} must be a non-empty string.");
+        }
+
+        return property.GetString()!;
     }
 }
 

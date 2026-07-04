@@ -30,6 +30,7 @@ public sealed class StructuralFitnessTests
         Assert.Contains(projectReferences, reference => reference.Contains("DotnetCoupling.Core", StringComparison.Ordinal));
         Assert.Contains(projectReferences, reference => reference.Contains("DotnetCoupling.Git", StringComparison.Ordinal));
         Assert.Contains(projectReferences, reference => reference.Contains("DotnetCoupling.Roslyn", StringComparison.Ordinal));
+        Assert.Contains(projectReferences, reference => reference.Contains("DotnetCoupling.Sarif", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -46,6 +47,33 @@ public sealed class StructuralFitnessTests
             .Select(value => value!)
             .ToArray();
 
+        Assert.DoesNotContain(projectReferences, reference => reference.Contains("DotnetCoupling.Git", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SarifProject_ContainsOnlySarifSdkProductionPackageReference()
+    {
+        string sarifProjectPath = Path.Combine(TestPaths.RepositoryRoot, "src", "DotnetCoupling.Sarif", "DotnetCoupling.Sarif.csproj");
+        XDocument document = XDocument.Load(sarifProjectPath);
+
+        string[] packageReferences = document
+            .Descendants()
+            .Where(element => element.Name.LocalName == "PackageReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => value is not null)
+            .Select(value => value!)
+            .ToArray();
+        string[] projectReferences = document
+            .Descendants()
+            .Where(element => element.Name.LocalName == "ProjectReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => value is not null)
+            .Select(value => value!)
+            .ToArray();
+
+        Assert.Equal(["Sarif.Sdk"], packageReferences);
+        Assert.Contains(projectReferences, reference => reference.Contains("DotnetCoupling.Core", StringComparison.Ordinal));
+        Assert.DoesNotContain(projectReferences, reference => reference.Contains("DotnetCoupling.Roslyn", StringComparison.Ordinal));
         Assert.DoesNotContain(projectReferences, reference => reference.Contains("DotnetCoupling.Git", StringComparison.Ordinal));
     }
 }

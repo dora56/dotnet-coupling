@@ -1,8 +1,8 @@
-# 将来機能 (Baseline / Hotspots / AI / SARIF)
+# 将来機能と Phase 4+ 設計 (Baseline / Hotspots / AI / SARIF)
 
 ## 24. Baseline / Ratchet Gate 設計
 
-v0.2 以降で実装する。
+v0.2 で実装済み。
 
 ### 24.1 目的
 
@@ -45,10 +45,10 @@ FAIL: 2 new High issues found.
 
 ### 25.1 Hotspots
 
-リファクタリング候補をランキングする。
+Phase 4 で `--hotspots [N]` として実装する。リファクタリング候補をランキングする。
 
 ```bash
-dotnet coupling --hotspots=10 ./src
+dotnet-coupling --hotspots 10 ./src
 ```
 
 スコア要素:
@@ -60,6 +60,10 @@ dotnet coupling --hotspots=10 ./src
 - circular dependency participation
 - project boundary crossing
 - v0.6 以降: cyclomatic complexity / cognitive complexity
+
+Phase 4 では complexity はまだ使わない。`--hotspots` のモデルは、Phase 6 で
+complexity-assisted ranking を足せるように、Grade とは別の priority score として
+保持する。
 
 ### 25.2 Impact
 
@@ -128,10 +132,10 @@ Suggested refactoring:
 
 ## 27. SARIF 出力設計
 
-v0.3 以降で `--sarif` を追加する。
+Phase 4 で `--sarif` を追加する。
 
 ```bash
-dotnet coupling --sarif --output coupling.sarif ./src
+dotnet-coupling --sarif --output coupling.sarif ./src
 ```
 
 目的:
@@ -148,6 +152,26 @@ Mapping:
 | Problem | message |
 | Location | physicalLocation |
 | Recommendation | help text |
+
+実装では Microsoft の `Sarif.Sdk` (`Microsoft.CodeAnalysis.Sarif`) を使う。
+`SarifLog`, `Run`, `Tool`, `ToolComponent`, `ReportingDescriptor`, `Result`,
+`Location`, `PhysicalLocation`, `ArtifactLocation`, `Region` などの object model を
+利用し、独自 SARIF JSON writer は持たない。
+
+Architecture boundary:
+
+- `DotnetCoupling.Sarif` だけが `Sarif.Sdk` に依存する。
+- `DotnetCoupling.Core` / `DotnetCoupling.Roslyn` / `DotnetCoupling.Git` は
+  `Microsoft.CodeAnalysis.Sarif` に依存しない。
+- CLI は composition root として `Json` / `Text` / `Summary` / `Sarif` /
+  `Hotspots` を選ぶ。
+
+Suppression:
+
+- `.coupling.json` の `ignore.issues` で suppressed された issue は SARIF には
+  出さない。
+- summary / JSON には suppressed count と reason を出す。
+- suppressed issue は grade と `--check` から除外する。
 
 ---
 

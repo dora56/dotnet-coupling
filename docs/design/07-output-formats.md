@@ -55,7 +55,7 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
   "$schema": "https://raw.githubusercontent.com/YOUR_GITHUB/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
   "schemaVersion": "0.1",
   "tool": "dotnet-coupling",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "analysis": {
     "path": "./src",
     "mode": "semantic-preview",
@@ -131,6 +131,16 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
 }
 ```
 
+`schemaVersion: 0.3` は Phase 4 の拡張 schema である。既定 JSON は既存互換の
+`0.1`、baseline 比較時は `0.2` を維持し、以下の optional field が必要なときだけ
+`0.3` を使う。
+
+- `hotspots`: `--json --hotspots` の Top N ranking
+- `suppressedIssues`: `.coupling.json` の `ignore.issues` で除外された issue
+
+suppressed issue は active issue counts、grade、`--check` の判定から除外する。
+ただし JSON と summary には件数と対象を残し、負債が隠れないようにする。
+
 ### 19.4 JSON Schema 方針
 
 `supported schemaVersion` は minor 単位で管理する。
@@ -138,6 +148,8 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
 ```text
 schemas/
   dotnet-coupling-report-0.1.schema.json
+  dotnet-coupling-report-0.2.schema.json
+  dotnet-coupling-report-0.3.schema.json
   dotnet-coupling-report.schema.json -> latest experimental
 ```
 
@@ -154,13 +166,51 @@ CI 利用者向けに、少なくとも以下は安定させる。
 - `manifest.blindSpots`
 - `manifest.diagnostics` は optional field として後方互換を保ちながら追加できる
 
-### 19.5 出力モード優先順位
+### 19.5 SARIF 出力
+
+`--sarif` は SARIF 2.1.0 を出力する。独自 JSON 生成ではなく Microsoft の
+`Sarif.Sdk` object model と serializer を使い、SARIF 依存は
+`DotnetCoupling.Sarif` project に閉じ込める。
+
+Mapping:
+
+| dotnet-coupling | SARIF |
+|---|---|
+| `IssueType` | `ruleId` / `rules[].id` |
+| `Problem` | `message.text` |
+| `Recommendation` | `rules[].help.text` |
+| `Critical` / `High` | `level: error` |
+| `Medium` | `level: warning` |
+| `Low` | `level: note` |
+| `Location.File` | repository-relative `physicalLocation.artifactLocation.uri` |
+| `(type, source, target)` | `partialFingerprints.dotnetCouplingIssueKey` |
+
+location がない issue は SARIF result としては出さない。suppressed issue も
+SARIF upload 対象には出さず、summary / JSON 側で可視化する。
+
+### 19.6 Hotspots 出力
+
+`--hotspots [N]` は coupling issue の修正候補をランキングする。Phase 4 では
+complexity 指標を使わず、以下を入力にする。
+
+- active issue count / severity / balance score
+- fan-in / fan-out
+- volatility
+- namespace / project boundary crossing
+- circular dependency participation
+
+Phase 6 で `cyclomaticComplexity` / `cognitiveComplexity` を `--hotspots` の ranking
+入力として追加できるように、health grade とは別の priority score として扱う。
+
+### 19.7 出力モード優先順位
 
 同時指定された場合の優先順位:
 
 1. `--json`
-2. `--check`
-3. `--summary`
-4. 通常レポート
+2. `--sarif`
+3. `--hotspots`
+4. `--check`
+5. `--summary`
+6. 通常レポート
 
-競合するモードが指定された場合は warning を出す。
+競合するモードが指定された場合は、上位の出力モードを採用する。

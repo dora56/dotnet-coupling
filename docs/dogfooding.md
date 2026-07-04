@@ -1,6 +1,6 @@
 # Dogfooding Guide
 
-Use this guide to collect Phase 2 public alpha feedback.
+Use this guide to collect release evidence before publishing a new version.
 
 ## Self Dogfood
 
@@ -10,6 +10,7 @@ local tool, installs it from the generated package, and uploads:
 - `dogfood-summary.txt`
 - `dogfood-no-git-summary.txt`
 - `dogfood-report.json`
+- `dogfood-report.sarif`
 - `dogfood-compare/semantic-compare.md`
 - `dogfood-compare/syntax-summary.txt`
 - `dogfood-compare/semantic-summary.txt`
@@ -22,14 +23,46 @@ The generated markdown should capture both headline differences and a compact
 metric/diagnostic diff so that semantic-only workspace warnings are visible as
 compare evidence rather than hidden in stderr.
 
-For Phase 3 semantic characterization, keep one small synthetic compare target
-as well. Real repositories are useful for stability and compatibility checks,
-but a tiny synthetic target is better for explaining an intentional semantic
-delta when the large targets happen to show no headline result change.
+For semantic characterization, keep one small synthetic compare target as well.
+Real repositories are useful for stability and compatibility checks, but a tiny
+synthetic target is better for explaining an intentional semantic delta when the
+large targets happen to show no headline result change.
+
+## Phase 4 PR Feedback Dogfood
+
+Before the `0.4.0` release candidate, verify the PR feedback outputs on self
+and three public C# repositories:
+
+- `https://github.com/LuckyPennySoftware/MediatR`
+- `https://github.com/FluentValidation/FluentValidation`
+- `https://github.com/Humanizr/Humanizer`
+
+Use `/private/tmp/dotnet-coupling-phase4-dogfood` for local clones and generated
+artifacts. Install the locally packed tool into a temporary tool path, then run:
+
+```bash
+dotnet-coupling --summary --no-git ./src
+dotnet-coupling --json --hotspots 5 --no-git ./src > dotnet-coupling-report.json
+dotnet-coupling --sarif --output dotnet-coupling-report.sarif --no-git ./src
+dotnet-coupling --hotspots 5 --no-git ./src > dotnet-coupling-hotspots.txt
+```
+
+For suppression smoke testing, add a temporary `.coupling.json` in the dogfood
+workspace with one precise `ignore.issues` entry copied from an observed issue,
+rerun `--summary --json --sarif`, and verify:
+
+- active issue counts and `--check` exclude the suppressed issue
+- JSON includes `suppressedIssues`
+- SARIF does not include the suppressed issue
+
+Record the results in `docs/dogfooding/phase4-pr-feedback-dogfooding-2026-07-04.md`.
+Keep the commit SHA, analyzed path, grade, issue counts, SARIF generation
+result, Hotspots Top 5, and suppression smoke outcome for each target.
 
 ## External Sample Dogfood
 
-Run against 2-3 small C# repositories before publishing a new alpha.
+Run against 2-3 small C# repositories before publishing a new alpha or stable
+release.
 
 Recommended target profile:
 
@@ -44,6 +77,8 @@ Commands:
 dotnet-coupling --summary ./src
 dotnet-coupling --summary --no-git ./src
 dotnet-coupling --json --no-git ./src > dotnet-coupling-report.json
+dotnet-coupling --sarif --output dotnet-coupling-report.sarif --no-git ./src
+dotnet-coupling --hotspots 5 --no-git ./src > dotnet-coupling-hotspots.txt
 dotnet-coupling --check --min-grade B ./src
 ```
 
@@ -52,6 +87,7 @@ Record for each target:
 - repository URL and commit SHA
 - command used
 - grade and issue counts
+- SARIF and hotspots artifact paths
 - false positives with issue type and source/target
 - false negatives with expected issue type
 - confusing output or missing context
