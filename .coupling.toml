@@ -25,51 +25,26 @@ issue_types = [
 [[domain.subdomains]]
 name = "CoreRules"
 category = "core"
-paths = [
-  "src/DotnetCoupling.Core/CouplingCalibrator.cs",
-  "src/DotnetCoupling.Core/CouplingResolver.cs",
-  "src/DotnetCoupling.Core/CouplingScoring.cs",
-  "src/DotnetCoupling.Core/ExternalCouplingDetector.cs",
-  "src/DotnetCoupling.Core/HotspotAnalyzer.cs",
-  "src/DotnetCoupling.Core/IssueDetector.cs",
-]
+paths = ["src/DotnetCoupling.Core/Domain/**"]
 expected_volatility = "high"
 
 [[domain.subdomains]]
 name = "CoreContracts"
 category = "supporting"
-paths = [
-  "src/DotnetCoupling.Core/Models.cs",
-  "src/DotnetCoupling.Core/UsingNamespace.cs",
-  "src/DotnetCoupling.Core/VolatilityAnalysis.cs",
-]
+paths = ["src/DotnetCoupling.Core/Contracts/**"]
 expected_volatility = "medium"
 
 [[domain.subdomains]]
 name = "CoreConfig"
 category = "supporting"
-paths = [
-  "src/DotnetCoupling.Core/Configuration*.cs",
-  "src/DotnetCoupling.Core/JsonConfigurationReader.cs",
-  "src/DotnetCoupling.Core/RawConfiguration.cs",
-  "src/DotnetCoupling.Core/TomlConfigurationReader.cs",
-]
+paths = ["src/DotnetCoupling.Core/Configuration/**"]
 expected_volatility = "medium"
 
 [[domain.subdomains]]
 name = "CoreReporting"
 category = "supporting"
-paths = ["src/DotnetCoupling.Core/ReportRenderer.cs"]
+paths = ["src/DotnetCoupling.Core/Reporting/**"]
 expected_volatility = "medium"
-
-[[domain.subdomains]]
-name = "CoreUtilities"
-category = "generic"
-paths = [
-  "src/DotnetCoupling.Core/DomainContextMatcher.cs",
-  "src/DotnetCoupling.Core/PathPatternMatcher.cs",
-]
-expected_volatility = "low"
 
 [[domain.subdomains]]
 name = "Roslyn"
@@ -97,47 +72,23 @@ expected_volatility = "medium"
 
 [[domain.areas]]
 name = "CoreRules"
-paths = [
-  "src/DotnetCoupling.Core/CouplingCalibrator.cs",
-  "src/DotnetCoupling.Core/CouplingResolver.cs",
-  "src/DotnetCoupling.Core/CouplingScoring.cs",
-  "src/DotnetCoupling.Core/ExternalCouplingDetector.cs",
-  "src/DotnetCoupling.Core/IssueDetector.cs",
-  "src/DotnetCoupling.Core/HotspotAnalyzer.cs",
-]
+paths = ["src/DotnetCoupling.Core/Domain/**"]
 technical_role = "domain_model"
 
 [[domain.areas]]
 name = "CoreContracts"
-paths = [
-  "src/DotnetCoupling.Core/Models.cs",
-  "src/DotnetCoupling.Core/UsingNamespace.cs",
-  "src/DotnetCoupling.Core/VolatilityAnalysis.cs",
-]
+paths = ["src/DotnetCoupling.Core/Contracts/**"]
 technical_role = "contract"
 
 [[domain.areas]]
 name = "CoreConfig"
-paths = [
-  "src/DotnetCoupling.Core/Configuration*.cs",
-  "src/DotnetCoupling.Core/JsonConfigurationReader.cs",
-  "src/DotnetCoupling.Core/RawConfiguration.cs",
-  "src/DotnetCoupling.Core/TomlConfigurationReader.cs",
-]
+paths = ["src/DotnetCoupling.Core/Configuration/**"]
 technical_role = "application_service"
 
 [[domain.areas]]
 name = "CoreReporting"
-paths = ["src/DotnetCoupling.Core/ReportRenderer.cs"]
+paths = ["src/DotnetCoupling.Core/Reporting/**"]
 technical_role = "adapter"
-
-[[domain.areas]]
-name = "CoreUtilities"
-paths = [
-  "src/DotnetCoupling.Core/DomainContextMatcher.cs",
-  "src/DotnetCoupling.Core/PathPatternMatcher.cs",
-]
-technical_role = "contract"
 
 [[domain.areas]]
 name = "RoslynAdapter"
@@ -162,6 +113,11 @@ technical_role = "composition_root"
 [[domain.areas]]
 name = "CliOutputAdapter"
 paths = ["src/DotnetCoupling.Cli/CliReportWriter.cs"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "CliPathAdapter"
+paths = ["src/DotnetCoupling.Cli/CliPathResolver.cs"]
 technical_role = "adapter"
 
 [[domain.areas]]
