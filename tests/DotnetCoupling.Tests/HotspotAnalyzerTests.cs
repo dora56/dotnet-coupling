@@ -76,6 +76,123 @@ public sealed class HotspotAnalyzerTests
     }
 
     [Fact]
+    public void Calculate_ReportWithHighComplexity_AddsComplexityReasonAndPriorityBonus()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        Hotspot baseline = Assert.Single(
+            HotspotAnalyzer.Calculate(report, count: 10),
+            hotspot => hotspot.Component == "Fixture.Global.Api.Handler");
+        MemberComplexity member = new(
+            "Fixture.Global.Api.Handler",
+            "Handle",
+            new SourceLocation(Path.Combine(fixture, "Api", "Handler.cs"), 5),
+            CyclomaticComplexity: 12,
+            CognitiveComplexity: 16);
+        AnalysisReport reportWithComplexity = report with
+        {
+            ComponentComplexities =
+            [
+                new ComponentComplexity(
+                    "Fixture.Global.Api.Handler",
+                    Path.Combine(fixture, "Api", "Handler.cs"),
+                    MemberCount: 1,
+                    MaxCyclomaticComplexity: 12,
+                    MaxCognitiveComplexity: 16,
+                    TotalCyclomaticComplexity: 12,
+                    TotalCognitiveComplexity: 16,
+                    MostComplexMember: member),
+            ],
+        };
+
+        Hotspot hotspotWithComplexity = Assert.Single(
+            HotspotAnalyzer.Calculate(reportWithComplexity, count: 10),
+            hotspot => hotspot.Component == "Fixture.Global.Api.Handler");
+
+        Assert.True(hotspotWithComplexity.Score > baseline.Score);
+        Assert.Contains("high cyclomatic complexity: 12", hotspotWithComplexity.Reasons);
+        Assert.Contains("high cognitive complexity: 16", hotspotWithComplexity.Reasons);
+        Assert.NotNull(hotspotWithComplexity.Complexity);
+        Assert.Equal("Handle", hotspotWithComplexity.Complexity.MostComplexMember);
+    }
+
+    [Fact]
+    public void Calculate_ReportWithLowComplexity_KeepsPriorityScore()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        Hotspot baseline = Assert.Single(
+            HotspotAnalyzer.Calculate(report, count: 10),
+            hotspot => hotspot.Component == "Fixture.Global.Api.Handler");
+        AnalysisReport reportWithComplexity = report with
+        {
+            ComponentComplexities =
+            [
+                new ComponentComplexity(
+                    "Fixture.Global.Api.Handler",
+                    Path.Combine(fixture, "Api", "Handler.cs"),
+                    MemberCount: 1,
+                    MaxCyclomaticComplexity: 1,
+                    MaxCognitiveComplexity: 0,
+                    TotalCyclomaticComplexity: 1,
+                    TotalCognitiveComplexity: 0,
+                    MostComplexMember: null),
+            ],
+        };
+
+        Hotspot hotspotWithComplexity = Assert.Single(
+            HotspotAnalyzer.Calculate(reportWithComplexity, count: 10),
+            hotspot => hotspot.Component == "Fixture.Global.Api.Handler");
+
+        Assert.Equal(baseline.Score, hotspotWithComplexity.Score);
+        Assert.DoesNotContain(hotspotWithComplexity.Reasons, reason => reason.Contains("complexity", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Calculate_FilePathHotspot_UsesComplexityFromComponentsInThatFile()
+    {
+        string filePath = "/tmp/sample/Handler.cs";
+        CouplingIssue issue = new(
+            IssueType.HiddenCoupling,
+            Severity.Medium,
+            filePath,
+            "/tmp/sample/Repository.cs",
+            0.50,
+            "Problem",
+            "Recommendation",
+            new SourceLocation(filePath, 1));
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 0, 0, true, true, 6),
+            new GradeResult("C", "Needs attention", "issue-density", "Test"),
+            0.50,
+            [],
+            [],
+            [],
+            [issue],
+            [],
+            ComponentComplexities:
+            [
+                new ComponentComplexity(
+                    "Sample.Handler",
+                    filePath,
+                    MemberCount: 1,
+                    MaxCyclomaticComplexity: 11,
+                    MaxCognitiveComplexity: 3,
+                    TotalCyclomaticComplexity: 11,
+                    TotalCognitiveComplexity: 3,
+                    MostComplexMember: new MemberComplexity("Sample.Handler", "Handle", new SourceLocation(filePath, 5), 11, 3)),
+            ]);
+
+        Hotspot hotspot = Assert.Single(
+            HotspotAnalyzer.Calculate(report, count: 10),
+            item => item.Component == filePath);
+
+        Assert.NotNull(hotspot.Complexity);
+        Assert.Equal(11, hotspot.Complexity.MaxCyclomaticComplexity);
+        Assert.Contains("high cyclomatic complexity: 11", hotspot.Reasons);
+    }
+
+    [Fact]
     public void Calculate_NonPositiveCount_Throws()
     {
         string fixture = TestPaths.Fixture("global-complexity");

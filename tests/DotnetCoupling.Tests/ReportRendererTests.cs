@@ -99,6 +99,30 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void Render_JsonOutputWithComplexityHotspots_UsesComplexitySchemaContract()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+            fixture,
+            AnalysisMode.Syntax,
+            volatilityProvider: null,
+            gitMonths: 6,
+            AnalysisOptions.Default,
+            includeComplexity: true);
+        report = report with { Hotspots = HotspotAnalyzer.Calculate(report, count: 1) };
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestPaths.RepositoryRoot, "schemas", "dotnet-coupling-report-0.4.schema.json")));
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        AssertRequiredProperties(schema.RootElement, document.RootElement);
+        Assert.Equal("0.4", document.RootElement.GetProperty("schemaVersion").GetString());
+        JsonElement hotspot = Assert.Single(document.RootElement.GetProperty("hotspots").EnumerateArray());
+        JsonElement complexity = hotspot.GetProperty("complexity");
+        Assert.Equal(1, complexity.GetProperty("maxCyclomaticComplexity").GetInt32());
+        Assert.Equal(0, complexity.GetProperty("maxCognitiveComplexity").GetInt32());
+        Assert.Equal("Handle", complexity.GetProperty("mostComplexMember").GetString());
+    }
+
+    [Fact]
     public void Render_HotspotsOutput_SeparatesRemediationPriorityFromHealthGrade()
     {
         string fixture = TestPaths.Fixture("global-complexity");
@@ -109,6 +133,24 @@ public sealed class ReportRendererTests
 
         Assert.Contains("Priority ranking for remediation;", rendered);
         Assert.Contains("Grade remains the project health gate.", rendered);
+    }
+
+    [Fact]
+    public void Render_HotspotsOutputWithComplexity_IncludesComplexitySummary()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+            fixture,
+            AnalysisMode.Syntax,
+            volatilityProvider: null,
+            gitMonths: 6,
+            AnalysisOptions.Default,
+            includeComplexity: true);
+        report = report with { Hotspots = HotspotAnalyzer.Calculate(report, count: 1) };
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Hotspots);
+
+        Assert.Contains("Complexity: cyclomatic max 1, cognitive max 0, members 1", rendered);
     }
 
     [Fact]

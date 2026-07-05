@@ -118,6 +118,7 @@ public static class CliApplication
             int gitMonths = parseResult.GetValue(gitMonthsOption);
             FileInfo? config = parseResult.GetValue(configOption);
             string? baselineRef = parseResult.GetValue(baselineOption);
+            bool includeHotspots = CliReportWriter.ShouldIncludeHotspots(hotspotsRequested, json, sarif);
 
             if (!string.IsNullOrWhiteSpace(failOn) && !TryParseSeverity(failOn, out _))
             {
@@ -149,7 +150,13 @@ public static class CliApplication
                 string analysisTargetPath = CliPathResolver.ResolveAnalysisTargetPath(fullTargetPath, analysisMode);
                 ConfigurationLoadResult configuration = ConfigurationLoader.Load(fullTargetPath, config);
                 IVolatilityProvider? volatilityProvider = noGit ? null : new GitVolatilityProvider();
-                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(analysisTargetPath, analysisMode, volatilityProvider, gitMonths, configuration.Options);
+                AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+                    analysisTargetPath,
+                    analysisMode,
+                    volatilityProvider,
+                    gitMonths,
+                    configuration.Options,
+                    includeComplexity: includeHotspots);
                 if (!string.IsNullOrWhiteSpace(baselineRef))
                 {
                     string? repositoryRoot = CliPathResolver.FindGitRepositoryRoot(analysisTargetPath);
@@ -171,8 +178,8 @@ public static class CliApplication
                         BaselineComparer.Compare(baselineRef, report, baselineReport));
                 }
 
-                report = CliReportWriter.AddHotspotsIfRequested(report, hotspotsRequested, hotspotsValue);
-                CliReportRenderOptions renderOptions = new(summary, json, sarif, hotspotsRequested, check, analysisTargetPath);
+                report = CliReportWriter.AddHotspotsIfIncluded(report, includeHotspots, hotspotsValue);
+                CliReportRenderOptions renderOptions = new(summary, json, sarif, includeHotspots, check, analysisTargetPath);
                 string rendered = CliReportWriter.Render(report, renderOptions);
                 CliReportWriter.Write(rendered, output);
 

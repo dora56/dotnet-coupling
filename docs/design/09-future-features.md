@@ -141,11 +141,12 @@ dotnet-coupling --hotspots 10 ./src
 - volatility
 - circular dependency participation
 - project boundary crossing
-- v0.6 以降: cyclomatic complexity / cognitive complexity
+- `0.5.0`: cyclomatic complexity / cognitive complexity
 
-Phase 4 では complexity はまだ使わない。`--hotspots` のモデルは、Phase 6 で
-complexity-assisted ranking を足せるように、Grade とは別の priority score として
-保持する。
+`0.5.0` では complexity-assisted ranking を `--hotspots` に限定して追加する。
+これは Grade とは別の priority score であり、complexity が高いだけでは issue
+severity や `--check` を変えない。threshold / weight の config 化、`--impact` や
+`--ai` への展開は後続スライスに残す。
 
 ### 25.3 Impact
 
@@ -259,7 +260,9 @@ Suppression:
 
 ## 28. Complexity-assisted Risk Prioritization
 
-v0.6 以降で `cyclomaticComplexity` / `cognitiveComplexity` を導入する。
+`0.5.0` で `--hotspots` 向けに `cyclomaticComplexity` /
+`cognitiveComplexity` を導入する。`0.6.0` 以降では、同じ priority model を
+`--impact` / `--trace` / `--ai` などの調査 UX へ広げる。
 
 ### 28.1 目的
 
@@ -328,7 +331,7 @@ max と sum を優先し、平均値だけで判断しない。
 - JSON schema には optional field として追加する。
 - field が無い場合も既存 consumer が動くようにする。
 - `--summary` では詳細数値を出しすぎず、hotspot reason として短く表示する。
-- complexity は補助指標であり、Phase 6 時点でも health grade の denominator には入れない。
+- complexity は補助指標であり、health grade の denominator には入れない。
 
 ---
 

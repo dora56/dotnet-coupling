@@ -7,18 +7,23 @@ internal sealed record CliReportRenderOptions(
     bool Summary,
     bool Json,
     bool Sarif,
-    bool HotspotsRequested,
+    bool IncludeHotspots,
     bool Check,
     string AnalysisTargetPath);
 
 internal static class CliReportWriter
 {
-    public static AnalysisReport AddHotspotsIfRequested(
+    public static bool ShouldIncludeHotspots(bool hotspotsRequested, bool jsonRequested, bool sarifRequested)
+    {
+        return hotspotsRequested && (jsonRequested || !sarifRequested);
+    }
+
+    public static AnalysisReport AddHotspotsIfIncluded(
         AnalysisReport report,
-        bool hotspotsRequested,
+        bool includeHotspots,
         int? hotspotsValue)
     {
-        if (!hotspotsRequested)
+        if (!includeHotspots)
         {
             return report;
         }
@@ -43,7 +48,7 @@ internal static class CliReportWriter
             return SarifReportRenderer.Render(report, repositoryRoot);
         }
 
-        ReportFormat format = options.HotspotsRequested
+        ReportFormat format = options.IncludeHotspots
             ? ReportFormat.Hotspots
             : options.Summary || options.Check
                 ? ReportFormat.Summary

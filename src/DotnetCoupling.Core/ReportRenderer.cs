@@ -114,6 +114,11 @@ public static class ReportRenderer
             builder.AppendLine(CultureInfo.InvariantCulture, $"{hotspot.Rank}. {hotspot.Component}");
             builder.AppendLine(CultureInfo.InvariantCulture, $"   Priority: {hotspot.Score:0.00}");
             builder.AppendLine(CultureInfo.InvariantCulture, $"   Issues: {hotspot.IssueCount} | Fan-in: {hotspot.FanIn} | Fan-out: {hotspot.FanOut} | Volatility: {hotspot.Volatility}");
+            if (hotspot.Complexity is not null)
+            {
+                builder.AppendLine(CultureInfo.InvariantCulture, $"   Complexity: cyclomatic max {hotspot.Complexity.MaxCyclomaticComplexity}, cognitive max {hotspot.Complexity.MaxCognitiveComplexity}, members {hotspot.Complexity.MemberCount}");
+            }
+
             builder.AppendLine(CultureInfo.InvariantCulture, $"   Reasons: {string.Join(", ", hotspot.Reasons)}");
         }
 
@@ -173,10 +178,13 @@ public static class ReportRenderer
     private static Dictionary<string, object?> CreateExtendedJsonDocument(AnalysisReport report)
     {
         IssueCounts counts = CountIssues(report);
+        bool hasComplexityHotspots = HasComplexityHotspots(report);
         Dictionary<string, object?> document = new(StringComparer.Ordinal)
         {
-            ["Schema"] = "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.3.schema.json",
-            ["SchemaVersion"] = "0.3",
+            ["Schema"] = hasComplexityHotspots
+                ? "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.4.schema.json"
+                : "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.3.schema.json",
+            ["SchemaVersion"] = hasComplexityHotspots ? "0.4" : "0.3",
             ["Tool"] = "dotnet-coupling",
             ["Version"] = ToolVersion,
             ["Analysis"] = CreateAnalysisJson(report),
@@ -218,7 +226,7 @@ public static class ReportRenderer
 
         if (report.Hotspots is not null)
         {
-            document["Hotspots"] = report.Hotspots;
+            document["Hotspots"] = CreateHotspotsJson(report.Hotspots);
         }
 
         if (report.SuppressedIssues is { Count: > 0 })
@@ -227,6 +235,38 @@ public static class ReportRenderer
         }
 
         return document;
+    }
+
+    private static bool HasComplexityHotspots(AnalysisReport report)
+    {
+        return report.Hotspots?.Any(hotspot => hotspot.Complexity is not null) == true;
+    }
+
+    private static Dictionary<string, object?>[] CreateHotspotsJson(IReadOnlyList<Hotspot> hotspots)
+    {
+        return hotspots.Select(hotspot =>
+        {
+            Dictionary<string, object?> json = new(StringComparer.Ordinal)
+            {
+                ["Rank"] = hotspot.Rank,
+                ["Component"] = hotspot.Component,
+                ["Score"] = hotspot.Score,
+                ["IssueCount"] = hotspot.IssueCount,
+                ["FanIn"] = hotspot.FanIn,
+                ["FanOut"] = hotspot.FanOut,
+                ["Volatility"] = hotspot.Volatility,
+                ["CrossesBoundary"] = hotspot.CrossesBoundary,
+                ["ParticipatesInCycle"] = hotspot.ParticipatesInCycle,
+                ["Reasons"] = hotspot.Reasons,
+            };
+
+            if (hotspot.Complexity is not null)
+            {
+                json["Complexity"] = hotspot.Complexity;
+            }
+
+            return json;
+        }).ToArray();
     }
 
     private static Dictionary<string, object?> CreateJsonDocumentWithBaseline(AnalysisReport report)

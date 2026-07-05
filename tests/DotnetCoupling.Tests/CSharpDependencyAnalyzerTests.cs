@@ -3292,6 +3292,132 @@ public sealed class CSharpDependencyAnalyzerTests
             && coupling.Target == "CSharpx.Either`2");
     }
 
+    [Fact]
+    public void Analyze_WithComplexity_DoesNotChangeGradeOrIssues()
+    {
+        string directory = CreateFixture(
+            "Handler.cs",
+            """
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle(int value)
+                {
+                    if (value > 0)
+                    {
+                        if (value < 10)
+                        {
+                            _ = new Repository();
+                        }
+                    }
+                }
+            }
+            """,
+            "Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public sealed class Repository
+            {
+            }
+            """);
+        AnalysisReport baseline = CSharpDependencyAnalyzer.Analyze(directory, useGit: false, gitMonths: 6);
+        AnalysisReport withComplexity = CSharpDependencyAnalyzer.Analyze(
+            directory,
+            AnalysisMode.Syntax,
+            volatilityProvider: null,
+            gitMonths: 6,
+            AnalysisOptions.Default,
+            includeComplexity: true);
+
+        Assert.Equal(baseline.Grade, withComplexity.Grade);
+        Assert.Equal(
+            baseline.Issues.Select(issue => (issue.Type, issue.Source, issue.Target)),
+            withComplexity.Issues.Select(issue => (issue.Type, issue.Source, issue.Target)));
+        ComponentComplexity complexity = Assert.Single(withComplexity.ComponentComplexities!, item => item.ComponentId == "Sample.App.Api.Handler");
+        Assert.Equal(3, complexity.MaxCyclomaticComplexity);
+    }
+
+    [Fact]
+    public void Analyze_HighComplexityOnly_DoesNotCreateIssues()
+    {
+        string directory = CreateFixture("""
+            namespace Sample.App;
+
+            public sealed class Calculator
+            {
+                public int Score(int value)
+                {
+                    if (value < 0)
+                    {
+                        return 0;
+                    }
+
+                    if (value == 0)
+                    {
+                        return 1;
+                    }
+
+                    if (value == 1)
+                    {
+                        return 2;
+                    }
+
+                    if (value == 2)
+                    {
+                        return 3;
+                    }
+
+                    if (value == 3)
+                    {
+                        return 4;
+                    }
+
+                    if (value == 4)
+                    {
+                        return 5;
+                    }
+
+                    if (value == 5)
+                    {
+                        return 6;
+                    }
+
+                    if (value == 6)
+                    {
+                        return 7;
+                    }
+
+                    if (value == 7)
+                    {
+                        return 8;
+                    }
+
+                    if (value == 8)
+                    {
+                        return 9;
+                    }
+
+                    return 10;
+                }
+            }
+            """);
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+            directory,
+            AnalysisMode.Syntax,
+            volatilityProvider: null,
+            gitMonths: 6,
+            AnalysisOptions.Default,
+            includeComplexity: true);
+
+        Assert.Empty(report.Issues);
+        Assert.Equal("B", report.Grade.Letter);
+        ComponentComplexity complexity = Assert.Single(report.ComponentComplexities!);
+        Assert.True(complexity.MaxCyclomaticComplexity >= HotspotAnalyzer.CyclomaticWarningThreshold);
+    }
+
     private static string CreateFixture(string source)
     {
         return CreateFixture("Sample.cs", source);

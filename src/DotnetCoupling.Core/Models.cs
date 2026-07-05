@@ -292,6 +292,32 @@ public sealed record SuppressedIssue(
     CouplingIssue Issue,
     string Reason);
 
+public sealed record MemberComplexity(
+    string ComponentId,
+    string MemberName,
+    SourceLocation Location,
+    int CyclomaticComplexity,
+    int CognitiveComplexity);
+
+public sealed record ComponentComplexity(
+    string ComponentId,
+    string FilePath,
+    int MemberCount,
+    int MaxCyclomaticComplexity,
+    int MaxCognitiveComplexity,
+    int TotalCyclomaticComplexity,
+    int TotalCognitiveComplexity,
+    MemberComplexity? MostComplexMember);
+
+public sealed record HotspotComplexity(
+    int MaxCyclomaticComplexity,
+    int MaxCognitiveComplexity,
+    int TotalCyclomaticComplexity,
+    int TotalCognitiveComplexity,
+    int MemberCount,
+    string? MostComplexMember,
+    SourceLocation? Location);
+
 public sealed record Hotspot(
     int Rank,
     string Component,
@@ -302,7 +328,8 @@ public sealed record Hotspot(
     Volatility Volatility,
     bool CrossesBoundary,
     bool ParticipatesInCycle,
-    IReadOnlyList<string> Reasons);
+    IReadOnlyList<string> Reasons,
+    HotspotComplexity? Complexity = null);
 
 public sealed record TemporalCoupling(
     string FileA,
@@ -359,7 +386,8 @@ public sealed record AnalysisReport(
     IReadOnlyList<SuppressedIssue>? SuppressedIssues = null,
     IReadOnlyList<Hotspot>? Hotspots = null,
     DomainContextSummary? DomainContext = null,
-    IReadOnlyList<ComponentRoleContext>? ComponentRoles = null);
+    IReadOnlyList<ComponentRoleContext>? ComponentRoles = null,
+    IReadOnlyList<ComponentComplexity>? ComponentComplexities = null);
 
 public sealed record BaselineComparison(
     string Ref,

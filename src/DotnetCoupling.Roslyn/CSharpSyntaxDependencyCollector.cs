@@ -8,14 +8,14 @@ namespace DotnetCoupling.Roslyn;
 
 internal static class CSharpSyntaxDependencyCollector
 {
-    internal static SyntaxFileAnalysis AnalyzeFile(string filePath, string? projectName = null)
+    internal static SyntaxFileAnalysis AnalyzeFile(string filePath, string? projectName = null, bool includeComplexity = false)
     {
         SyntaxTree tree = CSharpSyntaxTree.ParseText(File.ReadAllText(filePath), path: filePath);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
-        return AnalyzeRoot(tree, root, filePath, projectName, semanticModel: null);
+        return AnalyzeRoot(tree, root, filePath, projectName, semanticModel: null, includeComplexity);
     }
 
-    internal static SyntaxFileAnalysis AnalyzeDocument(Document document, string? projectName = null)
+    internal static SyntaxFileAnalysis AnalyzeDocument(Document document, string? projectName = null, bool includeComplexity = false)
     {
         SyntaxTree tree = document.GetSyntaxTreeAsync().GetAwaiter().GetResult()
             ?? throw new InvalidOperationException($"Document has no syntax tree: {document.FilePath ?? document.Name}");
@@ -24,7 +24,7 @@ internal static class CSharpSyntaxDependencyCollector
         SemanticModel semanticModel = document.GetSemanticModelAsync().GetAwaiter().GetResult()
             ?? throw new InvalidOperationException($"Document has no semantic model: {document.FilePath ?? document.Name}");
 
-        return AnalyzeRoot(tree, root, document.FilePath ?? tree.FilePath, projectName, semanticModel);
+        return AnalyzeRoot(tree, root, document.FilePath ?? tree.FilePath, projectName, semanticModel, includeComplexity);
     }
 
     private static SyntaxFileAnalysis AnalyzeRoot(
@@ -32,16 +32,21 @@ internal static class CSharpSyntaxDependencyCollector
         CompilationUnitSyntax root,
         string filePath,
         string? projectName,
-        SemanticModel? semanticModel)
+        SemanticModel? semanticModel,
+        bool includeComplexity)
     {
         string namespaceName = FindNamespace(root);
         ComponentWalker walker = new(tree, namespaceName, filePath, projectName, semanticModel);
         walker.Visit(root);
+        IReadOnlyList<MemberComplexity> complexities = includeComplexity
+            ? CSharpComplexityCollector.Collect(tree, root, namespaceName, filePath)
+            : [];
 
         return new SyntaxFileAnalysis(
             walker.Components,
             walker.Observations,
-            CollectUsingNamespaces(tree, root));
+            CollectUsingNamespaces(tree, root),
+            complexities);
     }
 
     private static string FindNamespace(CompilationUnitSyntax root)
@@ -1194,4 +1199,5 @@ internal static class CSharpSyntaxDependencyCollector
 internal sealed record SyntaxFileAnalysis(
     IReadOnlyList<Component> Components,
     IReadOnlyList<DependencyObservation> Observations,
-    IReadOnlyList<UsingNamespace> UsingNamespaces);
+    IReadOnlyList<UsingNamespace> UsingNamespaces,
+    IReadOnlyList<MemberComplexity> Complexities);
