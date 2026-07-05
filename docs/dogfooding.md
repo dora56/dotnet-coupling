@@ -59,6 +59,42 @@ Record the results in `docs/dogfooding/phase4-pr-feedback-dogfooding-2026-07-04.
 Keep the commit SHA, analyzed path, grade, issue counts, SARIF generation
 result, Hotspots Top 5, and suppression smoke outcome for each target.
 
+## Phase 5 Complexity Hotspots Dogfood
+
+Before the `0.5.0` release candidate, compare pre-change and current
+`--hotspots` output on self, non-DDD OSS, and DDD/sample targets.
+
+Required target profile:
+
+- self: `dotnet-coupling` with `.coupling.toml`
+- non-DDD OSS: Humanizer and FluentValidation
+- DDD/sample: eShopOnWeb and IDDD Samples
+- fallback: CleanArchitecture when an SDK or restore issue blocks one target
+
+Use `/private/tmp/dotnet-coupling-phase5-complexity-dogfood` for local clones,
+tool installs, and generated artifacts. Reuse the Phase 5 prototype configs
+from `/private/tmp/dotnet-coupling-role-prototypes/configs` when available.
+
+Commands:
+
+```bash
+dotnet-coupling --json --hotspots 10 --config .coupling.toml --mode syntax .
+dotnet-coupling --json --hotspots 10 --config .coupling.toml --mode semantic dotnet-coupling.slnx
+dotnet-coupling --json --hotspots 10 --no-git --config /path/to/prototype.toml /path/to/repo
+```
+
+Record for each target:
+
+- repository URL and commit SHA
+- command, mode, analyzed path, and config path
+- grade and issue counts before/after complexity-assisted hotspots
+- Hotspots Top 10 before/after, priority score changes, and complexity reasons
+- whether rank changes are explainable by high coupling, volatility, and complexity
+- workspace diagnostics for semantic mode instead of treating SDK warnings as tool failures
+
+Record the results in
+`docs/dogfooding/phase5-complexity-hotspots-dogfooding-2026-07-05.md`.
+
 ## External Sample Dogfood
 
 Run against 2-3 small C# repositories before publishing a new alpha or stable

@@ -10,8 +10,8 @@ Semantic Versioning を採用する。
 | `0.2.0-alpha.1` | public alpha feedback / config / baseline |
 | `0.3.0` | project model / semantic mode foundation |
 | `0.4.0` | SARIF / team CI integration / hotspots |
-| `0.5.0` | TOML config / domain context / impact / trace / AI output |
-| `0.6.0` | complexity-assisted risk prioritization |
+| `0.5.0` | TOML config / Domain Context Config / complexity-assisted hotspots |
+| `0.6.0` | investigation UX (`--impact` / `--trace` / Markdown report) |
 | `1.0.0` | CLI と JSON schema を安定化 |
 
 `1.0.0` までは JSON schema の破壊的変更を許容する。ただし変更履歴に明記する。
@@ -300,9 +300,10 @@ Architecture drivers:
 - [x] self + OSS 3 repos で SARIF / Hotspots / Suppression を dogfood
 - [x] GitHub Code Scanning 表示と PR CI green を確認して `0.4.0` RC へ進む
 
-### Phase 5: Advanced UX
+### Phase 5: Config-informed prioritization
 
-Goal: GitHub / SARIF / Markdown / CLI 上で、調査・修正計画に使える体験へ広げる。
+Goal: 手書きしやすい config、Domain Context、complexity-assisted hotspots を組み合わせ、
+`--hotspots` を「設計リスクの一覧」から「修正優先順位の説明」へ引き上げる。
 
 Non-goals:
 
@@ -310,6 +311,8 @@ Non-goals:
 - 常時稼働する server や frontend は持たない。
 - PR feedback / Code Scanning / Markdown report で足りる間は、CLI と machine-readable output を優先する。
 - サブドメイン分類を tool が自動推論しない。分類はユーザー設定から読み込む。
+- `--impact` / `--trace` / `--ai` / Markdown report / 日本語出力は `0.5.0`
+  の release scope から外し、Phase 6 以降で扱う。
 
 - [x] Tomlyn による `.coupling.toml` / `coupling.toml` config support を追加する
 - [x] Domain Context Config: user-supplied subdomain category / expected volatility を読み込む
@@ -319,11 +322,21 @@ Non-goals:
 - [x] self / OSS evaluation で Domain Context calibration の妥当性と過補正リスクを記録する
 - [x] value object / identifier / DTO / published language / module startup 向けの config authoring guidance を追加する
 - [x] partial Domain Context / Role Context coverage を summary と JSON run notes で可視化する
-- [ ] `--impact`
-- [ ] `--trace`
-- [ ] `--ai`
-- [ ] Markdown report
-- [ ] 日本語出力
+- [x] syntax mode で method / type 単位の cyclomatic complexity を計算する
+- [x] cognitive complexity の保守的なルールセットを実装する
+- [x] `--hotspots` の ranking 補助として complexity を使う
+- [x] priority reasons に high coupling / high volatility / high complexity を表示する
+- [x] JSON schema `0.4` に optional `hotspots[].complexity` を追加する
+- [x] complexity が高いだけでは Grade / issue severity / `--check` を変えない regression test を追加する
+- [x] self / OSS / DDD sample dogfooding で Grade・issue count が不変であることを記録する
+
+`0.5.0` release scope:
+
+- TOML config support
+- Domain Context Config and role-based score calibration
+- Complexity-assisted `--hotspots`
+- schema `0.4` optional hotspot complexity
+- Domain Context / complexity dogfooding evidence
 
 #### Future / Optional: Visualization
 
@@ -337,29 +350,44 @@ Web UI は、Phase 5 の既定タスクではなく、必要性が見えた場�
 - `--impact` / `--trace` / complexity-assisted prioritization が増え、CLI 出力だけでは比較しづらい
 - 履歴推移、解消状況、ownership などを可視化する明確な需要がある
 
-### Phase 6: Complexity-assisted prioritization
+### Phase 6: Investigation UX and prioritization tuning
 
-Goal: coupling issue の「良し悪し」ではなく、**どれから直すべきか** の優先順位を
-補助する。
+Goal: Phase 5 で整えた config-informed priority model を、調査・修正計画に使える
+CLI / report 体験へ広げる。
+
+#### Phase 6a: Complexity follow-up
 
 Principles:
 
-- [ ] `cyclomaticComplexity` / `cognitiveComplexity` は Balance Score / Grade の主計算に入れない
-- [ ] issue severity を直接上げる材料にしない
-- [ ] `--hotspots` / `--impact` / `--ai` の ranking 補助として使う
-- [ ] 高結合 + 高変更頻度 + 高複雑度の交点を優先する
-- [ ] JSON schema には optional field として追加し、後方互換を保つ
+- [x] `cyclomaticComplexity` / `cognitiveComplexity` は Balance Score / Grade の主計算に入れない
+- [x] issue severity を直接上げる材料にしない
+- [x] `--hotspots` の ranking 補助として使う
+- [x] 高結合 + 高変更頻度 + 高複雑度の交点を優先する
+- [x] JSON schema には optional field として追加し、後方互換を保つ
+- [ ] `--impact` / `--ai` の ranking 補助として使う
 
 Implementation:
 
-- [ ] syntax mode で method / type 単位の cyclomatic complexity を計算
+- [x] syntax mode で method / type 単位の cyclomatic complexity を計算
 - [ ] semantic mode で symbol と complexity metric を安定して紐づける
-- [ ] cognitive complexity のルールセットを明文化
-- [ ] `priorityScore` / `riskPriority` を issue とは別概念として追加
-- [ ] priority reasons を出力: high coupling, high volatility, high complexity など
+- [x] cognitive complexity のルールセットを明文化
+- [x] `priorityScore` / `riskPriority` を issue とは別概念として追加
+- [x] priority reasons を出力: high coupling, high volatility, high complexity など
 - [ ] threshold / weight を config で調整可能にする
-- [ ] complexity metric の fixture / golden / property tests を追加
-- [ ] complexity が高いだけでは fail しないことを CLI contract に明記
+- [x] complexity metric の unit / schema / CLI contract tests を追加
+- [x] complexity が高いだけでは fail しないことを CLI contract に明記
+
+Phase 5 / `0.5.0` では `--hotspots` に限定して fixed threshold で導入する。
+Phase 6 では semantic symbol identity、threshold / weight config、`--impact` /
+`--ai` への priority model 展開を扱う。
+
+#### Phase 6b: Investigation commands
+
+- [ ] `--impact`
+- [ ] `--trace`
+- [ ] Markdown report
+- [ ] 日本語出力
+- [ ] `--ai`
 
 ### Phase 7 Candidate: Default Auto Mode
 
