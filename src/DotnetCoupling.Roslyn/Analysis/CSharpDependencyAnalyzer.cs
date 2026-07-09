@@ -1,6 +1,9 @@
 using DotnetCoupling.Core;
+using DotnetCoupling.Roslyn.Collection;
+using DotnetCoupling.Roslyn.Discovery;
+using DotnetCoupling.Roslyn.Workspace;
 
-namespace DotnetCoupling.Roslyn;
+namespace DotnetCoupling.Roslyn.Analysis;
 
 public sealed class CSharpDependencyAnalyzer
 {

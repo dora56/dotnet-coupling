@@ -1,6 +1,6 @@
 using DotnetCoupling.Core;
 
-namespace DotnetCoupling.Roslyn;
+namespace DotnetCoupling.Roslyn.Discovery;
 
 internal static class FileDiscovery
 {

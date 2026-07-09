@@ -5,13 +5,16 @@ namespace DotnetCoupling.Tests;
 
 public sealed class StructuralFitnessTests
 {
-    [Fact]
-    public void CoreProject_ProductionSourcesLiveInResponsibilityFolders()
+    [Theory]
+    [InlineData("DotnetCoupling.Core")]
+    [InlineData("DotnetCoupling.Git")]
+    [InlineData("DotnetCoupling.Roslyn")]
+    public void FeatureProject_ProductionSourcesLiveInResponsibilityFolders(string projectName)
     {
-        string coreProjectDirectory = Path.Combine(TestPaths.RepositoryRoot, "src", "DotnetCoupling.Core");
+        string projectDirectory = Path.Combine(TestPaths.RepositoryRoot, "src", projectName);
 
         string[] rootSourceFiles = Directory
-            .EnumerateFiles(coreProjectDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+            .EnumerateFiles(projectDirectory, "*.cs", SearchOption.TopDirectoryOnly)
             .Select(path => Path.GetFileName(path) ?? path)
             .ToArray();
 

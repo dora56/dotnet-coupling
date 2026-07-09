@@ -1,8 +1,9 @@
 using System.Xml;
 using System.Xml.Linq;
 using DotnetCoupling.Core;
+using DotnetCoupling.Roslyn.Discovery;
 
-namespace DotnetCoupling.Roslyn;
+namespace DotnetCoupling.Roslyn.Workspace;
 
 internal sealed record ProjectModel(
     IReadOnlyList<ProjectModelProject> Projects,

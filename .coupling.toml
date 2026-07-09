@@ -47,15 +47,39 @@ paths = ["src/DotnetCoupling.Core/Reporting/**"]
 expected_volatility = "medium"
 
 [[domain.subdomains]]
-name = "Roslyn"
+name = "RoslynAnalysis"
 category = "supporting"
-paths = ["src/DotnetCoupling.Roslyn/**"]
+paths = ["src/DotnetCoupling.Roslyn/Analysis/**"]
 expected_volatility = "medium"
 
 [[domain.subdomains]]
-name = "Git"
+name = "RoslynCollection"
 category = "supporting"
-paths = ["src/DotnetCoupling.Git/**"]
+paths = ["src/DotnetCoupling.Roslyn/Collection/**"]
+expected_volatility = "medium"
+
+[[domain.subdomains]]
+name = "RoslynDiscovery"
+category = "supporting"
+paths = ["src/DotnetCoupling.Roslyn/Discovery/**"]
+expected_volatility = "low"
+
+[[domain.subdomains]]
+name = "RoslynWorkspace"
+category = "supporting"
+paths = ["src/DotnetCoupling.Roslyn/Workspace/**"]
+expected_volatility = "medium"
+
+[[domain.subdomains]]
+name = "GitBaseline"
+category = "supporting"
+paths = ["src/DotnetCoupling.Git/Baseline/**"]
+expected_volatility = "low"
+
+[[domain.subdomains]]
+name = "GitVolatility"
+category = "supporting"
+paths = ["src/DotnetCoupling.Git/Volatility/**"]
 expected_volatility = "low"
 
 [[domain.subdomains]]
@@ -91,13 +115,33 @@ paths = ["src/DotnetCoupling.Core/Reporting/**"]
 technical_role = "adapter"
 
 [[domain.areas]]
-name = "RoslynAdapter"
-paths = ["src/DotnetCoupling.Roslyn/**"]
+name = "RoslynAnalysis"
+paths = ["src/DotnetCoupling.Roslyn/Analysis/**"]
+technical_role = "application_service"
+
+[[domain.areas]]
+name = "RoslynCollectionAdapter"
+paths = ["src/DotnetCoupling.Roslyn/Collection/**"]
 technical_role = "adapter"
 
 [[domain.areas]]
-name = "GitAdapter"
-paths = ["src/DotnetCoupling.Git/**"]
+name = "RoslynDiscoveryAdapter"
+paths = ["src/DotnetCoupling.Roslyn/Discovery/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "RoslynWorkspaceAdapter"
+paths = ["src/DotnetCoupling.Roslyn/Workspace/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "GitBaselineAdapter"
+paths = ["src/DotnetCoupling.Git/Baseline/**"]
+technical_role = "adapter"
+
+[[domain.areas]]
+name = "GitVolatilityAdapter"
+paths = ["src/DotnetCoupling.Git/Volatility/**"]
 technical_role = "adapter"
 
 [[domain.areas]]

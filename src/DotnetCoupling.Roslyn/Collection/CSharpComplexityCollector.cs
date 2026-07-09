@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace DotnetCoupling.Roslyn;
+namespace DotnetCoupling.Roslyn.Collection;
 
 internal static class CSharpComplexityCollector
 {

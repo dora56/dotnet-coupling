@@ -34,17 +34,28 @@ dotnet-coupling/
     DotnetCoupling.Cli/
       Program.cs
     DotnetCoupling.Core/
-      Model/
-      Scoring/
+      Contracts/
+      Configuration/
+      Domain/
       Reporting/
-      Config/
     DotnetCoupling.Roslyn/
-      SyntaxAnalyzer.cs
-      SemanticAnalyzer.cs
-      WorkspaceLoader.cs
+      Analysis/
+        CSharpDependencyAnalyzer.cs
+      Collection/
+        CSharpSyntaxDependencyCollector.cs
+        CSharpComplexityCollector.cs
+      Discovery/
+        FileDiscovery.cs
+      Workspace/
+        ProjectModel.cs
+        SemanticWorkspaceLoader.cs
     DotnetCoupling.Git/
-      GitVolatilityAnalyzer.cs
-      BaselineAnalyzer.cs
+      Baseline/
+        BaselineComparer.cs
+        BaselineWorkspace.cs
+      Volatility/
+        GitVolatility.cs
+        GitVolatilityProvider.cs
     DotnetCoupling.Sarif/
       SarifRenderer.cs
   tests/
@@ -55,7 +66,10 @@ dotnet-coupling/
 
 Phase 3 では、semantic mode の土台として物理 project を分割する。`Cli` は
 orchestration に集中し、`Core` は公開 data contract / scoring / reporting、
-`Roslyn` は syntax / semantic 解析、`Git` は volatility / baseline を担当する。
+`Roslyn` は analysis orchestration / syntax collection / workspace loading、
+`Git` は volatility / baseline を担当する。純粋ロジックであっても、Git
+log や Roslyn workspace という所有文脈に閉じているものは各 project 内の
+責務別 namespace に置き、`Core` へ過剰に吸い上げない。
 
 ### 7.3 Phase 1 内部モジュール境界
 

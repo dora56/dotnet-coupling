@@ -1,9 +1,10 @@
 using DotnetCoupling.Core;
+using DotnetCoupling.Roslyn.Discovery;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 
-namespace DotnetCoupling.Roslyn;
+namespace DotnetCoupling.Roslyn.Workspace;
 
 internal static class SemanticWorkspaceLoader
 {

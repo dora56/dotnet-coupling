@@ -1,6 +1,8 @@
 using DotnetCoupling.Core;
-using DotnetCoupling.Git;
-using DotnetCoupling.Roslyn;
+using DotnetCoupling.Git.Baseline;
+using DotnetCoupling.Git.Volatility;
+using DotnetCoupling.Roslyn.Analysis;
+using DotnetCoupling.Roslyn.Workspace;
 using System.CommandLine;
 
 namespace DotnetCoupling.Cli;

@@ -1,5 +1,5 @@
 using DotnetCoupling.Core;
-using DotnetCoupling.Roslyn;
+using DotnetCoupling.Roslyn.Collection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

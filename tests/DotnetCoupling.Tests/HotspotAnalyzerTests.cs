@@ -1,5 +1,5 @@
 using DotnetCoupling.Core;
-using DotnetCoupling.Roslyn;
+using DotnetCoupling.Roslyn.Analysis;
 using Xunit;
 
 namespace DotnetCoupling.Tests;
