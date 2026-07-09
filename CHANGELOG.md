@@ -2,6 +2,46 @@
 
 All notable changes to `dotnet-coupling` are collected here.
 
+## 0.5.0
+
+Phase 5 adds config-informed prioritization so coupling findings can reflect
+the system's domain context and the complexity of the code that must be changed.
+
+### Added
+
+- TOML configuration through explicit `--config` files and automatic discovery
+  of `.coupling.toml` / `coupling.toml`, implemented with Tomlyn.
+- Domain Context configuration for subdomain category, expected volatility,
+  strategic boundary hints, and technical area roles.
+- `AccidentalVolatility` detection to distinguish expected business change from
+  churn caused by design or implementation friction.
+- Role-aware score calibration for contracts and composition roots while
+  preserving observed coupling evidence.
+- Domain Context and Role Context coverage in summary and JSON output so partial
+  configuration remains visible.
+- Syntax-based cyclomatic and cognitive complexity metrics for methods and types.
+- Complexity-assisted `--hotspots` ranking with explicit priority reasons.
+- JSON report schema `0.4` with optional `hotspots[].complexity` data.
+- Self, OSS, and DDD sample dogfooding evidence for Domain Context calibration
+  and complexity-assisted ranking.
+
+### Changed
+
+- Configuration loading now normalizes JSON and TOML into the same validated
+  internal model, including unknown-property and invalid-value diagnostics.
+- Hotspot priority can be increased by high complexity, but complexity does not
+  change Grade, issue severity, issue count, `--fail-on`, or `--check` behavior.
+- Core, Git, and Roslyn sources are organized by responsibility, with compiled
+  architecture and structural fitness tests protecting module boundaries.
+
+### Compatibility Notes
+
+- `syntax` mode remains the default; `semantic` mode remains explicit preview
+  functionality.
+- Existing JSON configuration and report schemas `0.1` through `0.3` remain
+  supported. Schema `0.4` is selected only for complexity-bearing hotspot JSON.
+- Existing CLI option names, exit codes, and NuGet package identity are unchanged.
+
 ## 0.4.0
 
 Phase 4 moves `dotnet-coupling` into PR feedback and team workflow use.
