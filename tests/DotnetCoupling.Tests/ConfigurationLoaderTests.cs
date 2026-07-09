@@ -1,6 +1,4 @@
 using DotnetCoupling.Core;
-using DotnetCoupling.Git;
-using DotnetCoupling.Roslyn;
 using System.Text.Json;
 using Xunit;
 
@@ -706,20 +704,22 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "CoreRules");
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "CoreContracts");
-        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "CoreUtilities");
         Assert.Contains(
             result.Options.DomainContext.Subdomains,
             subdomain => subdomain.Name == "CoreContracts"
-                && subdomain.PathPatterns.Contains("src/DotnetCoupling.Core/UsingNamespace.cs"));
-        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Roslyn");
+                && subdomain.PathPatterns.Contains("src/DotnetCoupling.Core/Contracts/**"));
+        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "RoslynAnalysis");
+        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "RoslynCollection");
+        Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "GitVolatility");
         Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CliCompositionRoot" && area.TechnicalRole == TechnicalRole.CompositionRoot);
         Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CoreContracts" && area.TechnicalRole == TechnicalRole.Contract);
         Assert.Contains(
             result.Options.DomainContext.Areas,
             area => area.Name == "CoreContracts"
                 && area.TechnicalRole == TechnicalRole.Contract
-                && area.PathPatterns.Contains("src/DotnetCoupling.Core/UsingNamespace.cs"));
-        Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CoreUtilities" && area.TechnicalRole == TechnicalRole.Contract);
+                && area.PathPatterns.Contains("src/DotnetCoupling.Core/Contracts/**"));
+        Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "CoreConfig" && area.TechnicalRole == TechnicalRole.ApplicationService);
+        Assert.Contains(result.Options.DomainContext.Areas, area => area.Name == "RoslynWorkspaceAdapter" && area.TechnicalRole == TechnicalRole.Adapter);
     }
 
     [Fact]

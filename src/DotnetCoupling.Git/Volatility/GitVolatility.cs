@@ -1,7 +1,7 @@
 using DotnetCoupling.Core;
 using System.Diagnostics;
 
-namespace DotnetCoupling.Git;
+namespace DotnetCoupling.Git.Volatility;
 
 public static class GitVolatility
 {

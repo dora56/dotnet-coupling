@@ -1,6 +1,9 @@
 using DotnetCoupling.Core;
+using DotnetCoupling.Roslyn.Collection;
+using DotnetCoupling.Roslyn.Discovery;
+using DotnetCoupling.Roslyn.Workspace;
 
-namespace DotnetCoupling.Roslyn;
+namespace DotnetCoupling.Roslyn.Analysis;
 
 public sealed class CSharpDependencyAnalyzer
 {
@@ -31,6 +34,17 @@ public sealed class CSharpDependencyAnalyzer
         int gitMonths,
         AnalysisOptions? options = null)
     {
+        return Analyze(targetPath, mode, volatilityProvider, gitMonths, options, includeComplexity: false);
+    }
+
+    public static AnalysisReport Analyze(
+        string targetPath,
+        AnalysisMode mode,
+        IVolatilityProvider? volatilityProvider,
+        int gitMonths,
+        AnalysisOptions? options,
+        bool includeComplexity)
+    {
         options ??= AnalysisOptions.Default;
         string fullPath = Path.GetFullPath(targetPath);
         IReadOnlyList<ProjectFile> projectFiles;
@@ -39,6 +53,7 @@ public sealed class CSharpDependencyAnalyzer
         ProjectMetadata? projectMetadata = null;
         List<Component> components = [];
         List<DependencyObservation> observations = [];
+        List<MemberComplexity> memberComplexities = [];
         Dictionary<string, List<UsingNamespace>> usingNamespacesByFile = new(StringComparer.Ordinal);
 
         if (mode == AnalysisMode.Semantic)
@@ -61,10 +76,11 @@ public sealed class CSharpDependencyAnalyzer
                              && document.FilePath is not null
                              && projectSourceFiles.Contains(document.FilePath)))
                 {
-                    SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeDocument(document, project.ProjectName);
+                    SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeDocument(document, project.ProjectName, includeComplexity);
                     usingNamespacesByFile[document.FilePath!] = syntaxFile.UsingNamespaces.ToList();
                     components.AddRange(syntaxFile.Components);
                     observations.AddRange(syntaxFile.Observations);
+                    memberComplexities.AddRange(syntaxFile.Complexities);
                 }
             }
         }
@@ -95,15 +111,19 @@ public sealed class CSharpDependencyAnalyzer
 
             foreach (ProjectFile projectFile in projectFiles)
             {
-                SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeFile(projectFile.FilePath, projectFile.ProjectName);
+                SyntaxFileAnalysis syntaxFile = CSharpSyntaxDependencyCollector.AnalyzeFile(projectFile.FilePath, projectFile.ProjectName, includeComplexity);
                 usingNamespacesByFile[projectFile.FilePath] = syntaxFile.UsingNamespaces.ToList();
                 components.AddRange(syntaxFile.Components);
                 observations.AddRange(syntaxFile.Observations);
+                memberComplexities.AddRange(syntaxFile.Complexities);
             }
         }
 
         components = CoalesceComponents(components);
         Dictionary<string, Component> componentsById = components.ToDictionary(component => component.Id, StringComparer.Ordinal);
+        IReadOnlyList<ComponentComplexity>? componentComplexities = includeComplexity
+            ? CreateComponentComplexities(memberComplexities, componentsById)
+            : null;
         HashSet<string> internalNamespaces = components
             .Select(component => component.Namespace)
             .Where(namespaceName => !string.IsNullOrWhiteSpace(namespaceName))
@@ -150,7 +170,8 @@ public sealed class CSharpDependencyAnalyzer
             ProjectMetadata: projectMetadata,
             SuppressedIssues: issueDetection.SuppressedIssues.Count == 0 ? null : issueDetection.SuppressedIssues,
             DomainContext: issueDetection.DomainContext,
-            ComponentRoles: issueDetection.ComponentRoles);
+            ComponentRoles: issueDetection.ComponentRoles,
+            ComponentComplexities: componentComplexities);
     }
 
     private sealed record ProjectFile(string FilePath, string? ProjectName);
@@ -161,6 +182,35 @@ public sealed class CSharpDependencyAnalyzer
             .GroupBy(component => component.Id, StringComparer.Ordinal)
             .Select(group => group.First())
             .ToList();
+    }
+
+    private static ComponentComplexity[] CreateComponentComplexities(
+        IEnumerable<MemberComplexity> memberComplexities,
+        Dictionary<string, Component> componentsById)
+    {
+        return memberComplexities
+            .Where(member => componentsById.ContainsKey(member.ComponentId))
+            .GroupBy(member => member.ComponentId, StringComparer.Ordinal)
+            .Select(group =>
+            {
+                Component component = componentsById[group.Key];
+                MemberComplexity? mostComplexMember = group
+                    .OrderByDescending(member => member.CognitiveComplexity)
+                    .ThenByDescending(member => member.CyclomaticComplexity)
+                    .ThenBy(member => member.MemberName, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                return new ComponentComplexity(
+                    group.Key,
+                    component.FilePath,
+                    group.Count(),
+                    group.Max(member => member.CyclomaticComplexity),
+                    group.Max(member => member.CognitiveComplexity),
+                    group.Sum(member => member.CyclomaticComplexity),
+                    group.Sum(member => member.CognitiveComplexity),
+                    mostComplexMember);
+            })
+            .OrderBy(complexity => complexity.ComponentId, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static IReadOnlyList<string> CreateBlindSpots(AnalysisMode mode)

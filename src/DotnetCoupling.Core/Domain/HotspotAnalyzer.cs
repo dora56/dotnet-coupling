@@ -3,6 +3,12 @@ namespace DotnetCoupling.Core;
 public static class HotspotAnalyzer
 {
     public const int DefaultCount = 10;
+    public const int CyclomaticWarningThreshold = 10;
+    public const int CognitiveWarningThreshold = 15;
+
+    private const double MaxComplexityBonus = 0.10;
+    private const double CyclomaticBonusRange = 20.0;
+    private const double CognitiveBonusRange = 30.0;
 
     public static IReadOnlyList<Hotspot> Calculate(AnalysisReport report)
     {
@@ -47,6 +53,7 @@ public static class HotspotAnalyzer
         Dictionary<string, ComponentRoleContext> roleContexts = (report.ComponentRoles ?? [])
             .GroupBy(context => context.ComponentId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        Dictionary<string, ComponentComplexity> complexities = CreateComplexityLookup(report.ComponentComplexities ?? []);
 
         return issuesByComponent
             .Select(pair =>
@@ -58,13 +65,16 @@ public static class HotspotAnalyzer
                 Volatility componentVolatility = volatility.GetValueOrDefault(component, Volatility.Low);
                 bool crossesBoundary = boundaryCrossingComponents.Contains(component);
                 bool participatesInCycle = cycleComponents.Contains(component);
+                ComponentComplexity? componentComplexity = complexities.GetValueOrDefault(component);
+                HotspotComplexity? hotspotComplexity = ToHotspotComplexity(componentComplexity);
                 double score = CalculatePriorityScore(
                     issues,
                     componentFanIn,
                     componentFanOut,
                     componentVolatility,
                     crossesBoundary,
-                    participatesInCycle);
+                    participatesInCycle,
+                    componentComplexity);
 
                 return new Hotspot(
                     Rank: 0,
@@ -83,7 +93,9 @@ public static class HotspotAnalyzer
                         componentVolatility,
                         crossesBoundary,
                         participatesInCycle,
-                        roleContexts.GetValueOrDefault(component)));
+                        roleContexts.GetValueOrDefault(component),
+                        componentComplexity),
+                    Complexity: hotspotComplexity);
             })
             .OrderByDescending(hotspot => hotspot.Score)
             .ThenByDescending(hotspot => hotspot.IssueCount)
@@ -135,7 +147,8 @@ public static class HotspotAnalyzer
         int fanOut,
         Volatility volatility,
         bool crossesBoundary,
-        bool participatesInCycle)
+        bool participatesInCycle,
+        ComponentComplexity? complexity)
     {
         double severity = issues.Count == 0 ? 0.0 : issues.Max(issue => SeverityRank(issue.Severity)) / 3.0;
         double issueDensity = Math.Min(1.0, issues.Count / 5.0);
@@ -144,6 +157,7 @@ public static class HotspotAnalyzer
         double volatilityScore = VolatilityRank(volatility) / 2.0;
         double boundary = crossesBoundary ? 0.10 : 0.0;
         double cycle = participatesInCycle ? 0.15 : 0.0;
+        double complexityBonus = CalculateComplexityPriority(complexity) * MaxComplexityBonus;
 
         return Math.Clamp(
             severity * 0.35
@@ -152,7 +166,8 @@ public static class HotspotAnalyzer
             + fan * 0.10
             + volatilityScore * 0.05
             + boundary
-            + cycle,
+            + cycle
+            + complexityBonus,
             0.0,
             1.0);
     }
@@ -164,7 +179,8 @@ public static class HotspotAnalyzer
         Volatility volatility,
         bool crossesBoundary,
         bool participatesInCycle,
-        ComponentRoleContext? roleContext)
+        ComponentRoleContext? roleContext,
+        ComponentComplexity? complexity)
     {
         List<string> reasons = [];
         Severity maxSeverity = issues.Count == 0 ? Severity.Low : issues.Max(issue => issue.Severity);
@@ -194,6 +210,19 @@ public static class HotspotAnalyzer
             reasons.Add("participates in a cycle");
         }
 
+        if (complexity is not null)
+        {
+            if (complexity.MaxCyclomaticComplexity >= CyclomaticWarningThreshold)
+            {
+                reasons.Add($"high cyclomatic complexity: {complexity.MaxCyclomaticComplexity}");
+            }
+
+            if (complexity.MaxCognitiveComplexity >= CognitiveWarningThreshold)
+            {
+                reasons.Add($"high cognitive complexity: {complexity.MaxCognitiveComplexity}");
+            }
+        }
+
         if (roleContext?.TechnicalRole is TechnicalRole technicalRole)
         {
             reasons.Add($"technical role: {ToSnakeCase(technicalRole.ToString())}");
@@ -205,6 +234,80 @@ public static class HotspotAnalyzer
         }
 
         return reasons;
+    }
+
+    private static double CalculateComplexityPriority(ComponentComplexity? complexity)
+    {
+        if (complexity is null)
+        {
+            return 0.0;
+        }
+
+        double cyclomaticPressure = Math.Clamp(
+            (complexity.MaxCyclomaticComplexity - CyclomaticWarningThreshold + 1) / CyclomaticBonusRange,
+            0.0,
+            1.0);
+        double cognitivePressure = Math.Clamp(
+            (complexity.MaxCognitiveComplexity - CognitiveWarningThreshold + 1) / CognitiveBonusRange,
+            0.0,
+            1.0);
+        return Math.Max(cyclomaticPressure, cognitivePressure);
+    }
+
+    private static HotspotComplexity? ToHotspotComplexity(ComponentComplexity? complexity)
+    {
+        if (complexity is null)
+        {
+            return null;
+        }
+
+        return new HotspotComplexity(
+            complexity.MaxCyclomaticComplexity,
+            complexity.MaxCognitiveComplexity,
+            complexity.TotalCyclomaticComplexity,
+            complexity.TotalCognitiveComplexity,
+            complexity.MemberCount,
+            complexity.MostComplexMember?.MemberName,
+            complexity.MostComplexMember?.Location);
+    }
+
+    private static Dictionary<string, ComponentComplexity> CreateComplexityLookup(IReadOnlyList<ComponentComplexity> complexities)
+    {
+        Dictionary<string, ComponentComplexity> lookup = complexities
+            .GroupBy(complexity => complexity.ComponentId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        foreach (IGrouping<string, ComponentComplexity> fileGroup in complexities.GroupBy(complexity => complexity.FilePath, StringComparer.Ordinal))
+        {
+            if (!lookup.ContainsKey(fileGroup.Key))
+            {
+                lookup[fileGroup.Key] = MergeFileComplexities(fileGroup.Key, fileGroup);
+            }
+        }
+
+        return lookup;
+    }
+
+    private static ComponentComplexity MergeFileComplexities(string filePath, IEnumerable<ComponentComplexity> complexities)
+    {
+        ComponentComplexity[] fileComplexities = complexities.ToArray();
+        MemberComplexity? mostComplexMember = fileComplexities
+            .Select(complexity => complexity.MostComplexMember)
+            .OfType<MemberComplexity>()
+            .OrderByDescending(member => member.CognitiveComplexity)
+            .ThenByDescending(member => member.CyclomaticComplexity)
+            .ThenBy(member => member.MemberName, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        return new ComponentComplexity(
+            filePath,
+            filePath,
+            fileComplexities.Sum(complexity => complexity.MemberCount),
+            fileComplexities.Length == 0 ? 0 : fileComplexities.Max(complexity => complexity.MaxCyclomaticComplexity),
+            fileComplexities.Length == 0 ? 0 : fileComplexities.Max(complexity => complexity.MaxCognitiveComplexity),
+            fileComplexities.Sum(complexity => complexity.TotalCyclomaticComplexity),
+            fileComplexities.Sum(complexity => complexity.TotalCognitiveComplexity),
+            mostComplexMember);
     }
 
     private static string[] SplitCycleComponents(string value)

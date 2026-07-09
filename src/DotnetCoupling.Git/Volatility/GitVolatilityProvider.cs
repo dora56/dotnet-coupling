@@ -1,6 +1,6 @@
 using DotnetCoupling.Core;
 
-namespace DotnetCoupling.Git;
+namespace DotnetCoupling.Git.Volatility;
 
 public sealed class GitVolatilityProvider : IVolatilityProvider
 {

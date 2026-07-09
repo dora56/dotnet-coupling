@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 
-namespace DotnetCoupling.Git;
+namespace DotnetCoupling.Git.Baseline;
 
 public sealed class BaselineWorkspace : IDisposable
 {

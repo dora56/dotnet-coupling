@@ -5,6 +5,40 @@ namespace DotnetCoupling.Tests;
 
 public sealed class StructuralFitnessTests
 {
+    [Theory]
+    [InlineData("DotnetCoupling.Core")]
+    [InlineData("DotnetCoupling.Git")]
+    [InlineData("DotnetCoupling.Roslyn")]
+    public void FeatureProject_ProductionSourcesLiveInResponsibilityFolders(string projectName)
+    {
+        string projectDirectory = Path.Combine(TestPaths.RepositoryRoot, "src", projectName);
+
+        string[] rootSourceFiles = Directory
+            .EnumerateFiles(projectDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+            .Select(path => Path.GetFileName(path) ?? path)
+            .ToArray();
+
+        Assert.Empty(rootSourceFiles);
+    }
+
+    [Fact]
+    public void CoreContracts_UseOnePublicContractPerFile()
+    {
+        string contractsDirectory = Path.Combine(TestPaths.RepositoryRoot, "src", "DotnetCoupling.Core", "Contracts");
+
+        foreach (string filePath in Directory.EnumerateFiles(contractsDirectory, "*.cs", SearchOption.TopDirectoryOnly))
+        {
+            int publicContractCount = File
+                .ReadLines(filePath)
+                .Count(line =>
+                    line.StartsWith("public sealed record ", StringComparison.Ordinal)
+                    || line.StartsWith("public enum ", StringComparison.Ordinal)
+                    || line.StartsWith("public interface ", StringComparison.Ordinal));
+
+            Assert.InRange(publicContractCount, 0, 1);
+        }
+    }
+
     [Fact]
     public void CliProject_DependsOnFeatureProjectsInsteadOfRoslynPackage()
     {

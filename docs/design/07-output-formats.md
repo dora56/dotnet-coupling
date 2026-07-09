@@ -158,6 +158,10 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
 - `hotspots`: `--json --hotspots` の Top N ranking
 - `suppressedIssues`: `.coupling.json` の `ignore.issues` で除外された issue
 
+`schemaVersion: 0.4` は `0.5.0` の拡張 schema である。`--json --hotspots` で
+hotspot に `complexity` が含まれる場合だけ使う。complexity は remediation priority
+の補助情報であり、Grade、issue severity、`--check` の判定には使わない。
+
 suppressed issue は active issue counts、grade、`--check` の判定から除外する。
 ただし JSON と summary には件数と対象を残し、負債が隠れないようにする。
 
@@ -170,6 +174,7 @@ schemas/
   dotnet-coupling-report-0.1.schema.json
   dotnet-coupling-report-0.2.schema.json
   dotnet-coupling-report-0.3.schema.json
+  dotnet-coupling-report-0.4.schema.json
   dotnet-coupling-report.schema.json -> latest experimental
 ```
 
@@ -214,16 +219,20 @@ SARIF upload 対象には出さず、summary / JSON 側で可視化する。
 
 `--hotspots [N]` は coupling issue の修正候補をランキングする。これは
 remediation priority であり、project health gate は §16 の issue density Grade
-に残す。Phase 4 では complexity 指標を使わず、以下を入力にする。
+に残す。`0.5.0` では以下を入力にする。
 
 - active issue count / severity / balance score
 - fan-in / fan-out
 - volatility
 - namespace / project boundary crossing
 - circular dependency participation
+- syntax-based cyclomatic complexity / cognitive complexity
 
-Phase 6 で `cyclomaticComplexity` / `cognitiveComplexity` を `--hotspots` の ranking
-入力として追加できるように、health grade とは別の priority score として扱う。
+Complexity は `--hotspots` が最終出力に効くときだけ計算する。`--json --hotspots`
+では `hotspots[].complexity` を出し、text hotspots では complexity summary と
+reason を表示する。固定 threshold は cyclomatic `>= 10`、cognitive `>= 15` で、
+priority score への加点は最大 `+0.10` に抑える。complexity が高いだけでは hotspot
+を作らず、active issue のある component だけを ranking 対象にする。
 
 ### 19.7 出力モード優先順位
 

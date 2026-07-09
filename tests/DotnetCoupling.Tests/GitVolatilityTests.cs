@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using DotnetCoupling.Core;
-using DotnetCoupling.Git;
-using DotnetCoupling.Roslyn;
+using DotnetCoupling.Git.Volatility;
 using Xunit;
 
 namespace DotnetCoupling.Tests;

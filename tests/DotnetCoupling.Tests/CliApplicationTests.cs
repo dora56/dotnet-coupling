@@ -35,7 +35,7 @@ public sealed class CliApplicationTests
 
         Assert.Equal(0, result.ExitCode);
         using JsonDocument document = JsonDocument.Parse(result.Output);
-        Assert.Equal("0.3", document.RootElement.GetProperty("schemaVersion").GetString());
+        Assert.Equal("0.4", document.RootElement.GetProperty("schemaVersion").GetString());
         Assert.True(document.RootElement.TryGetProperty("hotspots", out _));
         Assert.False(document.RootElement.TryGetProperty("runs", out _));
     }
@@ -95,6 +95,7 @@ public sealed class CliApplicationTests
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Hotspots", result.Output);
         Assert.Contains("Fixture.Global.Api.Handler", result.Output);
+        Assert.Contains("Complexity: cyclomatic max 1, cognitive max 0, members 1", result.Output);
     }
 
     [Fact]
@@ -104,8 +105,20 @@ public sealed class CliApplicationTests
 
         Assert.Equal(0, result.ExitCode);
         using JsonDocument document = JsonDocument.Parse(result.Output);
-        Assert.Equal("0.3", document.RootElement.GetProperty("schemaVersion").GetString());
-        Assert.Single(document.RootElement.GetProperty("hotspots").EnumerateArray());
+        Assert.Equal("0.4", document.RootElement.GetProperty("schemaVersion").GetString());
+        JsonElement hotspot = Assert.Single(document.RootElement.GetProperty("hotspots").EnumerateArray());
+        Assert.True(hotspot.TryGetProperty("complexity", out JsonElement complexity));
+        Assert.Equal(1, complexity.GetProperty("maxCyclomaticComplexity").GetInt32());
+    }
+
+    [Fact]
+    public async Task RunAsync_CheckHotspots_KeepsCheckExitCodeWhileRenderingComplexity()
+    {
+        CommandResult result = await RunCliAsync("--check", "--min-grade", "B", "--hotspots", "1", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("Hotspots", result.Output);
+        Assert.Contains("Complexity: cyclomatic max 1, cognitive max 0, members 1", result.Output);
     }
 
     [Fact]

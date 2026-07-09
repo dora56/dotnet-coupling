@@ -1,6 +1,4 @@
 using DotnetCoupling.Core;
-using DotnetCoupling.Git;
-using DotnetCoupling.Roslyn;
 using FsCheck;
 using FsCheck.Fluent;
 using Xunit;

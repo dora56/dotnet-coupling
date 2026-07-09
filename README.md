@@ -222,9 +222,11 @@ dotnet-coupling --sarif --output dotnet-coupling.sarif --no-git ./src
 ```
 
 `--hotspots [N]` ranks the top coupling repair candidates from active issues,
-fan-in, fan-out, volatility, boundary crossing, and cycle participation. The
-default count is `10`. Treat hotspots as a remediation priority list; the
-project Grade remains the health gate based on issue density.
+fan-in, fan-out, volatility, boundary crossing, cycle participation, and
+syntax-based cyclomatic/cognitive complexity. The default count is `10`. Treat
+hotspots as a remediation priority list; the project Grade remains the health
+gate based on issue density. Complexity can change hotspot priority and reasons,
+but it does not change issue severity, Grade, or `--check` exit codes.
 
 ```bash
 dotnet-coupling --hotspots ./src
@@ -241,7 +243,7 @@ JSON output includes:
 - issue counts and issue details
 - manifest run notes and blind spots
 - optional project-model metadata for project / assembly / package boundaries
-- optional hotspots and suppressed issues when requested
+- optional hotspots, hotspot complexity, and suppressed issues when requested
 
 Schema files live under [`schemas/`](schemas/).
 

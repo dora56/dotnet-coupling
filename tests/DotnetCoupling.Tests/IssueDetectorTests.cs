@@ -1,6 +1,4 @@
 using DotnetCoupling.Core;
-using DotnetCoupling.Git;
-using DotnetCoupling.Roslyn;
 using Xunit;
 
 namespace DotnetCoupling.Tests;
