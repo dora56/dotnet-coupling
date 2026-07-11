@@ -53,6 +53,49 @@ public sealed class CiWorkflowTests
     }
 
     [Fact]
+    public void ReportJob_UsesPinnedOctocovWithCoverageRatchetsAndForkSafeCommenting()
+    {
+        string workflow = ReadCiWorkflow();
+        string reportJob = ExtractJob(workflow, "report");
+        string octocovConfig = File.ReadAllText(Path.Combine(TestPaths.RepositoryRoot, ".octocov.yml"));
+
+        Assert.Contains("actions: write", reportJob);
+        Assert.Contains("pull-requests: write", reportJob);
+        Assert.DoesNotContain("issues: write", reportJob);
+        Assert.Contains("python3 scripts/generate-branch-coverage-metric.py", reportJob);
+        Assert.Contains("OCTOCOV_CUSTOM_METRICS_BRANCH_COVERAGE", reportJob);
+        Assert.Contains("uses: k1LoW/octocov-action@b3b6ee60482a667950f87553abf1df63217235d9", reportJob);
+        Assert.Contains("version: v0.75.9", reportJob);
+        Assert.Contains("if: always()", ExtractStep(reportJob, "Report coverage with octocov"));
+        Assert.Contains("if: always()", ExtractStep(reportJob, "Generate CI summary"));
+        Assert.Contains("OCTOCOV_FORK_PR", reportJob);
+        Assert.Contains("current >= 90% && diff >= -0.1%", octocovConfig);
+        Assert.Contains("artifact://${GITHUB_REPOSITORY}", octocovConfig);
+        Assert.Contains("github.event_name == 'pull_request' && env.OCTOCOV_FORK_PR != 'true'", octocovConfig);
+        Assert.Contains("summary:", octocovConfig);
+        string workflowPermissions = workflow[..workflow.IndexOf("jobs:", StringComparison.Ordinal)];
+        Assert.DoesNotContain("actions: write", workflowPermissions);
+        Assert.DoesNotContain("pull-requests: write", workflowPermissions);
+        Assert.Contains(
+            "if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository",
+            ExtractStep(reportJob, "Comment on PR"));
+    }
+
+    [Fact]
+    public void SelfBenchmarkJob_GatesSemanticBaselineAndUploadsReport()
+    {
+        string workflow = ReadCiWorkflow();
+        string job = ExtractJob(workflow, "self-benchmark");
+
+        Assert.Contains("--check --min-grade A --no-git ./src", job);
+        Assert.Contains("--baseline origin/main --fail-on High", job);
+        Assert.Contains("--config .coupling.toml --mode semantic dotnet-coupling.slnx", job);
+        Assert.Contains("semantic-self-report.json", job);
+        Assert.Contains("name: semantic-self-report", job);
+        Assert.Contains("if-no-files-found: error", job);
+    }
+
+    [Fact]
     public void NightlyMutationWorkflow_RunsFullStrykerAndUploadsReport()
     {
         string workflowPath = Path.Combine(TestPaths.RepositoryRoot, ".github", "workflows", "nightly-mutation.yml");
@@ -62,9 +105,11 @@ public sealed class CiWorkflowTests
         Assert.Contains("schedule:", workflow);
         Assert.Contains("workflow_dispatch:", workflow);
         Assert.Contains("timeout-minutes: 90", workflow);
-        Assert.Contains("dotnet tool run dotnet-stryker -- --config-file stryker-config.json", workflow);
+        Assert.Contains("config: stryker-config.json", workflow);
+        Assert.Contains("config: stryker-complexity-config.json", workflow);
+        Assert.Contains("dotnet tool run dotnet-stryker -- --config-file \"${{ matrix.config }}\"", workflow);
         Assert.DoesNotContain("--since", workflow);
-        Assert.Contains("name: mutation-report", workflow);
+        Assert.Contains("name: mutation-report-${{ matrix.name }}", workflow);
         Assert.Contains("path: StrykerOutput/**", workflow);
     }
 

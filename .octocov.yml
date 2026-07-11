@@ -1,0 +1,22 @@
+coverage:
+  paths:
+    - artifacts/coverage/coverage.xml
+  acceptable: current >= 90% && diff >= -0.1%
+
+comment:
+  if: github.event_name == 'pull_request' && env.OCTOCOV_FORK_PR != 'true'
+  updatePrevious: true
+  hideFooterLink: false
+
+summary:
+  if: true
+  hideFooterLink: false
+
+report:
+  if: is_default_branch
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+
+diff:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
