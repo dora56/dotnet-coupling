@@ -406,8 +406,8 @@ Release gate:
 - [x] semantic self Grade floor と no-new-High baseline gate を追加する
 - [x] Complexity 専用 nightly mutation suite を追加する
 - [x] self + OSS 3 targets の before/after dogfood を記録する
-- [ ] full local / PR / main quality gate を通過する
-- [ ] signed `v0.6.1` tag と Trusted Publishing を検証する
+- [x] full local / PR / main quality gate を通過する
+- [x] signed `v0.6.1` tag と Trusted Publishing を検証する
 
 ### Phase 7 Candidate: Default Auto Mode
 
