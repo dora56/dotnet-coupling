@@ -2,6 +2,35 @@
 
 All notable changes to `dotnet-coupling` are collected here.
 
+## 0.6.1
+
+Patch release focused on analysis and CI feedback reliability.
+
+### Changed
+
+- Cyclomatic and Cognitive Complexity now follow the `sonar-dotnet 10.27`
+  C# metric profile for supported member scopes, including logical sequences,
+  nesting, recursion, local functions, null-flow operators, and C# patterns.
+- Namespace cycle detection now uses analyzed component metadata instead of
+  inferring namespaces by trimming component identifiers, preventing nested
+  types from creating pseudo-namespace cycles.
+- Coverage reporting uses octocov for line coverage, main-branch diffs, Job
+  Summary, and same-repository PR comments. Branch coverage remains visible as
+  an octocov custom metric.
+- Self-benchmark CI now stores a semantic report, enforces a Grade C floor, and
+  rejects new High or Critical issues relative to `origin/main`.
+- Nightly mutation testing now runs separate Core and Roslyn complexity suites.
+
+### Compatibility Notes
+
+- Complexity values and hotspot order can change because the metric profile was
+  corrected. Complexity still does not affect Grade, issue severity, issue
+  count, `--fail-on`, or `--check`.
+- CLI options, exit codes, JSON schema shapes, and NuGet package identity are
+  unchanged.
+- Syntax mode remains the default and semantic mode remains explicit preview
+  functionality.
+
 ## 0.6.0
 
 Phase 6 turns coupling reports into an investigation aid while preserving the

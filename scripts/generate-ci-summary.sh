@@ -3,24 +3,24 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: scripts/generate-ci-summary.sh --coverage-dir DIR --mutation-dir DIR [--coupling-dir DIR]
+Usage: scripts/generate-ci-summary.sh --mutation-dir DIR [--coupling-dir DIR] [--semantic-dir DIR]
 
-Prints a GitHub-flavored markdown summary for CI coverage, mutation, and coupling feedback reports.
+Prints a GitHub-flavored markdown summary for mutation, coupling, and semantic self reports.
 EOF
 }
 
-coverage_dir=""
 mutation_dir=""
 coupling_dir=""
+semantic_dir=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --coverage-dir)
-      coverage_dir="${2:-}"
-      shift 2
-      ;;
     --mutation-dir)
       mutation_dir="${2:-}"
+      shift 2
+      ;;
+    --semantic-dir)
+      semantic_dir="${2:-}"
       shift 2
       ;;
     --coupling-dir)
@@ -39,37 +39,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$coverage_dir" || -z "$mutation_dir" ]]; then
+if [[ -z "$mutation_dir" ]]; then
   usage >&2
   exit 1
 fi
 
-python3 - "$coverage_dir" "$mutation_dir" "$coupling_dir" <<'PY'
+python3 - "$mutation_dir" "$coupling_dir" "$semantic_dir" <<'PY'
 from __future__ import annotations
 
 import collections
 import json
 import pathlib
 import sys
-import xml.etree.ElementTree as ET
 
-coverage_dir = pathlib.Path(sys.argv[1])
-mutation_dir = pathlib.Path(sys.argv[2])
-coupling_dir = pathlib.Path(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else None
-
-coverage_files = sorted(
-    {
-        path
-        for pattern in (
-            "coverage.cobertura.xml",
-            "coverage-*.cobertura.xml",
-            "*.coverage.cobertura.xml",
-            "coverage.cobertura*.xml",
-            "*.coverage.cobertura*.xml",
-        )
-        for path in coverage_dir.rglob(pattern)
-    }
-)
+mutation_dir = pathlib.Path(sys.argv[1])
+coupling_dir = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] else None
+semantic_dir = pathlib.Path(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else None
 mutation_files = sorted(mutation_dir.rglob("mutation-report.json"))
 coupling_sarif_files = sorted(coupling_dir.rglob("*.sarif")) if coupling_dir and coupling_dir.exists() else []
 hotspot_files = sorted(
@@ -79,23 +64,7 @@ hotspot_files = sorted(
         for path in coupling_dir.rglob(pattern)
     }
 ) if coupling_dir and coupling_dir.exists() else []
-
-if not coverage_files:
-    raise SystemExit(f"No Cobertura reports found under {coverage_dir}")
-
-covered_lines = 0
-valid_lines = 0
-covered_branches = 0
-valid_branches = 0
-for path in coverage_files:
-    root = ET.parse(path).getroot()
-    covered_lines += int(root.attrib.get("lines-covered", "0"))
-    valid_lines += int(root.attrib.get("lines-valid", "0"))
-    covered_branches += int(root.attrib.get("branches-covered", "0"))
-    valid_branches += int(root.attrib.get("branches-valid", "0"))
-
-line_rate = (covered_lines / valid_lines) if valid_lines else 0.0
-branch_rate = (covered_branches / valid_branches) if valid_branches else 0.0
+semantic_files = sorted(semantic_dir.rglob("semantic-self-report.json")) if semantic_dir and semantic_dir.exists() else []
 
 mutation_report = None
 statuses = collections.Counter()
@@ -115,14 +84,21 @@ compile_error = statuses.get("CompileError", 0)
 tracked = killed + survived + timeout + runtime_error + no_coverage
 tracked_score = (killed / tracked * 100.0) if tracked else None
 
-def pct(value: float) -> str:
-    return f"{value * 100:.1f}%"
-
 mutation_result = (
     f"{tracked_score:.1f}% kill ratio across tracked mutants"
     if tracked_score is not None
     else "not available for this run"
 )
+semantic_result = "not available for this run"
+semantic_report = None
+if semantic_files:
+    semantic_report = json.loads(semantic_files[0].read_text())
+    grade = semantic_report["grade"]["letter"]
+    issues = semantic_report.get("issues", [])
+    critical = sum(issue.get("severity") == "Critical" for issue in issues)
+    high = sum(issue.get("severity") == "High" for issue in issues)
+    medium = sum(issue.get("severity") == "Medium" for issue in issues)
+    semantic_result = f"Grade {grade} / {critical} Critical / {high} High / {medium} Medium"
 coupling_result = (
     f"{len(coupling_sarif_files)} SARIF / {len(hotspot_files)} hotspots artifact(s)"
     if coupling_sarif_files or hotspot_files
@@ -137,15 +113,9 @@ print("## CI Report")
 print()
 print("| Area | Result |")
 print("| --- | --- |")
-print(f"| Coverage | {pct(line_rate)} line / {pct(branch_rate)} branch |")
 print(f"| Mutation | {mutation_result} |")
 print(f"| Coupling feedback | {coupling_result} |")
-print()
-print("### Coverage")
-print()
-print(f"- Reports: {len(coverage_files)}")
-print(f"- Lines: {covered_lines}/{valid_lines} ({pct(line_rate)})")
-print(f"- Branches: {covered_branches}/{valid_branches} ({pct(branch_rate)})")
+print(f"| Semantic self | {semantic_result} |")
 print()
 print("### Mutation")
 print()
@@ -187,4 +157,12 @@ if coupling_sarif_files or hotspot_files:
     print("- Coupling feedback is generated from the packaged CLI and uploaded as SARIF / hotspots artifacts.")
 else:
     print("- Coupling feedback is reported as unavailable when the artifact job is skipped, cancelled, or cannot upload artifacts.")
+print()
+print("### Semantic Self")
+print()
+if semantic_report is None:
+    print("- Status: not available for this run")
+else:
+    print(f"- {semantic_result}")
+    print("- The baseline gate rejects new High or Critical issues against origin/main.")
 PY

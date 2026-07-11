@@ -118,6 +118,69 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_SemanticNestedTypeDependency_DoesNotCreatePseudoNamespaceCycle()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Types.cs",
+            """
+            namespace Sample.App;
+
+            public sealed class Outer
+            {
+                public sealed class Nested
+                {
+                    public Helper? Helper { get; init; }
+                }
+            }
+
+            public sealed class Helper
+            {
+                public Outer.Nested? Nested { get; init; }
+            }
+            """));
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+            projectPath,
+            AnalysisMode.Semantic,
+            volatilityProvider: null,
+            gitMonths: 6);
+
+        Assert.DoesNotContain(report.Issues, issue => issue.Type == IssueType.CircularDependency);
+    }
+
+    [Fact]
+    public void Analyze_SemanticCrossNamespaceCycle_ReportsCircularDependencyIssue()
+    {
+        string projectPath = CreateProjectFixture(
+            ("First.cs",
+            """
+            namespace Sample.App.First;
+
+            public sealed class FirstType
+            {
+                public Sample.App.Second.SecondType? Second { get; init; }
+            }
+            """),
+            ("Second.cs",
+            """
+            namespace Sample.App.Second;
+
+            public sealed class SecondType
+            {
+                public Sample.App.First.FirstType? First { get; init; }
+            }
+            """));
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+            projectPath,
+            AnalysisMode.Semantic,
+            volatilityProvider: null,
+            gitMonths: 6);
+
+        Assert.Contains(report.Issues, issue => issue.Type == IssueType.CircularDependency);
+    }
+
+    [Fact]
     public void Analyze_GeneratedFileNameAndHeader_ExcludesGeneratedCode()
     {
         string directory = CreateFixture(
@@ -3410,6 +3473,60 @@ public sealed class CSharpDependencyAnalyzerTests
         ComponentComplexity complexity = Assert.Single(report.ComponentComplexities!, item => item.MostComplexMember?.MemberName == "Execute");
         Assert.Equal("Sample.App.Outer`1.Inner", component.Id);
         Assert.Equal(component.Id, complexity.ComponentId);
+    }
+
+    [Fact]
+    public void Analyze_Complexity_UsesSameSyntaxMetricsInSyntaxAndSemanticModes()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            namespace Sample.App;
+
+            public sealed class Handler
+            {
+                public int Handle(int value, bool enabled)
+                {
+                    if (enabled && value > 0)
+                    {
+                        return value switch
+                        {
+                            < 10 => 1,
+                            _ => 2,
+                        };
+                    }
+
+                    return 0;
+                }
+            }
+            """));
+
+        AnalysisReport syntax = CSharpDependencyAnalyzer.Analyze(
+            projectPath,
+            AnalysisMode.Syntax,
+            volatilityProvider: null,
+            gitMonths: 6,
+            AnalysisOptions.Default,
+            includeComplexity: true);
+        AnalysisReport semantic = CSharpDependencyAnalyzer.Analyze(
+            projectPath,
+            AnalysisMode.Semantic,
+            volatilityProvider: null,
+            gitMonths: 6,
+            AnalysisOptions.Default,
+            includeComplexity: true);
+
+        ComponentComplexity syntaxComplexity = Assert.Single(
+            syntax.ComponentComplexities!,
+            item => item.ComponentId == "Sample.App.Handler");
+        ComponentComplexity semanticComplexity = Assert.Single(
+            semantic.ComponentComplexities!,
+            item => item.ComponentId == "Sample.App.Handler");
+
+        Assert.Equal(syntaxComplexity.MaxCyclomaticComplexity, semanticComplexity.MaxCyclomaticComplexity);
+        Assert.Equal(syntaxComplexity.MaxCognitiveComplexity, semanticComplexity.MaxCognitiveComplexity);
+        Assert.Equal(syntaxComplexity.TotalCyclomaticComplexity, semanticComplexity.TotalCyclomaticComplexity);
+        Assert.Equal(syntaxComplexity.TotalCognitiveComplexity, semanticComplexity.TotalCognitiveComplexity);
     }
 
     [Fact]

@@ -347,6 +347,24 @@ coverage は Cobertura XML、coupling feedback は SARIF / Hotspots text で確�
 | Nightly | Yes | full mutation と長期 trend を CI feedback loop から分離する |
 | Release gate | No | 公開フローの責務を pack/publish/release に限定する |
 
+#### Coverage feedback
+
+`0.6.1` から octocov を coverage 専任の feedback adapter として使う。
+MTP が生成する Cobertura を `artifacts/coverage/coverage.xml` に正規化し、line
+coverage と main report との差分を octocov が表示する。octocov の Cobertura parser
+は branch totals を集計しないため、branch coverage は structured XML parser から
+custom metric として渡す。
+
+- line floor: `90%`
+- branch floor: `80%`
+- allowed regression: `0.1` percentage points
+- same-repository PR: managed comment + Job Summary
+- fork PR: Job Summary only
+- main: `artifact://${GITHUB_REPOSITORY}` に比較用 report を保存
+
+Mutation は引き続き主指標であり、coverage は未実行領域と急な退行を検出する補助指標
+として扱う。
+
 ### 30.7 テスト依存パッケージ
 
 ```xml

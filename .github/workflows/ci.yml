@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
   changes:
@@ -147,16 +145,12 @@ jobs:
             \( -name 'coverage.cobertura.xml' -o -name 'coverage.cobertura*.xml' -o -name '*.coverage.cobertura.xml' -o -name '*.coverage.cobertura*.xml' \) \
             -not -path './artifacts/coverage/*' | sort)
 
-          if [[ "${#coverage_reports[@]}" -eq 0 ]]; then
-            echo "No coverage report was generated." >&2
+          if [[ "${#coverage_reports[@]}" -ne 1 ]]; then
+            echo "Expected exactly one coverage report, found ${#coverage_reports[@]}." >&2
             exit 1
           fi
 
-          index=0
-          for report in "${coverage_reports[@]}"; do
-            index=$((index + 1))
-            cp "$report" "artifacts/coverage/coverage-$index.cobertura.xml"
-          done
+          cp "${coverage_reports[0]}" artifacts/coverage/coverage.xml
 
       - name: Upload coverage report
         if: always()
@@ -232,6 +226,26 @@ jobs:
       - name: Self-benchmark
         run: |
           "$TOOL_PATH/dotnet-coupling" --check --min-grade A --no-git ./src
+
+      - name: Semantic self baseline gate
+        run: |
+          mkdir -p artifacts/semantic-self
+          "$TOOL_PATH/dotnet-coupling" --json --output artifacts/semantic-self/semantic-self-report.json --check --baseline origin/main --fail-on High --config .coupling.toml --mode semantic dotnet-coupling.slnx
+          grade="$(jq -r '.grade.letter' artifacts/semantic-self/semantic-self-report.json)"
+          case "$grade" in
+            C|B|A|S) ;;
+            *) echo "Semantic self grade $grade is below C." >&2; exit 1 ;;
+          esac
+          "$TOOL_PATH/dotnet-coupling" --summary --config .coupling.toml --mode semantic dotnet-coupling.slnx > artifacts/semantic-self/semantic-self-summary.txt
+
+      - name: Upload semantic self report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: semantic-self-report
+          path: artifacts/semantic-self
+          if-no-files-found: error
+          retention-days: 14
 
   coupling-feedback:
     runs-on: ubuntu-slim
@@ -310,8 +324,8 @@ jobs:
       - coupling-feedback
     if: always() && needs.changes.outputs.docs_only != 'true'
     permissions:
+      actions: write
       contents: read
-      issues: write
       pull-requests: write
 
     steps:
@@ -323,6 +337,14 @@ jobs:
         with:
           name: coverage-report
           path: artifacts/coverage
+
+      - name: Download semantic self report
+        if: needs.self-benchmark.result != 'skipped' && needs.self-benchmark.result != 'cancelled'
+        uses: actions/download-artifact@v8.0.1
+        continue-on-error: true
+        with:
+          name: semantic-self-report
+          path: artifacts/semantic-self
 
       - name: Download coupling SARIF artifact
         if: needs.coupling-feedback.result != 'skipped' && needs.coupling-feedback.result != 'cancelled'
@@ -340,17 +362,30 @@ jobs:
           name: dotnet-coupling-hotspots
           path: artifacts/coupling/hotspots
 
+      - name: Generate branch coverage metric
+        run: python3 scripts/generate-branch-coverage-metric.py --coverage artifacts/coverage/coverage.xml --output artifacts/coverage/branch-coverage.json
+
+      - name: Report coverage with octocov
+        if: always()
+        uses: k1LoW/octocov-action@b3b6ee60482a667950f87553abf1df63217235d9 # v1.5.1
+        with:
+          version: v0.75.9
+        env:
+          OCTOCOV_CUSTOM_METRICS_BRANCH_COVERAGE: artifacts/coverage/branch-coverage.json
+          OCTOCOV_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
       - name: Generate CI summary
+        if: always()
         shell: bash
         run: |
           scripts/generate-ci-summary.sh \
-            --coverage-dir artifacts/coverage \
             --mutation-dir artifacts/mutation \
             --coupling-dir artifacts/coupling \
+            --semantic-dir artifacts/semantic-self \
             | tee ci-summary.md | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Comment on PR
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}

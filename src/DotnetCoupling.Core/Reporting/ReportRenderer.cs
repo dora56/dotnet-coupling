@@ -523,6 +523,11 @@ public static class ReportRenderer
             notes = ["Semantic symbol resolution is not enabled."];
         }
 
+        if (report.ComponentComplexities is not null)
+        {
+            notes.Add("Sonar C# 10.27 compatible complexity profile.");
+        }
+
         notes.AddRange(CreateDomainContextCoverageNotes(report));
         return notes;
     }

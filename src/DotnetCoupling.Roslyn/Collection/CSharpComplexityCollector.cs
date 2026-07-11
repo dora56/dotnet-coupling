@@ -81,8 +81,24 @@ internal static class CSharpComplexityCollector
 
         public override void VisitLocalFunctionStatement(LocalFunctionStatementSyntax node)
         {
-            AddMember(node, node.Identifier.ValueText);
+            if (node.Modifiers.Any(modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StaticKeyword)))
+            {
+                AddMember(node, node.Identifier.ValueText);
+            }
+
             base.VisitLocalFunctionStatement(node);
+        }
+
+        public override void VisitFieldDeclaration(FieldDeclarationSyntax node)
+        {
+            VariableDeclaratorSyntax? initializedField = node.Declaration.Variables
+                .FirstOrDefault(variable => variable.Initializer is not null);
+            if (initializedField is not null)
+            {
+                AddMember(node, initializedField.Identifier.ValueText);
+            }
+
+            base.VisitFieldDeclaration(node);
         }
 
         public override void VisitAccessorDeclaration(AccessorDeclarationSyntax node)
@@ -129,14 +145,15 @@ internal static class CSharpComplexityCollector
                 return;
             }
 
-            ComplexityMetric metric = ComplexityMetricCalculator.Calculate(node);
+            int cyclomaticComplexity = CSharpCyclomaticComplexityCalculator.Calculate(node);
+            int cognitiveComplexity = CSharpCognitiveComplexityCalculator.Calculate(node);
             FileLinePositionSpan span = tree.GetLineSpan(node.Span);
             Members.Add(new MemberComplexity(
                 componentId,
                 memberName,
                 new SourceLocation(filePath, span.StartLinePosition.Line + 1),
-                metric.CyclomaticComplexity,
-                metric.CognitiveComplexity));
+                cyclomaticComplexity,
+                cognitiveComplexity));
         }
 
         private string CreateComponentId(string name, int arity)
@@ -158,6 +175,7 @@ internal static class CSharpComplexityCollector
                 AccessorDeclarationSyntax accessor => accessor.Body is not null || accessor.ExpressionBody is not null,
                 PropertyDeclarationSyntax property => property.ExpressionBody is not null,
                 IndexerDeclarationSyntax indexer => indexer.ExpressionBody is not null,
+                FieldDeclarationSyntax field => field.Declaration.Variables.Any(variable => variable.Initializer is not null),
                 _ => false,
             };
         }
@@ -175,193 +193,4 @@ internal static class CSharpComplexityCollector
         }
     }
 
-    private sealed record ComplexityMetric(int CyclomaticComplexity, int CognitiveComplexity);
-
-    private sealed class ComplexityMetricCalculator : CSharpSyntaxWalker
-    {
-        private readonly SyntaxNode _root;
-        private int _cyclomaticComplexity = 1;
-        private int _cognitiveComplexity;
-        private int _nesting;
-
-        private ComplexityMetricCalculator(SyntaxNode root)
-        {
-            _root = root;
-        }
-
-        internal static ComplexityMetric Calculate(SyntaxNode node)
-        {
-            ComplexityMetricCalculator calculator = new(node);
-            calculator.Visit(node);
-            return new ComplexityMetric(calculator._cyclomaticComplexity, calculator._cognitiveComplexity);
-        }
-
-        public override void VisitIfStatement(IfStatementSyntax node)
-        {
-            AddNestedDecision();
-            Visit(node.Condition);
-            VisitWithNesting(node.Statement);
-            if (node.Else?.Statement is IfStatementSyntax elseIf)
-            {
-                Visit(elseIf);
-            }
-            else if (node.Else?.Statement is StatementSyntax elseStatement)
-            {
-                VisitWithNesting(elseStatement);
-            }
-        }
-
-        public override void VisitForStatement(ForStatementSyntax node)
-        {
-            AddNestedDecision();
-            Visit(node.Declaration);
-            foreach (ExpressionSyntax initializer in node.Initializers)
-            {
-                Visit(initializer);
-            }
-
-            Visit(node.Condition);
-            foreach (ExpressionSyntax incrementor in node.Incrementors)
-            {
-                Visit(incrementor);
-            }
-
-            VisitWithNesting(node.Statement);
-        }
-
-        public override void VisitForEachStatement(ForEachStatementSyntax node)
-        {
-            AddNestedDecision();
-            Visit(node.Expression);
-            VisitWithNesting(node.Statement);
-        }
-
-        public override void VisitForEachVariableStatement(ForEachVariableStatementSyntax node)
-        {
-            AddNestedDecision();
-            Visit(node.Variable);
-            Visit(node.Expression);
-            VisitWithNesting(node.Statement);
-        }
-
-        public override void VisitWhileStatement(WhileStatementSyntax node)
-        {
-            AddNestedDecision();
-            Visit(node.Condition);
-            VisitWithNesting(node.Statement);
-        }
-
-        public override void VisitDoStatement(DoStatementSyntax node)
-        {
-            AddNestedDecision();
-            VisitWithNesting(node.Statement);
-            Visit(node.Condition);
-        }
-
-        public override void VisitCatchClause(CatchClauseSyntax node)
-        {
-            AddNestedDecision();
-            Visit(node.Declaration);
-            Visit(node.Filter);
-            VisitWithNesting(node.Block);
-        }
-
-        public override void VisitConditionalExpression(ConditionalExpressionSyntax node)
-        {
-            AddNestedDecision();
-            Visit(node.Condition);
-            VisitWithNesting(node.WhenTrue);
-            VisitWithNesting(node.WhenFalse);
-        }
-
-        public override void VisitSwitchStatement(SwitchStatementSyntax node)
-        {
-            _cognitiveComplexity += 1 + _nesting;
-            Visit(node.Expression);
-            VisitWithNesting(node.Sections);
-        }
-
-        public override void VisitSwitchExpression(SwitchExpressionSyntax node)
-        {
-            _cognitiveComplexity += 1 + _nesting;
-            Visit(node.GoverningExpression);
-            VisitWithNesting(node.Arms);
-        }
-
-        public override void VisitCaseSwitchLabel(CaseSwitchLabelSyntax node)
-        {
-            _cyclomaticComplexity++;
-            base.VisitCaseSwitchLabel(node);
-        }
-
-        public override void VisitSwitchExpressionArm(SwitchExpressionArmSyntax node)
-        {
-            _cyclomaticComplexity++;
-            base.VisitSwitchExpressionArm(node);
-        }
-
-        public override void VisitBinaryExpression(BinaryExpressionSyntax node)
-        {
-            if (node.IsKind(SyntaxKind.LogicalAndExpression) || node.IsKind(SyntaxKind.LogicalOrExpression))
-            {
-                _cyclomaticComplexity++;
-                _cognitiveComplexity++;
-            }
-
-            base.VisitBinaryExpression(node);
-        }
-
-        public override void VisitLocalFunctionStatement(LocalFunctionStatementSyntax node)
-        {
-            if (!ReferenceEquals(node, _root))
-            {
-                // Nested local functions are reported as their own member complexity.
-                return;
-            }
-
-            base.VisitLocalFunctionStatement(node);
-        }
-
-        private void AddNestedDecision()
-        {
-            _cyclomaticComplexity++;
-            _cognitiveComplexity += 1 + _nesting;
-        }
-
-        private void VisitWithNesting(SyntaxNode? node)
-        {
-            if (node is null)
-            {
-                return;
-            }
-
-            _nesting++;
-            Visit(node);
-            _nesting--;
-        }
-
-        private void VisitWithNesting<TNode>(SeparatedSyntaxList<TNode> nodes)
-            where TNode : SyntaxNode
-        {
-            _nesting++;
-            foreach (TNode node in nodes)
-            {
-                Visit(node);
-            }
-
-            _nesting--;
-        }
-
-        private void VisitWithNesting<TNode>(SyntaxList<TNode> nodes)
-            where TNode : SyntaxNode
-        {
-            _nesting++;
-            foreach (TNode node in nodes)
-            {
-                Visit(node);
-            }
-
-            _nesting--;
-        }
-    }
 }

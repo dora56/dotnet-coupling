@@ -10,8 +10,17 @@ permissions:
 
 jobs:
   mutation:
+    name: mutation (${{ matrix.name }})
     runs-on: ubuntu-slim
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            config: stryker-config.json
+          - name: complexity
+            config: stryker-complexity-config.json
 
     steps:
       - name: Checkout
@@ -41,13 +50,13 @@ jobs:
         run: dotnet tool restore
 
       - name: Mutation test
-        run: dotnet tool run dotnet-stryker -- --config-file stryker-config.json
+        run: dotnet tool run dotnet-stryker -- --config-file "${{ matrix.config }}"
 
       - name: Upload mutation report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: mutation-report
+          name: mutation-report-${{ matrix.name }}
           path: StrykerOutput/**
           if-no-files-found: warn
           retention-days: 14

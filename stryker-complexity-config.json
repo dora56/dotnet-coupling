@@ -1,0 +1,40 @@
+{
+  "stryker-config": {
+    "project": "src/DotnetCoupling.Roslyn/DotnetCoupling.Roslyn.csproj",
+    "test-projects": [
+      "tests/DotnetCoupling.Tests/DotnetCoupling.Tests.csproj"
+    ],
+    "reporters": [
+      "progress",
+      "cleartext",
+      "html",
+      "json"
+    ],
+    "concurrency": 4,
+    "mutation-level": "Standard",
+    "ignore-mutations": [
+      "assignment",
+      "initializer",
+      "block",
+      "statement",
+      "unary",
+      "update",
+      "string",
+      "stringmethod",
+      "linq",
+      "math",
+      "checked",
+      "regex",
+      "bitwise"
+    ],
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 60
+    },
+    "test-runner": "mtp",
+    "mutate": [
+      "**/Collection/Complexity/*.cs"
+    ]
+  }
+}

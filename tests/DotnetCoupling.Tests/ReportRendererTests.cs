@@ -119,6 +119,13 @@ public sealed class ReportRendererTests
         Assert.Equal(1, complexity.GetProperty("maxCyclomaticComplexity").GetInt32());
         Assert.Equal(0, complexity.GetProperty("maxCognitiveComplexity").GetInt32());
         Assert.Equal("Handle", complexity.GetProperty("mostComplexMember").GetString());
+        string[] runNotes = document.RootElement
+            .GetProperty("manifest")
+            .GetProperty("runNotes")
+            .EnumerateArray()
+            .Select(item => item.GetString()!)
+            .ToArray();
+        Assert.Contains("Sonar C# 10.27 compatible complexity profile.", runNotes);
     }
 
     [Fact]

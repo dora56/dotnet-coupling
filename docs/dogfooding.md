@@ -114,6 +114,20 @@ workspace diagnostics, Markdown/AI usefulness, and Grade/issue-count invariance.
 Required coverage is self, Humanizer, FluentValidation, MediatR, and one DDD
 sample where semantic workspace loading is viable.
 
+## v0.6.1 Analysis Reliability
+
+Compare the published `0.6.0` tool and the candidate `0.6.1` tool against the
+same target commits. Required targets are self, Humanizer, FluentValidation, and
+MediatR. Self runs must use `.coupling.toml` in both syntax and semantic modes.
+
+Record Grade and issue-count invariance, complexity and Top 10 rank deltas,
+semantic pseudo-cycle removal, and three-run median performance. Complexity
+changes must be explainable by the Sonar C# 10.27 profile. Syntax and semantic
+median runtime may not regress by 10% or more.
+
+Keep the evidence in
+`docs/dogfooding/v0.6.1-analysis-reliability-dogfooding-2026-07-11.md`.
+
 ## External Sample Dogfood
 
 Run against 2-3 small C# repositories before publishing a new alpha or stable

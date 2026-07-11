@@ -55,7 +55,7 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
   "$schema": "https://raw.githubusercontent.com/YOUR_GITHUB/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
   "schemaVersion": "0.1",
   "tool": "dotnet-coupling",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "analysis": {
     "path": "./src",
     "mode": "semantic-preview",
@@ -239,6 +239,10 @@ Complexity は `--hotspots` が最終出力に効くときだけ計算する。`
 reason を表示する。固定 threshold は cyclomatic `>= 10`、cognitive `>= 15` で、
 priority score への加点は最大 `+0.10` に抑える。complexity が高いだけでは hotspot
 を作らず、active issue のある component だけを ranking 対象にする。
+
+complexity を含む JSON manifest の `runNotes` には
+`Sonar C# 10.27 compatible complexity profile.` を追加する。schema field は増やさず、
+既存 `hotspots[].complexity` の数値 provenance として扱う。
 
 ### 19.7 Investigation / Markdown / AI output
 
