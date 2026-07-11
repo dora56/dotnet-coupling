@@ -1163,6 +1163,91 @@ public sealed class CSharpDependencyAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_SemanticMode_RecordsSourceAndTargetMemberIdentities()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Handler.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Handler
+            {
+                public void Handle()
+                {
+                    Repository.Save();
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public static class Repository
+            {
+                public static void Save()
+                {
+                }
+            }
+            """));
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+            projectPath,
+            AnalysisMode.Semantic,
+            volatilityProvider: null,
+            gitMonths: 6);
+
+        DependencyObservation observation = Assert.Single(report.Observations, item =>
+            item.SourceComponentId == "Sample.App.Api.Handler"
+            && item.TargetName == "Sample.App.Infrastructure.Repository"
+            && item.Kind == DependencyKind.StaticCall);
+        Assert.Equal("Sample.App.Api.Handler.Handle", observation.SourceSymbol);
+        Assert.Equal("Sample.App.Infrastructure.Repository.Save", observation.TargetSymbol);
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_RecordsOperatorAsSourceMember()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Value.cs",
+            """
+            using Sample.App.Infrastructure;
+
+            namespace Sample.App.Api;
+
+            public sealed class Value
+            {
+                public static Value operator +(Value left, Value right)
+                {
+                    Repository.Save();
+                    return left;
+                }
+            }
+            """),
+            ("Repository.cs",
+            """
+            namespace Sample.App.Infrastructure;
+
+            public static class Repository
+            {
+                public static void Save() { }
+            }
+            """));
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+            projectPath,
+            AnalysisMode.Semantic,
+            volatilityProvider: null,
+            gitMonths: 6);
+
+        DependencyObservation observation = Assert.Single(report.Observations, item =>
+            item.TargetSymbol == "Sample.App.Infrastructure.Repository.Save"
+            && item.Kind == DependencyKind.StaticCall);
+        Assert.Equal("Sample.App.Api.Value.op_Addition", observation.SourceSymbol);
+    }
+
+    [Fact]
     public void Analyze_SemanticMode_ResolvesChainedInvocationToContainingTypes()
     {
         string projectPath = CreateProjectFixture(
@@ -3289,6 +3374,42 @@ public sealed class CSharpDependencyAnalyzerTests
         Assert.Contains(report.Couplings, coupling =>
             coupling.Source == "CSharpx.Either"
             && coupling.Target == "CSharpx.Either`2");
+    }
+
+    [Fact]
+    public void Analyze_SemanticMode_NestedGenericType_UsesSameSymbolIdentityForComponentAndComplexity()
+    {
+        string projectPath = CreateProjectFixture(
+            ("Outer.cs",
+            """
+            namespace Sample.App;
+
+            public sealed class Outer<T>
+            {
+                public sealed class Inner
+                {
+                    public void Execute(int value)
+                    {
+                        if (value > 0)
+                        {
+                        }
+                    }
+                }
+            }
+            """));
+
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(
+            projectPath,
+            AnalysisMode.Semantic,
+            volatilityProvider: null,
+            gitMonths: 6,
+            AnalysisOptions.Default,
+            includeComplexity: true);
+
+        Component component = Assert.Single(report.Components, item => item.Name == "Inner");
+        ComponentComplexity complexity = Assert.Single(report.ComponentComplexities!, item => item.MostComplexMember?.MemberName == "Execute");
+        Assert.Equal("Sample.App.Outer`1.Inner", component.Id);
+        Assert.Equal(component.Id, complexity.ComponentId);
     }
 
     [Fact]

@@ -9,12 +9,13 @@ internal static class JsonConfigurationReader
         using FileStream stream = configFile.OpenRead();
         using JsonDocument document = JsonDocument.Parse(stream);
         JsonElement root = document.RootElement;
-        ConfigurationValueReader.AssertKnownProperties(root, "", ["$schema", "analysis", "thresholds", "ignore", "domain"]);
+        ConfigurationValueReader.AssertKnownProperties(root, "", ["$schema", "analysis", "thresholds", "ignore", "domain", "prioritization"]);
 
         RawAnalysis? analysis = null;
         RawThresholds? thresholds = null;
         RawIgnore? ignore = null;
         RawDomain? domain = null;
+        RawPrioritization? prioritization = null;
 
         if (root.TryGetProperty("analysis", out JsonElement analysisElement))
         {
@@ -75,7 +76,31 @@ internal static class JsonConfigurationReader
                     : null);
         }
 
-        return new RawConfiguration(analysis, thresholds, ignore, domain);
+        if (root.TryGetProperty("prioritization", out JsonElement prioritizationElement))
+        {
+            ConfigurationValueReader.AssertKnownProperties(prioritizationElement, "prioritization", [
+                "cyclomaticComplexityThreshold",
+                "cognitiveComplexityThreshold",
+                "complexityWeight",
+            ]);
+            prioritization = new RawPrioritization(
+                ConfigurationValueReader.ReadPositiveInt(
+                    prioritizationElement,
+                    "cyclomaticComplexityThreshold",
+                    "prioritization.cyclomaticComplexityThreshold"),
+                ConfigurationValueReader.ReadPositiveInt(
+                    prioritizationElement,
+                    "cognitiveComplexityThreshold",
+                    "prioritization.cognitiveComplexityThreshold"),
+                ConfigurationValueReader.ReadDoubleInRange(
+                    prioritizationElement,
+                    "complexityWeight",
+                    "prioritization.complexityWeight",
+                    0,
+                    0.5));
+        }
+
+        return new RawConfiguration(analysis, thresholds, ignore, domain, prioritization);
     }
 
     private static List<RawDomainSubdomain> ReadDomainSubdomains(JsonElement element)

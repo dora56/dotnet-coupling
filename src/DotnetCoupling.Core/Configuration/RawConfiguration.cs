@@ -4,7 +4,8 @@ internal sealed record RawConfiguration(
     RawAnalysis? Analysis,
     RawThresholds? Thresholds,
     RawIgnore? Ignore,
-    RawDomain? Domain);
+    RawDomain? Domain,
+    RawPrioritization? Prioritization);
 
 internal sealed record RawAnalysis(
     IReadOnlyList<string>? ExcludePathPatterns,
@@ -16,6 +17,11 @@ internal sealed record RawThresholds(
     int? MinTemporalCoupling,
     int? MaxTemporalFilesPerCommit,
     int? ScatteredExternalBreadth);
+
+internal sealed record RawPrioritization(
+    int? CyclomaticComplexityThreshold,
+    int? CognitiveComplexityThreshold,
+    double? ComplexityWeight);
 
 internal sealed record RawIgnore(
     IReadOnlyList<string>? PathPatterns,

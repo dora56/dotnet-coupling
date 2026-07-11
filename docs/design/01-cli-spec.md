@@ -32,6 +32,12 @@ project boundary distance を補助する。Phase 3b では明示 `semantic` mod
 | `--git-months <n>` | Git 履歴を見る月数 | `6` |
 | `--config <file>` | 設定ファイル指定 (`.json`, `.toml`) | 自動探索 |
 | `--baseline <ref>` | 指定 Git ref と比較する | 未指定 |
+| `--impact <component>` | 指定コンポーネントへの直接・間接依存元を表示 | 未指定 |
+| `--trace <symbol>` | semantic type/member 依存を追跡 | 未指定 |
+| `--depth <n>` | impact/trace の最大探索深度 (`0` は無制限) | `3` |
+| `--markdown` | Markdown report を出力 | `false` |
+| `--ai` | coding agent 向けの決定的な引き継ぎを出力 | `false` |
+| `--jp`, `--japanese` | human-readable output を日本語化 | `false` |
 | `--help` | ヘルプ表示 | - |
 | `--version` | バージョン表示 | - |
 
@@ -46,14 +52,15 @@ project boundary distance を補助する。Phase 3b では明示 `semantic` mod
 場合に `.coupling.toml` / `coupling.toml` を探す。TOML を使いたい場合は
 `--config .coupling.toml` で明示指定できる。
 
+`--impact` / `--trace` / `--hotspots` は相互排他である。`--trace` は
+`--mode semantic` を必須とする。`--depth` は impact/trace とだけ併用でき、負数は
+exit code `2` を返す。`--sarif` は investigation / Markdown / AI と併用できない。
+`--json` は impact/trace と併用できるが、Markdown/AI とは併用できない。
+
 ### 5.3 将来オプション
 
 | オプション | 説明 |
 |---|---|
-| `--impact <component>` | 指定コンポーネント変更時の影響範囲を見る |
-| `--trace <symbol>` | 指定型・メソッドへの依存を追跡 |
-| `--ai` | AI coding agent 向け出力 |
-| `--jp`, `--japanese` | 日本語説明付き出力 |
 | `--web` | 必要性が確認された場合に検討する Web UI 起動 |
 
 ---

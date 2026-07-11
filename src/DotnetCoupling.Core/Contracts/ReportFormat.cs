@@ -6,4 +6,7 @@ public enum ReportFormat
     Summary,
     Json,
     Hotspots,
+    Markdown,
+    Ai,
+    Investigation,
 }

@@ -36,6 +36,7 @@ inspected without changing the default contract.
 - [Configuration](#configuration)
 - [Baseline Gate](#baseline-gate)
 - [SARIF and Hotspots](#sarif-and-hotspots)
+- [Investigation](#investigation)
 - [Output and Schema](#output-and-schema)
 - [CI and Quality Gates](#ci-and-quality-gates)
 - [Current Blind Spots](#current-blind-spots)
@@ -106,6 +107,16 @@ dotnet-coupling --sarif --output dotnet-coupling.sarif ./src
 # Top refactoring candidates
 dotnet-coupling --hotspots 10 ./src
 
+# Reverse dependency impact
+dotnet-coupling --impact MyApp.Domain.Order --depth 3 ./src
+
+# Semantic member trace
+dotnet-coupling --trace Save --mode semantic ./sample.sln
+
+# Shareable and coding-agent reports
+dotnet-coupling --markdown --impact Order ./src
+dotnet-coupling --ai ./src
+
 # Skip Git history for faster local runs
 dotnet-coupling --no-git ./src
 
@@ -157,6 +168,7 @@ Current supported settings include:
 - domain context for user-supplied core/supporting/generic subdomain categories
   and expected volatility
 - role context for strategic boundaries and technical areas
+- complexity thresholds and weight for remediation prioritization
 
 TOML keys use `snake_case`; JSON keeps the existing `camelCase` schema shape.
 `analysis.test_projects` / `analysis.testProjects` marks test project files.
@@ -233,6 +245,27 @@ dotnet-coupling --hotspots ./src
 dotnet-coupling --json --hotspots 5 ./src
 ```
 
+## Investigation
+
+`--impact <component>` performs a bounded, cycle-safe reverse dependency walk.
+`--trace <symbol>` uses semantic observations to identify type or member callers;
+it therefore requires `--mode semantic` and a project or solution input.
+`--depth` defaults to `3`, and `0` means unlimited traversal.
+
+```bash
+dotnet-coupling --impact Order --depth 2 ./src
+dotnet-coupling --trace Repository.Save --mode semantic ./MyApp.sln
+dotnet-coupling --json --impact Order ./src
+dotnet-coupling --markdown --impact Order ./src
+dotnet-coupling --ai --trace Repository.Save --mode semantic ./MyApp.sln
+dotnet-coupling --summary --jp ./src
+```
+
+Markdown is intended for artifacts and PR summaries. `--ai` emits deterministic
+evidence and bounded recommendations from the report; it does not call an LLM
+or invent source changes. `--jp` / `--japanese` localizes human-readable output
+without changing JSON or SARIF.
+
 ## Output and Schema
 
 JSON output includes:
@@ -244,6 +277,7 @@ JSON output includes:
 - manifest run notes and blind spots
 - optional project-model metadata for project / assembly / package boundaries
 - optional hotspots, hotspot complexity, and suppressed issues when requested
+- optional impact or trace evidence in schema `0.5`
 
 Schema files live under [`schemas/`](schemas/).
 

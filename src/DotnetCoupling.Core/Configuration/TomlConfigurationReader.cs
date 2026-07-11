@@ -9,12 +9,13 @@ internal static class TomlConfigurationReader
     {
         using StreamReader reader = configFile.OpenText();
         TomlTable root = TomlSerializer.Deserialize<TomlTable>(reader) ?? new TomlTable();
-        ConfigurationValueReader.AssertKnownProperties(root, "", ["analysis", "thresholds", "ignore", "domain"]);
+        ConfigurationValueReader.AssertKnownProperties(root, "", ["analysis", "thresholds", "ignore", "domain", "prioritization"]);
 
         RawAnalysis? analysis = null;
         RawThresholds? thresholds = null;
         RawIgnore? ignore = null;
         RawDomain? domain = null;
+        RawPrioritization? prioritization = null;
 
         if (root.TryGetValue("analysis", out object? analysisValue))
         {
@@ -63,7 +64,32 @@ internal static class TomlConfigurationReader
                 ReadDomainAreas(domainTable, "areas"));
         }
 
-        return new RawConfiguration(analysis, thresholds, ignore, domain);
+        if (root.TryGetValue("prioritization", out object? prioritizationValue))
+        {
+            TomlTable prioritizationTable = ConfigurationValueReader.ReadTable(prioritizationValue, "prioritization");
+            ConfigurationValueReader.AssertKnownProperties(prioritizationTable, "prioritization", [
+                "cyclomatic_complexity_threshold",
+                "cognitive_complexity_threshold",
+                "complexity_weight",
+            ]);
+            prioritization = new RawPrioritization(
+                ConfigurationValueReader.ReadPositiveInt(
+                    prioritizationTable,
+                    "cyclomatic_complexity_threshold",
+                    "prioritization.cyclomatic_complexity_threshold"),
+                ConfigurationValueReader.ReadPositiveInt(
+                    prioritizationTable,
+                    "cognitive_complexity_threshold",
+                    "prioritization.cognitive_complexity_threshold"),
+                ConfigurationValueReader.ReadDoubleInRange(
+                    prioritizationTable,
+                    "complexity_weight",
+                    "prioritization.complexity_weight",
+                    0,
+                    0.5));
+        }
+
+        return new RawConfiguration(analysis, thresholds, ignore, domain, prioritization);
     }
 
     private static List<RawDomainSubdomain>? ReadDomainSubdomains(TomlTable table, string propertyName)

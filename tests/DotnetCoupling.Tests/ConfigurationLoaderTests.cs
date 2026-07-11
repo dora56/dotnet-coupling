@@ -7,6 +7,22 @@ namespace DotnetCoupling.Tests;
 public sealed class ConfigurationLoaderTests
 {
     [Fact]
+    public void AnalysisOptions_LegacyConstructor_UsesDefaultPrioritization()
+    {
+        AnalysisOptions options = new(
+            [],
+            [],
+            [],
+            [],
+            new HashSet<IssueType>(),
+            [],
+            AnalysisThresholds.Default,
+            DomainContext.Empty);
+
+        Assert.Equal(PrioritizationOptions.Default, options.Prioritization);
+    }
+
+    [Fact]
     public void Load_ExplicitConfig_ReadsThresholdsAndIgnores()
     {
         string directory = CreateDirectory();
@@ -115,6 +131,120 @@ public sealed class ConfigurationLoaderTests
         Assert.Equal("Sample.Api.Handler", suppression.Source);
         Assert.Equal("Sample.Domain.Model", suppression.Target);
         Assert.Equal("Tracked in ADR-001", suppression.Reason);
+    }
+
+    [Fact]
+    public void Load_ExplicitConfig_ReadsComplexityPrioritization()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            """
+            {
+              "prioritization": {
+                "cyclomaticComplexityThreshold": 12,
+                "cognitiveComplexityThreshold": 18,
+                "complexityWeight": 0.20
+              }
+            }
+            """);
+
+        ConfigurationLoadResult result = ConfigurationLoader.Load(directory, new FileInfo(configPath));
+
+        Assert.Equal(12, result.Options.Prioritization.CyclomaticComplexityThreshold);
+        Assert.Equal(18, result.Options.Prioritization.CognitiveComplexityThreshold);
+        Assert.Equal(0.20, result.Options.Prioritization.ComplexityWeight);
+    }
+
+    [Fact]
+    public void Load_ExplicitTomlConfig_ReadsComplexityPrioritization()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [prioritization]
+            cyclomatic_complexity_threshold = 11
+            cognitive_complexity_threshold = 17
+            complexity_weight = 0.25
+            """);
+
+        ConfigurationLoadResult result = ConfigurationLoader.Load(directory, new FileInfo(configPath));
+
+        Assert.Equal(11, result.Options.Prioritization.CyclomaticComplexityThreshold);
+        Assert.Equal(17, result.Options.Prioritization.CognitiveComplexityThreshold);
+        Assert.Equal(0.25, result.Options.Prioritization.ComplexityWeight);
+    }
+
+    [Theory]
+    [InlineData(-0.01)]
+    [InlineData(0.51)]
+    public void Load_ComplexityWeightOutsideSupportedRange_ThrowsConfigurationException(double weight)
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(
+            configPath,
+            $$"""
+            {
+              "prioritization": {
+                "complexityWeight": {{weight.ToString(System.Globalization.CultureInfo.InvariantCulture)}}
+              }
+            }
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("prioritization.complexityWeight", exception.Message);
+        Assert.Contains("between 0 and 0.5", exception.Message);
+    }
+
+    [Fact]
+    public void Load_NoPrioritization_UsesBackwardCompatibleDefaults()
+    {
+        string directory = CreateDirectory();
+
+        ConfigurationLoadResult result = ConfigurationLoader.Load(directory, explicitConfig: null);
+
+        Assert.Equal(10, result.Options.Prioritization.CyclomaticComplexityThreshold);
+        Assert.Equal(15, result.Options.Prioritization.CognitiveComplexityThreshold);
+        Assert.Equal(0.10, result.Options.Prioritization.ComplexityWeight);
+    }
+
+    [Fact]
+    public void Load_NonPositiveComplexityThreshold_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.toml");
+        File.WriteAllText(
+            configPath,
+            """
+            [prioritization]
+            cyclomatic_complexity_threshold = 0
+            """);
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("prioritization.cyclomatic_complexity_threshold", exception.Message);
+        Assert.Contains("positive integer", exception.Message);
+    }
+
+    [Fact]
+    public void Load_UnknownPrioritizationProperty_ThrowsConfigurationException()
+    {
+        string directory = CreateDirectory();
+        string configPath = Path.Combine(directory, ".coupling.json");
+        File.WriteAllText(configPath, """{ "prioritization": { "complexityBonus": 0.2 } }""");
+
+        ConfigurationException exception = Assert.Throws<ConfigurationException>(() =>
+            ConfigurationLoader.Load(directory, new FileInfo(configPath)));
+
+        Assert.Contains("Unknown configuration property", exception.Message);
+        Assert.Contains("prioritization.complexityBonus", exception.Message);
     }
 
     [Fact]
@@ -671,6 +801,7 @@ public sealed class ConfigurationLoaderTests
         Assert.Equal(20, result.Options.Thresholds.MaxDependencies);
         Assert.Contains("**/tests/**", result.Options.TestProjectPathPatterns);
         Assert.Contains(IssueType.ScatteredExternalCoupling, result.Options.IgnoreIssueTypes);
+        Assert.Equal(PrioritizationOptions.Default, result.Options.Prioritization);
         Assert.Contains(result.Options.DomainContext.Subdomains, subdomain => subdomain.Name == "Billing");
         Assert.Contains(result.Options.DomainContext.Areas, area => area.TechnicalRole == TechnicalRole.DomainModel);
         Assert.Contains(result.Options.DomainContext.Areas, area => area.TechnicalRole == TechnicalRole.CompositionRoot);
@@ -758,6 +889,23 @@ public sealed class ConfigurationLoaderTests
         Assert.Contains("openHostService", strategicRoles);
         Assert.Contains("domainModel", technicalRoles);
         Assert.Contains("compositionRoot", technicalRoles);
+    }
+
+    [Fact]
+    public void ConfigSchema_IncludesPrioritizationBounds()
+    {
+        string schemaPath = Path.Combine(TestPaths.RepositoryRoot, "schemas", "dotnet-coupling-config-0.2.schema.json");
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(schemaPath));
+
+        JsonElement properties = schema.RootElement
+            .GetProperty("properties")
+            .GetProperty("prioritization")
+            .GetProperty("properties");
+
+        Assert.Equal(1, properties.GetProperty("cyclomaticComplexityThreshold").GetProperty("minimum").GetInt32());
+        Assert.Equal(1, properties.GetProperty("cognitiveComplexityThreshold").GetProperty("minimum").GetInt32());
+        Assert.Equal(0, properties.GetProperty("complexityWeight").GetProperty("minimum").GetDouble());
+        Assert.Equal(0.5, properties.GetProperty("complexityWeight").GetProperty("maximum").GetDouble());
     }
 
     private static string CreateDirectory()

@@ -28,6 +28,7 @@ The full design spec is split by concern under `../docs/design/`:
 | `10-engineering.md` | Perf, security, testing, CI |
 | `11-roadmap.md` | Versioning, phases |
 | `12-reference.md` | Mapping table, blind spots, risks |
+| `13-phase6-investigation-ux.md` | Phase 6 investigation commands and release plan |
 
 Start with `05-scoring.md` for the core algorithm, or `03-architecture.md` for implementation structure.
 

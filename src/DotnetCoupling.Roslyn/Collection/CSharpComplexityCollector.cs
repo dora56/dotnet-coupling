@@ -11,9 +11,10 @@ internal static class CSharpComplexityCollector
         SyntaxTree tree,
         CompilationUnitSyntax root,
         string namespaceName,
-        string filePath)
+        string filePath,
+        SemanticModel? semanticModel = null)
     {
-        ComplexityCollectorWalker walker = new(tree, namespaceName, filePath);
+        ComplexityCollectorWalker walker = new(tree, namespaceName, filePath, semanticModel);
         walker.Visit(root);
         return walker.Members;
     }
@@ -21,7 +22,8 @@ internal static class CSharpComplexityCollector
     private sealed class ComplexityCollectorWalker(
         SyntaxTree tree,
         string namespaceName,
-        string filePath) : CSharpSyntaxWalker
+        string filePath,
+        SemanticModel? semanticModel) : CSharpSyntaxWalker
     {
         private readonly Stack<string> _componentIds = new();
 
@@ -111,9 +113,10 @@ internal static class CSharpComplexityCollector
 
         private void VisitTypeDeclaration(TypeDeclarationSyntax node, Action visitChildren)
         {
-            string componentId = CreateComponentId(
-                node.Identifier.ValueText,
-                node.TypeParameterList?.Parameters.Count ?? 0);
+            string componentId = SymbolIdentity.CreateType(semanticModel?.GetDeclaredSymbol(node))
+                ?? CreateComponentId(
+                    node.Identifier.ValueText,
+                    node.TypeParameterList?.Parameters.Count ?? 0);
             _componentIds.Push(componentId);
             visitChildren();
             _componentIds.Pop();

@@ -43,6 +43,11 @@ TOML を使いたい場合は `--config .coupling.toml` で明示指定できる
     "maxTemporalFilesPerCommit": 50,
     "scatteredExternalBreadth": 5
   },
+  "prioritization": {
+    "cyclomaticComplexityThreshold": 10,
+    "cognitiveComplexityThreshold": 15,
+    "complexityWeight": 0.10
+  },
   "ignore": {
     "paths": ["**/Legacy/**"],
     "namespaces": ["MyApp.Legacy"],
@@ -113,6 +118,11 @@ min_temporal_coupling = 3
 max_temporal_files_per_commit = 50
 scattered_external_breadth = 5
 
+[prioritization]
+cyclomatic_complexity_threshold = 10
+cognitive_complexity_threshold = 15
+complexity_weight = 0.10
+
 [ignore]
 paths = ["**/Legacy/**"]
 namespaces = ["MyApp.Legacy"]
@@ -142,6 +152,11 @@ expected_volatility = "low"
 から除外する。テストコードの検証用依存で `GlobalComplexity` /
 `InappropriateIntimacy` / `HiddenCoupling` などが増え、production code の設計リスクが
 読みにくくなるケースを避けるための設定である。
+
+`prioritization` は Hotspots / Impact / AI の修正優先順位だけを調整する。
+cyclomatic / cognitive threshold は正の整数、`complexityWeight` /
+`complexity_weight` は `0.0` から `0.5` の範囲とする。これらは Grade、issue
+severity、issue count、`--check` の判定には影響しない。
 
 ### 21.5 Domain Context Config
 

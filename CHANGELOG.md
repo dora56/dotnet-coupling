@@ -2,6 +2,48 @@
 
 All notable changes to `dotnet-coupling` are collected here.
 
+## 0.6.0
+
+Phase 6 turns coupling reports into an investigation aid while preserving the
+existing project health gate.
+
+### Added
+
+- `--impact <component>` with bounded, cycle-safe reverse dependency paths,
+  affected project/namespace sets, and explainable risk reasons.
+- `--trace <symbol>` for semantic type/member caller evidence, including direct
+  source member and location data.
+- `--depth <N>` for impact/trace traversal; the default is `3` and `0` is
+  unlimited.
+- Markdown reports, deterministic coding-agent handoff through `--ai`, and
+  Japanese human-readable output through `--jp` / `--japanese`.
+- Configurable cyclomatic/cognitive thresholds and complexity weight under
+  `prioritization` for Hotspots, Impact, and AI priority evidence.
+- JSON report schema `0.5` with optional `impact` and `trace` fields.
+- Self, Humanizer, FluentValidation, MediatR, and eShopOnWeb dogfooding evidence.
+
+### Changed
+
+- Semantic observations now retain stable source and target member identities,
+  including methods, constructors, accessors, local functions, and operators.
+- AI and Markdown output preserve observed issue evidence, recommendations,
+  locations, priority reasons, diagnostics, and analysis blind spots.
+- Circular-dependency hotspots are ranked by actual namespace participant
+  instead of treating a rendered `A -> B` cycle path as a component.
+- Impact boundary state is preserved across transitive paths and traversed-edge
+  scoring is linear in the analyzed graph size.
+
+### Compatibility Notes
+
+- `syntax` remains the default mode; `--trace` requires explicit semantic mode.
+- Grade, issue severity, issue counts, `--fail-on`, and `--check` are unchanged
+  by investigation and presentation options.
+- Existing report schemas `0.1` through `0.4` remain selected for their existing
+  scenarios. Schema `0.5` is used only when impact or trace data is requested.
+- The previous public `AnalysisOptions` constructor remains available and uses
+  default prioritization values.
+- NuGet package identity and existing CLI options remain unchanged.
+
 ## 0.5.0
 
 Phase 5 adds config-informed prioritization so coupling findings can reflect

@@ -143,14 +143,14 @@ dotnet-coupling --hotspots 10 ./src
 - project boundary crossing
 - `0.5.0`: cyclomatic complexity / cognitive complexity
 
-`0.5.0` では complexity-assisted ranking を `--hotspots` に限定して追加する。
+`0.5.0` では complexity-assisted ranking を `--hotspots` に限定して追加した。
 これは Grade とは別の priority score であり、complexity が高いだけでは issue
-severity や `--check` を変えない。threshold / weight の config 化、`--impact` や
-`--ai` への展開は後続スライスに残す。
+severity や `--check` を変えない。`0.6.0` では threshold / weight の config 化と
+`--impact` / `--ai` への展開を追加した。
 
 ### 25.3 Impact
 
-指定コンポーネントを変更した場合の影響範囲を出す。
+`0.6.0` で指定コンポーネントを変更した場合の影響範囲を出す。
 
 ```bash
 dotnet coupling --impact MyApp.Domain.User ./src
@@ -171,13 +171,14 @@ dotnet coupling --impact MyApp.Domain.User ./src
 dotnet coupling --trace IUserRepository ./src
 ```
 
-MVP の syntax-only では精度が出にくいため、semantic mode 後に実装する。
+`0.6.0` で semantic mode の type/member identity を使って実装した。
 
 ---
 
 ## 26. AI 出力設計
 
-v0.5 以降で `--ai` を追加する。
+`0.6.0` で `--ai` を追加する。外部 LLM は呼ばず、観測 evidence と既存
+recommendation から決定的な引き継ぎを生成する。
 
 目的は AI coding agent に渡しやすい形で issue を整理すること。
 
