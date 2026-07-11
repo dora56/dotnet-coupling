@@ -240,6 +240,12 @@ hotspots as a remediation priority list; the project Grade remains the health
 gate based on issue density. Complexity can change hotspot priority and reasons,
 but it does not change issue severity, Grade, or `--check` exit codes.
 
+Complexity uses the `sonar-dotnet 10.27` C# metric profile. Cyclomatic
+Complexity counts executable entry points and C# control-flow decisions.
+Cognitive Complexity counts flow breaks, logical-operator sequences, and
+nesting while discounting shorthand such as null coalescing. Top-level
+statements are not attributed because the report model ranks named components.
+
 ```bash
 dotnet-coupling --hotspots ./src
 dotnet-coupling --json --hotspots 5 ./src
@@ -294,10 +300,12 @@ Current CI posture:
 - `nightly-mutation`: full Stryker run on schedule or manual dispatch
 - `release`: build, test, format, pack, local tool smoke, publish
 
-CI uploads `coverage-report`, `dotnet-coupling-sarif`, `dotnet-coupling-hotspots`,
-and dogfood artifacts for inspection. The PR summary includes coverage and
-coupling feedback; mutation appears as not available in PR CI and is reported by
-the nightly workflow instead.
+CI uploads `coverage-report`, `semantic-self-report`, `dotnet-coupling-sarif`,
+`dotnet-coupling-hotspots`, and dogfood artifacts for inspection. octocov adds
+line and branch coverage, the main-branch delta, and same-repository PR feedback.
+Line coverage must remain at least 90%, branch coverage at least 80%, and neither
+may regress by more than 0.1 percentage points. Mutation appears as not available
+in PR CI and is reported by the nightly workflow instead.
 
 ## Current Blind Spots
 
@@ -320,6 +328,7 @@ dotnet format dotnet-coupling.slnx --verify-no-changes --no-restore
 dotnet test dotnet-coupling.slnx --configuration Release --results-directory TestResults/Coverage --coverage --coverage-output coverage.cobertura.xml --coverage-output-format cobertura
 dotnet tool restore
 dotnet tool run dotnet-stryker -- --config-file stryker-config.json
+dotnet tool run dotnet-stryker -- --config-file stryker-complexity-config.json
 ```
 
 Release history is collected in [`CHANGELOG.md`](CHANGELOG.md).

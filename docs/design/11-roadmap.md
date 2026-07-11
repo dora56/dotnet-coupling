@@ -12,6 +12,7 @@ Semantic Versioning を採用する。
 | `0.4.0` | SARIF / team CI integration / hotspots |
 | `0.5.0` | TOML config / Domain Context Config / complexity-assisted hotspots |
 | `0.6.0` | investigation UX (`--impact` / `--trace` / Markdown report) |
+| `0.6.1` | Sonar-compatible complexity and CI feedback reliability |
 | `1.0.0` | CLI と JSON schema を安定化 |
 
 `1.0.0` までは JSON schema の破壊的変更を許容する。ただし変更履歴に明記する。
@@ -396,6 +397,17 @@ Release gate:
 - [x] full local quality gate を通過
 - [x] PR / main quality gate を通過
 - [x] signed `v0.6.0` tag と Trusted Publishing を検証
+
+### v0.6.1: Analysis Reliability Patch
+
+- [x] Cyclomatic / Cognitive Complexity を `sonar-dotnet 10.27` C# profile に合わせる
+- [x] nested type による pseudo-namespace cycle を除去する
+- [x] octocov line/branch coverage feedback と ratchet gate を追加する
+- [x] semantic self Grade floor と no-new-High baseline gate を追加する
+- [x] Complexity 専用 nightly mutation suite を追加する
+- [x] self + OSS 3 targets の before/after dogfood を記録する
+- [ ] full local / PR / main quality gate を通過する
+- [ ] signed `v0.6.1` tag と Trusted Publishing を検証する
 
 ### Phase 7 Candidate: Default Auto Mode
 

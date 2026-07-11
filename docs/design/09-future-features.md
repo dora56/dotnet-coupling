@@ -292,6 +292,21 @@ complexity は coupling health の主判定ではなく、issue の修正優先�
 type aggregate は、所属 method の max / average / sum を保持する。ranking では
 max と sum を優先し、平均値だけで判断しない。
 
+`0.6.1` 以降は `sonar-dotnet 10.27` の C# metric profile を互換基準とする。
+
+- Cyclomatic は executable declaration、conditional、loop、switch case / arm、
+  logical operator、conditional access、null coalescing、binary pattern を数える。
+- Cognitive は `if` / `else`、loop、catch、ternary、switch、logical sequence、
+  lambda / local function nesting、direct recursion、`goto` を数える。
+- `try` / `finally`、同種 logical operator の繰り返し、null coalescing は
+  Cognitive の加点対象にしない。
+- non-static local function は enclosing member に帰属し、static local function は
+  独立 member として扱う。
+- top-level statement は named component へ安全に帰属できないため対象外とする。
+
+この profile の変更は hotspot priority の数値を変え得るが、Balance Score、Grade、
+issue severity、`--check` には伝播させない。
+
 ### 28.3 Priority Model
 
 `priorityScore` は issue severity とは別に保持する。
