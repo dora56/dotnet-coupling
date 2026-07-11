@@ -34,8 +34,8 @@
     },
     "test-runner": "mtp",
     "mutate": [
-      "CouplingScoring.cs",
-      "IssueDetector.cs"
+      "**/CouplingScoring.cs",
+      "**/IssueDetector.cs"
     ]
   }
 }
