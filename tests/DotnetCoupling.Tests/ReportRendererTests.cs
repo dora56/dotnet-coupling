@@ -122,6 +122,159 @@ public sealed class ReportRendererTests
     }
 
     [Fact]
+    public void Render_JsonOutputWithImpact_UsesInvestigationSchemaContract()
+    {
+        AnalysisReport report = CreateInvestigationReport() with
+        {
+            Impact = new ImpactAnalysis(
+                "Sample.Target",
+                "Sample.Target",
+                0.72,
+                ["3 dependent components", "crosses a project or namespace boundary"],
+                [new DependencyPath("Sample.Caller", 1, ["Sample.Target", "Sample.Caller"], "Sample.App", "Sample", true, new SourceLocation("Caller.cs", 4))],
+                ["Sample.App"],
+                ["Sample"],
+                null),
+        };
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(TestPaths.RepositoryRoot, "schemas", "dotnet-coupling-report-0.5.schema.json")));
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        AssertRequiredProperties(schema.RootElement, document.RootElement);
+        Assert.Equal("0.5", document.RootElement.GetProperty("schemaVersion").GetString());
+        JsonElement impact = document.RootElement.GetProperty("impact");
+        Assert.Equal("Sample.Target", impact.GetProperty("component").GetString());
+        Assert.Equal("Sample.Caller", impact.GetProperty("dependents")[0].GetProperty("component").GetString());
+    }
+
+    [Fact]
+    public void Render_JsonOutputWithTrace_UsesInvestigationSchemaContract()
+    {
+        AnalysisReport report = CreateInvestigationReport() with
+        {
+            Trace = new TraceAnalysis(
+                "Execute",
+                "Sample.Target.Execute()",
+                TracedSymbolKind.Member,
+                [new DependencyPath("Sample.Caller", 1, ["Sample.Target.Execute()", "Sample.Caller"], "Sample.App", "Sample", false, new SourceLocation("Caller.cs", 8), "Sample.Caller.Run()")]),
+        };
+        using JsonDocument document = JsonDocument.Parse(ReportRenderer.Render(report, ReportFormat.Json));
+
+        Assert.Equal("0.5", document.RootElement.GetProperty("schemaVersion").GetString());
+        JsonElement trace = document.RootElement.GetProperty("trace");
+        Assert.Equal("Member", trace.GetProperty("kind").GetString());
+        Assert.Equal("Sample.Caller.Run()", trace.GetProperty("callers")[0].GetProperty("sourceSymbol").GetString());
+    }
+
+    [Fact]
+    public void Render_MarkdownWithImpact_ProducesShareableEvidence()
+    {
+        AnalysisReport report = CreateInvestigationReport() with
+        {
+            Impact = new ImpactAnalysis(
+                "Sample.Target",
+                "Sample.Target",
+                0.72,
+                ["1 dependent component", "crosses a project or namespace boundary"],
+                [new DependencyPath("Sample.Caller", 1, ["Sample.Target", "Sample.Caller"], "Sample.App", "Sample", true, new SourceLocation("Caller.cs", 4))],
+                ["Sample.App"],
+                ["Sample"],
+                null),
+        };
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Markdown);
+
+        Assert.Contains("# dotnet-coupling report", rendered);
+        Assert.Contains("## Impact: `Sample.Target`", rendered);
+        Assert.Contains("Risk score: **0.72**", rendered);
+        Assert.Contains("`Sample.Target` -> `Sample.Caller`", rendered);
+    }
+
+    [Fact]
+    public void Render_AiOutput_ReusesIssueEvidenceAndRecommendation()
+    {
+        CouplingIssue issue = new(
+            IssueType.GlobalComplexity,
+            Severity.High,
+            "Sample.Caller",
+            "Sample.Target",
+            0.32,
+            "Caller coordinates too many dependencies.",
+            "Split orchestration from policy.",
+            new SourceLocation("Caller.cs", 4));
+        AnalysisReport report = CreateInvestigationReport() with { Issues = [issue] };
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Ai);
+
+        Assert.Contains("# Coding-agent handoff", rendered);
+        Assert.Contains("Caller coordinates too many dependencies.", rendered);
+        Assert.Contains("Split orchestration from policy.", rendered);
+        Assert.Contains("Caller.cs:4", rendered);
+        Assert.Contains("Verify Grade and issue counts remain unchanged", rendered);
+    }
+
+    [Fact]
+    public void Render_Markdown_IncludesRecommendationsLocationsAndAnalysisLimits()
+    {
+        CouplingIssue issue = new(
+            IssueType.GlobalComplexity,
+            Severity.High,
+            "Sample.Caller",
+            "Sample.Target",
+            0.32,
+            "Caller coordinates too many dependencies.",
+            "Split orchestration from policy.",
+            new SourceLocation("src/Caller.cs", 4));
+        AnalysisReport report = CreateInvestigationReport() with
+        {
+            Issues = [issue],
+            BlindSpots = ["Runtime dependency resolution is not observed."],
+            Diagnostics = [new AnalysisDiagnostic("workspace-warning", "Warning", "One project could not be loaded.", "Sample.sln")],
+        };
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Markdown);
+
+        Assert.Contains("Split orchestration from policy.", rendered);
+        Assert.Contains("`src/Caller.cs:4`", rendered);
+        Assert.Contains("## Diagnostics", rendered);
+        Assert.Contains("workspace-warning", rendered);
+        Assert.Contains("## Blind spots", rendered);
+        Assert.Contains("Runtime dependency resolution is not observed.", rendered);
+    }
+
+    [Fact]
+    public void Render_SummaryInJapanese_LocalizesHumanLabelsOnly()
+    {
+        AnalysisReport report = CreateInvestigationReport() with
+        {
+            Diagnostics = [new AnalysisDiagnostic("workspace-warning", "Warning", "One project could not be loaded.", "Sample.sln")],
+        };
+
+        string rendered = ReportRenderer.Render(report, ReportFormat.Summary, ReportLanguage.Japanese);
+
+        Assert.Contains("評価: B", rendered);
+        Assert.Contains("ファイル: 2", rendered);
+        Assert.Contains("問題: 0 Critical, 0 High, 0 Medium", rendered);
+        Assert.Contains("Git: disabled", rendered);
+        Assert.Contains("Diagnostics: 1 recoverable warning(s)", rendered);
+    }
+
+    [Fact]
+    public void Render_TextAndHotspotsInJapanese_LocalizeHumanLabels()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
+        report = report with { Hotspots = HotspotAnalyzer.Calculate(report, 1) };
+
+        string text = ReportRenderer.Render(report, ReportFormat.Text, ReportLanguage.Japanese);
+        string hotspots = ReportRenderer.Render(report, ReportFormat.Hotspots, ReportLanguage.Japanese);
+
+        Assert.Contains("解析対象:", text);
+        Assert.Contains("上位の問題", text);
+        Assert.Contains("優先順位", hotspots);
+        Assert.Contains("理由:", hotspots);
+    }
+
+    [Fact]
     public void Render_HotspotsOutput_SeparatesRemediationPriorityFromHealthGrade()
     {
         string fixture = TestPaths.Fixture("global-complexity");
@@ -979,6 +1132,19 @@ public sealed class ReportRendererTests
         JsonElement project = Assert.Single(projectModel.GetProperty("projects").EnumerateArray());
         Assert.Equal("App", project.GetProperty("projectName").GetString());
         Assert.Equal(1, project.GetProperty("sourceFileCount").GetInt32());
+    }
+
+    private static AnalysisReport CreateInvestigationReport()
+    {
+        return new AnalysisReport(
+            new AnalysisSummary("/tmp/sample", "semantic-preview", 2, 2, 1, 0, false, false, 6),
+            new GradeResult("B", "Healthy", "issue-density", "Test"),
+            0.80,
+            [],
+            [],
+            [],
+            [],
+            []);
     }
 
     private static JsonElement Parse(string json)

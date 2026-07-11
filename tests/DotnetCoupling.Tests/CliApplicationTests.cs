@@ -131,6 +131,167 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task RunAsync_JsonImpact_IncludesInvestigationWithoutChangingCheckResult()
+    {
+        CommandResult result = await RunCliAsync(
+            "--json", "--impact", "Fixture.Global.Infrastructure.Repository",
+            "--check", "--min-grade", "B", "--no-git",
+            TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(1, result.ExitCode);
+        using JsonDocument document = JsonDocument.Parse(result.Output);
+        Assert.Equal("0.5", document.RootElement.GetProperty("schemaVersion").GetString());
+        Assert.Equal("Fixture.Global.Infrastructure.Repository", document.RootElement.GetProperty("impact").GetProperty("component").GetString());
+    }
+
+    [Fact]
+    public async Task RunAsync_MarkdownImpact_ReturnsShareableReport()
+    {
+        CommandResult result = await RunCliAsync(
+            "--markdown", "--impact", "Repository", "--depth", "1", "--no-git",
+            TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("# dotnet-coupling report", result.Output);
+        Assert.Contains("## Impact: `Fixture.Global.Infrastructure.Repository`", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_MarkdownHotspots_IncludesRequestedPriorityCandidates()
+    {
+        CommandResult result = await RunCliAsync(
+            "--markdown", "--hotspots", "1", "--no-git",
+            TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("## Priority candidates", result.Output);
+        Assert.Contains("Fixture.Global.Api.Handler", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_Ai_ReturnsDeterministicHandoff()
+    {
+        string configPath = Path.Combine(CreateDirectory(), ".coupling.json");
+        WriteFile(
+            configPath,
+            """
+            {
+              "prioritization": {
+                "cyclomaticComplexityThreshold": 1,
+                "cognitiveComplexityThreshold": 15,
+                "complexityWeight": 0.1
+              }
+            }
+            """);
+
+        CommandResult result = await RunCliAsync("--ai", "--config", configPath, "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("# Coding-agent handoff", result.Output);
+        Assert.Contains("## Observed evidence", result.Output);
+        Assert.Contains("## Priority candidates", result.Output);
+        Assert.Contains("Fixture.Global.Api.Handler", result.Output);
+        Assert.Contains("high cyclomatic complexity: 1", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_JpAlias_LocalizesSummary()
+    {
+        CommandResult result = await RunCliAsync("--summary", "--jp", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("評価: C", result.Output);
+    }
+
+    [Theory]
+    [InlineData("--impact", "Repository", "--trace", "Handle")]
+    [InlineData("--impact", "Repository", "--hotspots", "1")]
+    [InlineData("--impact", "Repository", "--sarif", "")]
+    [InlineData("--markdown", "", "--ai", "")]
+    public async Task RunAsync_IncompatibleInvestigationOptions_ReturnCliArgumentError(
+        string firstOption,
+        string firstValue,
+        string secondOption,
+        string secondValue)
+    {
+        List<string> args = [firstOption];
+        if (firstValue.Length > 0)
+        {
+            args.Add(firstValue);
+        }
+
+        args.Add(secondOption);
+        if (secondValue.Length > 0)
+        {
+            args.Add(secondValue);
+        }
+
+        args.Add("--no-git");
+        args.Add(TestPaths.Fixture("global-complexity"));
+
+        CommandResult result = await RunCliAsync([.. args]);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("cannot be combined", result.Error);
+    }
+
+    [Theory]
+    [InlineData("--depth", "2")]
+    [InlineData("--impact", "Repository", "--depth", "-1")]
+    public async Task RunAsync_InvalidDepthUsage_ReturnsCliArgumentError(params string[] optionArgs)
+    {
+        CommandResult result = await RunCliAsync([.. optionArgs, "--no-git", TestPaths.Fixture("global-complexity")]);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("--depth", result.Error);
+    }
+
+    [Fact]
+    public async Task RunAsync_TraceInSyntaxMode_ReturnsCliArgumentError()
+    {
+        CommandResult result = await RunCliAsync("--trace", "Handle", "--mode", "syntax", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("--trace requires --mode semantic", result.Error);
+    }
+
+    [Fact]
+    public async Task RunAsync_SemanticMemberTrace_ReturnsCallerEvidence()
+    {
+        string projectPath = CreateTraceProject();
+
+        CommandResult result = await RunCliAsync(
+            "--trace", "Repository.Save", "--mode", "semantic", "--depth", "1", "--no-git", projectPath);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Dependency trace: Sample.Infrastructure.Repository.Save", result.Output);
+        Assert.Contains("Sample.Application.OrderService.Handle", result.Output);
+    }
+
+    [Fact]
+    public async Task RunAsync_UnknownImpactTarget_ReturnsCliArgumentError()
+    {
+        CommandResult result = await RunCliAsync("--impact", "Missing", "--no-git", TestPaths.Fixture("global-complexity"));
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("No analyzed component matches 'Missing'", result.Error);
+    }
+
+    [Fact]
+    public async Task RunAsync_AmbiguousImpactTarget_ReturnsSortedCandidates()
+    {
+        string directory = CreateDirectory();
+        WriteFile(Path.Combine(directory, "Sales.cs"), "namespace Sales; public sealed class Repository { }");
+        WriteFile(Path.Combine(directory, "Support.cs"), "namespace Support; public sealed class Repository { }");
+
+        CommandResult result = await RunCliAsync("--impact", "Repository", "--no-git", directory);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("ambiguous", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.Error.IndexOf("Sales.Repository", StringComparison.Ordinal) < result.Error.IndexOf("Support.Repository", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task RunAsync_CheckMinGrade_ReturnsFailureWhenGradeIsTooLow()
     {
         CommandResult result = await RunCliAsync("--check", "--min-grade", "B", "--no-git", TestPaths.Fixture("global-complexity"));
@@ -1196,6 +1357,47 @@ public sealed class CliApplicationTests
     }
 
     private sealed record CommandResult(int ExitCode, string Output, string Error);
+
+    private static string CreateTraceProject()
+    {
+        string directory = CreateDirectory();
+        string projectPath = Path.Combine(directory, "Sample.csproj");
+        WriteFile(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile(
+            Path.Combine(directory, "Repository.cs"),
+            """
+            namespace Sample.Infrastructure;
+
+            public sealed class Repository
+            {
+                public void Save() { }
+            }
+            """);
+        WriteFile(
+            Path.Combine(directory, "OrderService.cs"),
+            """
+            using Sample.Infrastructure;
+
+            namespace Sample.Application;
+
+            public sealed class OrderService
+            {
+                public void Handle()
+                {
+                    new Repository().Save();
+                }
+            }
+            """);
+        return projectPath;
+    }
 
     private static string CreateDirectory()
     {

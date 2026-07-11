@@ -54,6 +54,26 @@
       },
       "additionalProperties": false
     },
+    "prioritization": {
+      "type": "object",
+      "description": "Complexity tuning for remediation priority only. These values do not affect Grade, issue severity, or --check.",
+      "properties": {
+        "cyclomaticComplexityThreshold": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cognitiveComplexityThreshold": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "complexityWeight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5
+        }
+      },
+      "additionalProperties": false
+    },
     "ignore": {
       "type": "object",
       "properties": {

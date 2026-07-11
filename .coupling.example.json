@@ -17,6 +17,11 @@
     "maxTemporalFilesPerCommit": 50,
     "scatteredExternalBreadth": 5
   },
+  "prioritization": {
+    "cyclomaticComplexityThreshold": 10,
+    "cognitiveComplexityThreshold": 15,
+    "complexityWeight": 0.1
+  },
   "ignore": {
     "paths": [
       "**/Legacy/**"

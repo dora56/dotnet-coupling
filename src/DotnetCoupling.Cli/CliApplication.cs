@@ -88,6 +88,37 @@ public static class CliApplication
             Description = "Compare issues against the specified Git ref.",
         };
 
+        Option<string?> impactOption = new("--impact")
+        {
+            Description = "Show direct and transitive dependents of a component.",
+        };
+
+        Option<string?> traceOption = new("--trace")
+        {
+            Description = "Trace semantic dependencies on a type or member.",
+        };
+
+        Option<int> depthOption = new("--depth")
+        {
+            Description = "Maximum impact or trace depth. Use 0 for unlimited.",
+            DefaultValueFactory = _ => 3,
+        };
+
+        Option<bool> markdownOption = new("--markdown")
+        {
+            Description = "Render a Markdown report.",
+        };
+
+        Option<bool> aiOption = new("--ai")
+        {
+            Description = "Render deterministic coding-agent guidance.",
+        };
+
+        Option<bool> japaneseOption = new("--japanese", "--jp")
+        {
+            Description = "Localize human-readable output in Japanese.",
+        };
+
         rootCommand.Arguments.Add(pathArgument);
         rootCommand.Options.Add(summaryOption);
         rootCommand.Options.Add(jsonOption);
@@ -102,6 +133,12 @@ public static class CliApplication
         rootCommand.Options.Add(gitMonthsOption);
         rootCommand.Options.Add(configOption);
         rootCommand.Options.Add(baselineOption);
+        rootCommand.Options.Add(impactOption);
+        rootCommand.Options.Add(traceOption);
+        rootCommand.Options.Add(depthOption);
+        rootCommand.Options.Add(markdownOption);
+        rootCommand.Options.Add(aiOption);
+        rootCommand.Options.Add(japaneseOption);
 
         rootCommand.SetAction(parseResult =>
         {
@@ -120,6 +157,13 @@ public static class CliApplication
             int gitMonths = parseResult.GetValue(gitMonthsOption);
             FileInfo? config = parseResult.GetValue(configOption);
             string? baselineRef = parseResult.GetValue(baselineOption);
+            string? impactQuery = parseResult.GetValue(impactOption);
+            string? traceQuery = parseResult.GetValue(traceOption);
+            int depth = parseResult.GetValue(depthOption);
+            bool depthSpecified = parseResult.GetResult(depthOption) is { Implicit: false };
+            bool markdown = parseResult.GetValue(markdownOption);
+            bool ai = parseResult.GetValue(aiOption);
+            bool japanese = parseResult.GetValue(japaneseOption);
             bool includeHotspots = CliReportWriter.ShouldIncludeHotspots(hotspotsRequested, json, sarif);
 
             if (!string.IsNullOrWhiteSpace(failOn) && !TryParseSeverity(failOn, out _))
@@ -131,6 +175,50 @@ public static class CliApplication
             if (!TryParseMode(mode, out AnalysisMode analysisMode))
             {
                 Console.Error.WriteLine($"Invalid value for --mode: {mode}");
+                return 2;
+            }
+
+            bool impactRequested = !string.IsNullOrWhiteSpace(impactQuery);
+            bool traceRequested = !string.IsNullOrWhiteSpace(traceQuery);
+            if ((impactRequested ? 1 : 0) + (traceRequested ? 1 : 0) + (hotspotsRequested ? 1 : 0) > 1)
+            {
+                Console.Error.WriteLine("--impact, --trace, and --hotspots cannot be combined.");
+                return 2;
+            }
+
+            if (sarif && (impactRequested || traceRequested || markdown || ai))
+            {
+                Console.Error.WriteLine("--sarif cannot be combined with --impact, --trace, --markdown, or --ai.");
+                return 2;
+            }
+
+            if (markdown && ai)
+            {
+                Console.Error.WriteLine("--markdown and --ai cannot be combined.");
+                return 2;
+            }
+
+            if (json && (markdown || ai))
+            {
+                Console.Error.WriteLine("--json cannot be combined with --markdown or --ai.");
+                return 2;
+            }
+
+            if (traceRequested && analysisMode != AnalysisMode.Semantic)
+            {
+                Console.Error.WriteLine("--trace requires --mode semantic.");
+                return 2;
+            }
+
+            if (depth < 0)
+            {
+                Console.Error.WriteLine("Invalid value for --depth: value must be non-negative.");
+                return 2;
+            }
+
+            if (depthSpecified && !impactRequested && !traceRequested)
+            {
+                Console.Error.WriteLine("--depth can only be used with --impact or --trace.");
                 return 2;
             }
 
@@ -158,7 +246,7 @@ public static class CliApplication
                     volatilityProvider,
                     gitMonths,
                     configuration.Options,
-                    includeComplexity: includeHotspots);
+                    includeComplexity: includeHotspots || impactRequested || ai);
                 if (!string.IsNullOrWhiteSpace(baselineRef))
                 {
                     string? repositoryRoot = CliPathResolver.FindGitRepositoryRoot(analysisTargetPath);
@@ -180,8 +268,35 @@ public static class CliApplication
                         BaselineComparer.Compare(baselineRef, report, baselineReport));
                 }
 
-                report = CliReportWriter.AddHotspotsIfIncluded(report, includeHotspots, hotspotsValue);
-                CliReportRenderOptions renderOptions = new(summary, json, sarif, includeHotspots, check, analysisTargetPath);
+                if (impactRequested)
+                {
+                    report = report with
+                    {
+                        Impact = ImpactAnalyzer.Analyze(report, impactQuery!, depth, configuration.Options.Prioritization),
+                    };
+                }
+
+                if (traceRequested)
+                {
+                    report = report with { Trace = TraceAnalyzer.Analyze(report, traceQuery!, depth) };
+                }
+
+                report = CliReportWriter.AddHotspotsIfIncluded(
+                    report,
+                    includeHotspots || ai,
+                    hotspotsValue,
+                    configuration.Options.Prioritization);
+                CliReportRenderOptions renderOptions = new(
+                    summary,
+                    json,
+                    sarif,
+                    includeHotspots,
+                    markdown,
+                    ai,
+                    impactRequested || traceRequested,
+                    japanese ? ReportLanguage.Japanese : ReportLanguage.English,
+                    check,
+                    analysisTargetPath);
                 string rendered = CliReportWriter.Render(report, renderOptions);
                 CliReportWriter.Write(rendered, output);
 
@@ -213,6 +328,11 @@ public static class CliApplication
                 return 0;
             }
             catch (ConfigurationException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 2;
+            }
+            catch (InvestigationQueryException ex)
             {
                 Console.Error.WriteLine(ex.Message);
                 return 2;

@@ -7,4 +7,6 @@ public sealed record DependencyObservation(
     UsageContext Usage,
     string FilePath,
     int Line,
-    string? Expression);
+    string? Expression,
+    string? SourceSymbol = null,
+    string? TargetSymbol = null);

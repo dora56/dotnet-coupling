@@ -15,6 +15,11 @@ min_temporal_coupling = 3
 max_temporal_files_per_commit = 50
 scattered_external_breadth = 5
 
+[prioritization]
+cyclomatic_complexity_threshold = 10
+cognitive_complexity_threshold = 15
+complexity_weight = 0.10
+
 [ignore]
 paths = [
   "**/Legacy/**",

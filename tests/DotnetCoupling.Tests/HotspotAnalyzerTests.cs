@@ -149,6 +149,39 @@ public sealed class HotspotAnalyzerTests
     }
 
     [Fact]
+    public void Calculate_CustomComplexityThresholdsAndWeight_ControlPriorityBonus()
+    {
+        string fixture = TestPaths.Fixture("global-complexity");
+        AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6) with
+        {
+            ComponentComplexities =
+            [
+                new ComponentComplexity(
+                    "Fixture.Global.Api.Handler",
+                    Path.Combine(fixture, "Api", "Handler.cs"),
+                    MemberCount: 1,
+                    MaxCyclomaticComplexity: 12,
+                    MaxCognitiveComplexity: 16,
+                    TotalCyclomaticComplexity: 12,
+                    TotalCognitiveComplexity: 16,
+                    MostComplexMember: null),
+            ],
+        };
+
+        Hotspot defaultHotspot = Assert.Single(
+            HotspotAnalyzer.Calculate(report, count: 10),
+            hotspot => hotspot.Component == "Fixture.Global.Api.Handler");
+        PrioritizationOptions options = new(20, 30, 0.25);
+
+        Hotspot configuredHotspot = Assert.Single(
+            HotspotAnalyzer.Calculate(report, count: 10, options),
+            hotspot => hotspot.Component == "Fixture.Global.Api.Handler");
+
+        Assert.True(defaultHotspot.Score > configuredHotspot.Score);
+        Assert.DoesNotContain(configuredHotspot.Reasons, reason => reason.Contains("complexity", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Calculate_FilePathHotspot_UsesComplexityFromComponentsInThatFile()
     {
         string filePath = "/tmp/sample/Handler.cs";
@@ -199,6 +232,36 @@ public sealed class HotspotAnalyzerTests
         AnalysisReport report = CSharpDependencyAnalyzer.Analyze(fixture, useGit: false, gitMonths: 6);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => HotspotAnalyzer.Calculate(report, count: 0));
+    }
+
+    [Fact]
+    public void Calculate_CircularDependency_RanksIndividualCycleParticipants()
+    {
+        CouplingIssue issue = new(
+            IssueType.CircularDependency,
+            Severity.High,
+            "Sample.A -> Sample.B",
+            "Sample.A -> Sample.B",
+            0,
+            "Namespaces form a circular dependency.",
+            "Invert one direction.",
+            null);
+        AnalysisReport report = new(
+            new AnalysisSummary("/tmp/sample", "syntax-only", 2, 2, 0, 0, false, false, 6),
+            new GradeResult("D", "At risk", "issue-density", "Test"),
+            0,
+            [],
+            [],
+            [],
+            [issue],
+            []);
+
+        IReadOnlyList<Hotspot> hotspots = HotspotAnalyzer.Calculate(report, count: 10);
+
+        Assert.Equal(["Sample.A", "Sample.B"], hotspots.Select(hotspot => hotspot.Component).Order(StringComparer.Ordinal));
+        Assert.All(hotspots, hotspot => Assert.True(hotspot.ParticipatesInCycle));
+        Assert.All(hotspots, hotspot => Assert.Equal(1, hotspot.IssueCount));
+        Assert.DoesNotContain(hotspots, hotspot => hotspot.Component.Contains(" -> ", StringComparison.Ordinal));
     }
 
     private static object ToComparable(Hotspot hotspot)

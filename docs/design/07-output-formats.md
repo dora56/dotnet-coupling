@@ -55,7 +55,7 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
   "$schema": "https://raw.githubusercontent.com/YOUR_GITHUB/dotnet-coupling/main/schemas/dotnet-coupling-report.schema.json",
   "schemaVersion": "0.1",
   "tool": "dotnet-coupling",
-  "version": "0.4.0",
+  "version": "0.6.0",
   "analysis": {
     "path": "./src",
     "mode": "semantic-preview",
@@ -162,6 +162,11 @@ JSON は v0.1 から `$schema` と `schemaVersion` を含める。`1.0.0` まで
 hotspot に `complexity` が含まれる場合だけ使う。complexity は remediation priority
 の補助情報であり、Grade、issue severity、`--check` の判定には使わない。
 
+`schemaVersion: 0.5` は `0.6.0` の investigation schema である。
+`--json --impact` または `--json --trace` の場合だけ選択し、optional `impact` /
+`trace` evidence を追加する。investigation view は Grade、issue severity、issue
+count、`--check` 判定を変更しない。
+
 suppressed issue は active issue counts、grade、`--check` の判定から除外する。
 ただし JSON と summary には件数と対象を残し、負債が隠れないようにする。
 
@@ -175,7 +180,8 @@ schemas/
   dotnet-coupling-report-0.2.schema.json
   dotnet-coupling-report-0.3.schema.json
   dotnet-coupling-report-0.4.schema.json
-  dotnet-coupling-report.schema.json -> latest experimental
+  dotnet-coupling-report-0.5.schema.json
+  dotnet-coupling-report.schema.json -> stable default 0.1 contract
 ```
 
 CI 利用者向けに、少なくとも以下は安定させる。
@@ -234,15 +240,27 @@ reason を表示する。固定 threshold は cyclomatic `>= 10`、cognitive `>=
 priority score への加点は最大 `+0.10` に抑える。complexity が高いだけでは hotspot
 を作らず、active issue のある component だけを ranking 対象にする。
 
-### 19.7 出力モード優先順位
+### 19.7 Investigation / Markdown / AI output
+
+`--impact` は internal coupling graph を逆向きに breadth-first traversal し、最短
+path、depth、project/namespace boundary、risk reasons を出す。`--trace` は semantic
+observation の symbol identity から caller evidence を出す。Markdown は共有用、AI
+output は観測 evidence と既存 recommendation に限定した coding-agent handoff であり、
+外部 LLM を呼ばない。
+
+### 19.8 出力モード優先順位
 
 同時指定された場合の優先順位:
 
 1. `--json`
 2. `--sarif`
-3. `--hotspots`
-4. `--check`
-5. `--summary`
-6. 通常レポート
+3. `--ai`
+4. `--markdown`
+5. investigation text
+6. `--hotspots`
+7. `--check`
+8. `--summary`
+9. 通常レポート
 
-競合するモードが指定された場合は、上位の出力モードを採用する。
+契約上競合する investigation / SARIF / Markdown / AI の組み合わせは silent precedence
+にせず exit code `2` とする。

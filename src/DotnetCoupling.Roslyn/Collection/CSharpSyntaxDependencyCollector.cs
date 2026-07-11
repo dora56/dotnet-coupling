@@ -39,7 +39,7 @@ internal static class CSharpSyntaxDependencyCollector
         ComponentWalker walker = new(tree, namespaceName, filePath, projectName, semanticModel);
         walker.Visit(root);
         IReadOnlyList<MemberComplexity> complexities = includeComplexity
-            ? CSharpComplexityCollector.Collect(tree, root, namespaceName, filePath)
+            ? CSharpComplexityCollector.Collect(tree, root, namespaceName, filePath, semanticModel)
             : [];
 
         return new SyntaxFileAnalysis(
@@ -91,10 +91,13 @@ internal static class CSharpSyntaxDependencyCollector
         private readonly Dictionary<string, string> _dynamicLocalTargets = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _dynamicFieldTargets = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _dynamicPropertyTargets = new(StringComparer.Ordinal);
+        private readonly Stack<string?> _sourceSymbols = new();
 
         public List<Component> Components { get; } = [];
 
         public List<DependencyObservation> Observations { get; } = [];
+
+        private string? CurrentSourceSymbol => _sourceSymbols.TryPeek(out string? symbol) ? symbol : null;
 
         public override void VisitClassDeclaration(ClassDeclarationSyntax node)
         {
@@ -118,7 +121,7 @@ internal static class CSharpSyntaxDependencyCollector
 
         public override void VisitEnumDeclaration(EnumDeclarationSyntax node)
         {
-            Component component = CreateComponent(node.Identifier.ValueText, arity: 0, ComponentKind.Enum, node.Modifiers);
+            Component component = CreateComponent(node, node.Identifier.ValueText, arity: 0, ComponentKind.Enum, node.Modifiers);
             Components.Add(component);
         }
 
@@ -177,29 +180,55 @@ internal static class CSharpSyntaxDependencyCollector
 
         public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
         {
-            AddObservation(node.ReturnType, DependencyKind.TypeReference, UsageContext.ReturnType);
-            foreach (ParameterSyntax parameter in node.ParameterList.Parameters)
+            VisitSourceMember(node, () =>
             {
-                if (parameter.Type is not null)
+                AddObservation(node.ReturnType, DependencyKind.TypeReference, UsageContext.ReturnType);
+                foreach (ParameterSyntax parameter in node.ParameterList.Parameters)
                 {
-                    AddObservation(parameter.Type, DependencyKind.TypeReference, UsageContext.ParameterType);
+                    if (parameter.Type is not null)
+                    {
+                        AddObservation(parameter.Type, DependencyKind.TypeReference, UsageContext.ParameterType);
+                    }
                 }
-            }
 
-            base.VisitMethodDeclaration(node);
+                base.VisitMethodDeclaration(node);
+            });
         }
 
         public override void VisitConstructorDeclaration(ConstructorDeclarationSyntax node)
         {
-            foreach (ParameterSyntax parameter in node.ParameterList.Parameters)
+            VisitSourceMember(node, () =>
             {
-                if (parameter.Type is not null)
+                foreach (ParameterSyntax parameter in node.ParameterList.Parameters)
                 {
-                    AddObservation(parameter.Type, DependencyKind.TypeReference, UsageContext.ParameterType);
+                    if (parameter.Type is not null)
+                    {
+                        AddObservation(parameter.Type, DependencyKind.TypeReference, UsageContext.ParameterType);
+                    }
                 }
-            }
 
-            base.VisitConstructorDeclaration(node);
+                base.VisitConstructorDeclaration(node);
+            });
+        }
+
+        public override void VisitLocalFunctionStatement(LocalFunctionStatementSyntax node)
+        {
+            VisitSourceMember(node, () => base.VisitLocalFunctionStatement(node));
+        }
+
+        public override void VisitAccessorDeclaration(AccessorDeclarationSyntax node)
+        {
+            VisitSourceMember(node, () => base.VisitAccessorDeclaration(node));
+        }
+
+        public override void VisitOperatorDeclaration(OperatorDeclarationSyntax node)
+        {
+            VisitSourceMember(node, () => base.VisitOperatorDeclaration(node));
+        }
+
+        public override void VisitConversionOperatorDeclaration(ConversionOperatorDeclarationSyntax node)
+        {
+            VisitSourceMember(node, () => base.VisitConversionOperatorDeclaration(node));
         }
 
         public override void VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
@@ -249,6 +278,7 @@ internal static class CSharpSyntaxDependencyCollector
         private void VisitTypeDeclaration(TypeDeclarationSyntax node, ComponentKind kind, Action visitChildren)
         {
             Component component = CreateComponent(
+                node,
                 node.Identifier.ValueText,
                 node.TypeParameterList?.Parameters.Count ?? 0,
                 kind,
@@ -259,11 +289,24 @@ internal static class CSharpSyntaxDependencyCollector
             _componentStack.Pop();
         }
 
-        private Component CreateComponent(string name, int arity, ComponentKind kind, SyntaxTokenList modifiers)
+        private Component CreateComponent(
+            BaseTypeDeclarationSyntax node,
+            string name,
+            int arity,
+            ComponentKind kind,
+            SyntaxTokenList modifiers)
         {
             string typeName = CreateTypeIdentity(name, arity);
-            string id = string.IsNullOrWhiteSpace(namespaceName) ? typeName : $"{namespaceName}.{typeName}";
+            string id = SymbolIdentity.CreateType(semanticModel?.GetDeclaredSymbol(node))
+                ?? (string.IsNullOrWhiteSpace(namespaceName) ? typeName : $"{namespaceName}.{typeName}");
             return new Component(id, name, namespaceName, projectName, filePath, kind, ResolveVisibility(modifiers));
+        }
+
+        private void VisitSourceMember(SyntaxNode node, Action visitChildren)
+        {
+            _sourceSymbols.Push(SymbolIdentity.CreateMember(semanticModel?.GetDeclaredSymbol(node)));
+            visitChildren();
+            _sourceSymbols.Pop();
         }
 
         private void AddObservation(TypeSyntax type, DependencyKind kind, UsageContext usage)
@@ -287,7 +330,9 @@ internal static class CSharpSyntaxDependencyCollector
                 usage,
                 filePath,
                 span.StartLinePosition.Line + 1,
-                type.ToString()));
+                type.ToString(),
+                CurrentSourceSymbol,
+                semanticModel is null ? null : targetName));
         }
 
         private void AddBaseTypeObservation(TypeSyntax type)
@@ -338,7 +383,9 @@ internal static class CSharpSyntaxDependencyCollector
                 methodSymbol.IsStatic ? UsageContext.StaticCall : UsageContext.MethodCall,
                 filePath,
                 span.StartLinePosition.Line + 1,
-                node.Expression.ToString()));
+                node.Expression.ToString(),
+                CurrentSourceSymbol,
+                SymbolIdentity.CreateMember(methodSymbol)));
         }
 
         private void AddNameOfObservation(InvocationExpressionSyntax node)
@@ -365,7 +412,9 @@ internal static class CSharpSyntaxDependencyCollector
                 UsageContext.Reflection,
                 filePath,
                 span.StartLinePosition.Line + 1,
-                node.ToString()));
+                node.ToString(),
+                CurrentSourceSymbol,
+                semanticModel is null ? null : targetName));
         }
 
         private bool AddServiceLocatorObservation(InvocationExpressionSyntax node)
@@ -724,7 +773,9 @@ internal static class CSharpSyntaxDependencyCollector
                 usage,
                 filePath,
                 span.StartLinePosition.Line + 1,
-                node.ToString()));
+                node.ToString(),
+                CurrentSourceSymbol,
+                SymbolIdentity.CreateMember(memberSymbol)));
         }
 
         private static string ExtractTypeName(TypeSyntax type, SemanticModel? semanticModel)
@@ -1136,28 +1187,12 @@ internal static class CSharpSyntaxDependencyCollector
 
         private static string? TryCreateSymbolIdentity(ITypeSymbol typeSymbol)
         {
-            if (typeSymbol is INamedTypeSymbol namedType)
-            {
-                return TryCreateSymbolIdentity(namedType);
-            }
-
-            return null;
+            return SymbolIdentity.CreateType(typeSymbol);
         }
 
         private static string? TryCreateSymbolIdentity(INamedTypeSymbol namedType)
         {
-            if (namedType.SpecialType != SpecialType.None)
-            {
-                return null;
-            }
-
-            if (namedType.ContainingNamespace is null || namedType.ContainingNamespace.IsGlobalNamespace)
-            {
-                return namedType.MetadataName;
-            }
-
-            string namespacePrefix = namedType.ContainingNamespace.ToDisplayString();
-            return $"{namespacePrefix}.{namedType.MetadataName}";
+            return SymbolIdentity.CreateType(namedType);
         }
 
         private static string ExtractSimpleName(SimpleNameSyntax name)

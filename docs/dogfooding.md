@@ -95,6 +95,25 @@ Record for each target:
 Record the results in
 `docs/dogfooding/phase5-complexity-hotspots-dogfooding-2026-07-05.md`.
 
+## Phase 6 Investigation UX
+
+Phase 6 dogfooding compares investigation views without allowing output selection
+to change Grade, issue counts, or check results. Use a locally packed tool and
+record exact repository SHAs.
+
+```bash
+dotnet-coupling --impact ComponentName --depth 3 --config .coupling.toml .
+dotnet-coupling --trace Type.Member --mode semantic Project.sln
+dotnet-coupling --markdown --impact ComponentName --no-git ./src
+dotnet-coupling --ai --trace Type.Member --mode semantic Project.sln
+dotnet-coupling --summary --jp --no-git ./src
+```
+
+For each target, record target resolution, direct/transitive paths, ambiguity or
+workspace diagnostics, Markdown/AI usefulness, and Grade/issue-count invariance.
+Required coverage is self, Humanizer, FluentValidation, MediatR, and one DDD
+sample where semantic workspace loading is viable.
+
 ## External Sample Dogfood
 
 Run against 2-3 small C# repositories before publishing a new alpha or stable

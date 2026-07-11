@@ -15,6 +15,12 @@ internal static class ConfigurationOptionsFactory
             rawThresholds?.ScatteredExternalBreadth ?? defaultThresholds.ScatteredExternalBreadth);
 
         RawIgnore? rawIgnore = configuration.Ignore;
+        PrioritizationOptions defaultPrioritization = defaults.Prioritization;
+        RawPrioritization? rawPrioritization = configuration.Prioritization;
+        PrioritizationOptions prioritization = new(
+            rawPrioritization?.CyclomaticComplexityThreshold ?? defaultPrioritization.CyclomaticComplexityThreshold,
+            rawPrioritization?.CognitiveComplexityThreshold ?? defaultPrioritization.CognitiveComplexityThreshold,
+            rawPrioritization?.ComplexityWeight ?? defaultPrioritization.ComplexityWeight);
         return new AnalysisOptions(
             configuration.Analysis?.ExcludePathPatterns ?? defaults.ExcludePathPatterns,
             configuration.Analysis?.TestProjectPathPatterns ?? defaults.TestProjectPathPatterns,
@@ -23,7 +29,8 @@ internal static class ConfigurationOptionsFactory
             rawIgnore?.IssueTypes is null ? defaults.IgnoreIssueTypes : ReadIssueTypes(rawIgnore.IssueTypes),
             rawIgnore?.Issues is null ? defaults.IssueSuppressions : ReadIssueSuppressions(rawIgnore.Issues),
             thresholds,
-            configuration.Domain is null ? defaults.DomainContext : ReadDomainContext(configuration.Domain));
+            configuration.Domain is null ? defaults.DomainContext : ReadDomainContext(configuration.Domain),
+            prioritization);
     }
 
     private static HashSet<IssueType> ReadIssueTypes(IReadOnlyList<string> rawValues)

@@ -83,6 +83,11 @@ internal static class ConfigurationValueReader
 
     internal static int? ReadPositiveInt(JsonElement element, string propertyName)
     {
+        return ReadPositiveInt(element, propertyName, $"thresholds.{propertyName}");
+    }
+
+    internal static int? ReadPositiveInt(JsonElement element, string propertyName, string path)
+    {
         if (!element.TryGetProperty(propertyName, out JsonElement value))
         {
             return null;
@@ -90,7 +95,7 @@ internal static class ConfigurationValueReader
 
         if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int result) || result <= 0)
         {
-            throw new ConfigurationException($"thresholds.{propertyName} must be a positive integer.");
+            throw new ConfigurationException($"{path} must be a positive integer.");
         }
 
         return result;
@@ -116,6 +121,62 @@ internal static class ConfigurationValueReader
         }
 
         return (int)result.Value;
+    }
+
+    internal static double? ReadDoubleInRange(
+        JsonElement element,
+        string propertyName,
+        string path,
+        double minimum,
+        double maximum)
+    {
+        if (!element.TryGetProperty(propertyName, out JsonElement value))
+        {
+            return null;
+        }
+
+        if (value.ValueKind != JsonValueKind.Number
+            || !value.TryGetDouble(out double result)
+            || !double.IsFinite(result)
+            || result < minimum
+            || result > maximum)
+        {
+            throw new ConfigurationException($"{path} must be between {minimum} and {maximum}.");
+        }
+
+        return result;
+    }
+
+    internal static double? ReadDoubleInRange(
+        TomlTable table,
+        string propertyName,
+        string path,
+        double minimum,
+        double maximum)
+    {
+        if (!table.TryGetValue(propertyName, out object? value))
+        {
+            return null;
+        }
+
+        double? result = value switch
+        {
+            double doubleValue => doubleValue,
+            float floatValue => floatValue,
+            int intValue => intValue,
+            long longValue => longValue,
+            _ => null,
+        };
+
+        if (result is null
+            || !double.IsFinite(result.Value)
+            || result < minimum
+            || result > maximum)
+        {
+            throw new ConfigurationException($"{path} must be between {minimum} and {maximum}.");
+        }
+
+        return result;
     }
 
     internal static List<RawIssueSuppression> ReadIssueSuppressions(JsonElement element)

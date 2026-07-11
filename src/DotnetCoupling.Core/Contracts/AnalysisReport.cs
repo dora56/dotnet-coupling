@@ -16,4 +16,6 @@ public sealed record AnalysisReport(
     IReadOnlyList<Hotspot>? Hotspots = null,
     DomainContextSummary? DomainContext = null,
     IReadOnlyList<ComponentRoleContext>? ComponentRoles = null,
-    IReadOnlyList<ComponentComplexity>? ComponentComplexities = null);
+    IReadOnlyList<ComponentComplexity>? ComponentComplexities = null,
+    ImpactAnalysis? Impact = null,
+    TraceAnalysis? Trace = null);

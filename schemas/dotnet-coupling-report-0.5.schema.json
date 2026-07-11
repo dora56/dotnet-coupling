@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.5.schema.json",
+  "title": "dotnet-coupling investigation report",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "tool", "version", "analysis", "grade", "scores", "issueCounts", "issues", "manifest"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": "0.5" },
+    "tool": { "const": "dotnet-coupling" },
+    "version": { "type": "string" },
+    "analysis": { "$ref": "dotnet-coupling-report-0.1.schema.json#/properties/analysis" },
+    "grade": { "$ref": "dotnet-coupling-report-0.1.schema.json#/properties/grade" },
+    "scores": { "$ref": "dotnet-coupling-report-0.1.schema.json#/properties/scores" },
+    "issueCounts": { "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issueCounts" },
+    "issues": { "type": "array", "items": { "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/issue" } },
+    "projectModel": { "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/projectModel" },
+    "baseline": { "$ref": "dotnet-coupling-report-0.2.schema.json#/properties/baseline" },
+    "hotspots": { "type": "array", "items": { "$ref": "dotnet-coupling-report-0.4.schema.json#/$defs/hotspot" } },
+    "suppressedIssues": { "type": "array", "items": { "$ref": "dotnet-coupling-report-0.3.schema.json#/$defs/suppressedIssue" } },
+    "impact": { "$ref": "#/$defs/impact" },
+    "trace": { "$ref": "#/$defs/trace" },
+    "manifest": { "$ref": "dotnet-coupling-report-0.1.schema.json#/properties/manifest" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "dependencyPath": {
+      "type": "object",
+      "required": ["component", "depth", "path", "namespace", "crossesBoundary"],
+      "properties": {
+        "component": { "type": "string" },
+        "depth": { "type": "integer", "minimum": 1 },
+        "path": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+        "project": { "type": ["string", "null"] },
+        "namespace": { "type": "string" },
+        "crossesBoundary": { "type": "boolean" },
+        "location": {
+          "anyOf": [
+            { "$ref": "dotnet-coupling-report-0.1.schema.json#/$defs/location" },
+            { "type": "null" }
+          ]
+        },
+        "sourceSymbol": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "impact": {
+      "type": "object",
+      "required": ["query", "component", "riskScore", "reasons", "dependents", "projects", "namespaces"],
+      "properties": {
+        "query": { "type": "string" },
+        "component": { "type": "string" },
+        "riskScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "dependents": { "type": "array", "items": { "$ref": "#/$defs/dependencyPath" } },
+        "projects": { "type": "array", "items": { "type": "string" } },
+        "namespaces": { "type": "array", "items": { "type": "string" } },
+        "complexity": {
+          "anyOf": [
+            { "$ref": "dotnet-coupling-report-0.4.schema.json#/$defs/hotspotComplexity" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "trace": {
+      "type": "object",
+      "required": ["query", "symbol", "kind", "callers"],
+      "properties": {
+        "query": { "type": "string" },
+        "symbol": { "type": "string" },
+        "kind": { "enum": ["Component", "Member"] },
+        "callers": { "type": "array", "items": { "$ref": "#/$defs/dependencyPath" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

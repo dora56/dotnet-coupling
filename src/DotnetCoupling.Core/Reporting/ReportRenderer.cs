@@ -25,13 +25,84 @@ public static class ReportRenderer
 
     public static string Render(AnalysisReport report, ReportFormat format)
     {
+        return Render(report, format, ReportLanguage.English);
+    }
+
+    public static string Render(AnalysisReport report, ReportFormat format, ReportLanguage language)
+    {
         return format switch
         {
             ReportFormat.Json => RenderJson(report),
+            ReportFormat.Summary when language == ReportLanguage.Japanese => RenderJapaneseSummary(report),
             ReportFormat.Summary => RenderSummary(report),
+            ReportFormat.Hotspots when language == ReportLanguage.Japanese => RenderJapaneseHotspots(report),
             ReportFormat.Hotspots => RenderHotspots(report),
+            ReportFormat.Markdown => MarkdownReportRenderer.Render(report, language),
+            ReportFormat.Ai => AiReportRenderer.Render(report, language),
+            ReportFormat.Investigation => InvestigationReportRenderer.Render(report, language),
+            _ when language == ReportLanguage.Japanese => RenderJapaneseText(report),
             _ => RenderText(report),
         };
+    }
+
+    private static string RenderJapaneseText(AnalysisReport report)
+    {
+        IssueCounts counts = CountIssues(report);
+        StringBuilder builder = new();
+        builder.AppendLine(CultureInfo.InvariantCulture, $"解析対象: '{report.Summary.Path}'");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"解析完了: {report.Summary.Files} ファイル、{report.Summary.Components} 型");
+        builder.AppendLine();
+        builder.AppendLine(CultureInfo.InvariantCulture, $"評価: {report.Grade.Letter} ({report.Grade.Display}) | 平均スコア: {report.AverageBalanceScore:0.00} | 問題: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"判定基準: {report.Grade.Basis}、内部結合 {report.Summary.InternalCouplings} 件");
+        builder.AppendLine(DescribeGit(report));
+        AppendDomainContextSummary(builder, report);
+        AppendSuppressedSummary(builder, report);
+        AppendBaselineText(builder, report);
+        builder.AppendLine();
+        builder.AppendLine("上位の問題");
+        builder.AppendLine("------------------------------------------------------------");
+        if (report.Issues.Count == 0)
+        {
+            builder.AppendLine("問題は検出されませんでした。");
+        }
+        else
+        {
+            foreach ((CouplingIssue issue, int index) in report.Issues.Take(10).Select((issue, index) => (issue, index + 1)))
+            {
+                builder.AppendLine(CultureInfo.InvariantCulture, $"{index}. {issue.Source} -> {issue.Target}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"   種類: {issue.Type} | 重要度: {issue.Severity} | スコア: {issue.Score:0.00}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"   問題: {issue.Problem}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"   推奨: {issue.Recommendation}");
+            }
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private static string RenderJapaneseSummary(AnalysisReport report)
+    {
+        IssueCounts counts = CountIssues(report);
+        StringBuilder builder = new();
+        builder.AppendLine(CultureInfo.InvariantCulture, $"評価: {report.Grade.Letter} | 平均スコア: {report.AverageBalanceScore:0.00} | 判定基準: {report.Grade.Basis}");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"ファイル: {report.Summary.Files} | 型: {report.Summary.Components} | 結合: 内部 {report.Summary.InternalCouplings} / 外部 {report.Summary.ExternalCouplings}");
+        builder.AppendLine(CultureInfo.InvariantCulture, $"問題: {counts.Critical} Critical, {counts.High} High, {counts.Medium} Medium");
+        if (!string.Equals(report.Summary.Mode, "syntax-only", StringComparison.Ordinal))
+        {
+            builder.AppendLine(CultureInfo.InvariantCulture, $"解析モード: {report.Summary.Mode}");
+        }
+
+        builder.AppendLine(DescribeGit(report));
+        AppendDomainContextSummary(builder, report);
+        AppendDiagnosticsSummary(builder, report);
+        AppendSuppressedSummary(builder, report);
+        AppendBaselineSummary(builder, report);
+        if (report.Grade.Letter == "S")
+        {
+            builder.AppendLine("評価: S (過剰最適化の警告)");
+            builder.AppendLine("これは表彰ではありません。抽象化過多または閾値が厳しすぎる可能性があります。");
+        }
+
+        return builder.ToString().TrimEnd();
     }
 
     private static string RenderText(AnalysisReport report)
@@ -125,6 +196,35 @@ public static class ReportRenderer
         return builder.ToString().TrimEnd();
     }
 
+    private static string RenderJapaneseHotspots(AnalysisReport report)
+    {
+        IReadOnlyList<Hotspot> hotspots = report.Hotspots ?? [];
+        StringBuilder builder = new();
+        builder.AppendLine("ホットスポット");
+        builder.AppendLine("修正の優先順位です。Grade はプロジェクト健全性の判定として維持されます。");
+        builder.AppendLine("------------------------------------------------------------");
+        if (hotspots.Count == 0)
+        {
+            builder.AppendLine("ホットスポットは検出されませんでした。");
+            return builder.ToString().TrimEnd();
+        }
+
+        foreach (Hotspot hotspot in hotspots)
+        {
+            builder.AppendLine(CultureInfo.InvariantCulture, $"{hotspot.Rank}. {hotspot.Component}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"   優先度: {hotspot.Score:0.00}");
+            builder.AppendLine(CultureInfo.InvariantCulture, $"   問題: {hotspot.IssueCount} | Fan-in: {hotspot.FanIn} | Fan-out: {hotspot.FanOut} | 揮発性: {hotspot.Volatility}");
+            if (hotspot.Complexity is not null)
+            {
+                builder.AppendLine(CultureInfo.InvariantCulture, $"   複雑度: cyclomatic 最大 {hotspot.Complexity.MaxCyclomaticComplexity}, cognitive 最大 {hotspot.Complexity.MaxCognitiveComplexity}, members {hotspot.Complexity.MemberCount}");
+            }
+
+            builder.AppendLine(CultureInfo.InvariantCulture, $"   理由: {string.Join(", ", hotspot.Reasons)}");
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
     private static string RenderJson(AnalysisReport report)
     {
         object document = HasExtendedJson(report)
@@ -138,7 +238,9 @@ public static class ReportRenderer
     private static bool HasExtendedJson(AnalysisReport report)
     {
         return report.Hotspots is not null
-            || report.SuppressedIssues is { Count: > 0 };
+            || report.SuppressedIssues is { Count: > 0 }
+            || report.Impact is not null
+            || report.Trace is not null;
     }
 
     private static Dictionary<string, object?> CreateJsonDocument(AnalysisReport report)
@@ -178,13 +280,16 @@ public static class ReportRenderer
     private static Dictionary<string, object?> CreateExtendedJsonDocument(AnalysisReport report)
     {
         IssueCounts counts = CountIssues(report);
+        bool hasInvestigation = report.Impact is not null || report.Trace is not null;
         bool hasComplexityHotspots = HasComplexityHotspots(report);
         Dictionary<string, object?> document = new(StringComparer.Ordinal)
         {
-            ["Schema"] = hasComplexityHotspots
-                ? "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.4.schema.json"
-                : "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.3.schema.json",
-            ["SchemaVersion"] = hasComplexityHotspots ? "0.4" : "0.3",
+            ["Schema"] = hasInvestigation
+                ? "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.5.schema.json"
+                : hasComplexityHotspots
+                    ? "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.4.schema.json"
+                    : "https://raw.githubusercontent.com/dora56/dotnet-coupling/main/schemas/dotnet-coupling-report-0.3.schema.json",
+            ["SchemaVersion"] = hasInvestigation ? "0.5" : hasComplexityHotspots ? "0.4" : "0.3",
             ["Tool"] = "dotnet-coupling",
             ["Version"] = ToolVersion,
             ["Analysis"] = CreateAnalysisJson(report),
@@ -232,6 +337,16 @@ public static class ReportRenderer
         if (report.SuppressedIssues is { Count: > 0 })
         {
             document["SuppressedIssues"] = report.SuppressedIssues;
+        }
+
+        if (report.Impact is not null)
+        {
+            document["Impact"] = report.Impact;
+        }
+
+        if (report.Trace is not null)
+        {
+            document["Trace"] = report.Trace;
         }
 
         return document;

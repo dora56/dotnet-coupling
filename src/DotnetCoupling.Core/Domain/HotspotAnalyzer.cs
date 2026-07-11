@@ -6,16 +6,20 @@ public static class HotspotAnalyzer
     public const int CyclomaticWarningThreshold = 10;
     public const int CognitiveWarningThreshold = 15;
 
-    private const double MaxComplexityBonus = 0.10;
-    private const double CyclomaticBonusRange = 20.0;
-    private const double CognitiveBonusRange = 30.0;
-
     public static IReadOnlyList<Hotspot> Calculate(AnalysisReport report)
     {
         return Calculate(report, DefaultCount);
     }
 
     public static IReadOnlyList<Hotspot> Calculate(AnalysisReport report, int count)
+    {
+        return Calculate(report, count, PrioritizationOptions.Default);
+    }
+
+    public static IReadOnlyList<Hotspot> Calculate(
+        AnalysisReport report,
+        int count,
+        PrioritizationOptions prioritization)
     {
         if (count <= 0)
         {
@@ -25,8 +29,23 @@ public static class HotspotAnalyzer
         Dictionary<string, List<CouplingIssue>> issuesByComponent = new(StringComparer.Ordinal);
         foreach (CouplingIssue issue in report.Issues)
         {
+            if (issue.Type == IssueType.CircularDependency)
+            {
+                foreach (string participant in SplitCycleComponents(issue.Source)
+                    .Concat(SplitCycleComponents(issue.Target))
+                    .Distinct(StringComparer.Ordinal))
+                {
+                    AddIssue(issuesByComponent, participant, issue);
+                }
+
+                continue;
+            }
+
             AddIssue(issuesByComponent, issue.Source, issue);
-            AddIssue(issuesByComponent, issue.Target, issue);
+            if (!string.Equals(issue.Source, issue.Target, StringComparison.Ordinal))
+            {
+                AddIssue(issuesByComponent, issue.Target, issue);
+            }
         }
 
         Dictionary<string, int> fanOut = report.Couplings
@@ -66,7 +85,7 @@ public static class HotspotAnalyzer
                 bool crossesBoundary = boundaryCrossingComponents.Contains(component);
                 bool participatesInCycle = cycleComponents.Contains(component);
                 ComponentComplexity? componentComplexity = complexities.GetValueOrDefault(component);
-                HotspotComplexity? hotspotComplexity = ToHotspotComplexity(componentComplexity);
+                HotspotComplexity? hotspotComplexity = ComplexityPrioritizer.CreateSummary(componentComplexity);
                 double score = CalculatePriorityScore(
                     issues,
                     componentFanIn,
@@ -74,7 +93,8 @@ public static class HotspotAnalyzer
                     componentVolatility,
                     crossesBoundary,
                     participatesInCycle,
-                    componentComplexity);
+                    componentComplexity,
+                    prioritization);
 
                 return new Hotspot(
                     Rank: 0,
@@ -94,7 +114,8 @@ public static class HotspotAnalyzer
                         crossesBoundary,
                         participatesInCycle,
                         roleContexts.GetValueOrDefault(component),
-                        componentComplexity),
+                        componentComplexity,
+                        prioritization),
                     Complexity: hotspotComplexity);
             })
             .OrderByDescending(hotspot => hotspot.Score)
@@ -148,7 +169,8 @@ public static class HotspotAnalyzer
         Volatility volatility,
         bool crossesBoundary,
         bool participatesInCycle,
-        ComponentComplexity? complexity)
+        ComponentComplexity? complexity,
+        PrioritizationOptions prioritization)
     {
         double severity = issues.Count == 0 ? 0.0 : issues.Max(issue => SeverityRank(issue.Severity)) / 3.0;
         double issueDensity = Math.Min(1.0, issues.Count / 5.0);
@@ -157,7 +179,8 @@ public static class HotspotAnalyzer
         double volatilityScore = VolatilityRank(volatility) / 2.0;
         double boundary = crossesBoundary ? 0.10 : 0.0;
         double cycle = participatesInCycle ? 0.15 : 0.0;
-        double complexityBonus = CalculateComplexityPriority(complexity) * MaxComplexityBonus;
+        double complexityBonus = ComplexityPrioritizer.CalculatePressure(complexity, prioritization)
+            * prioritization.ComplexityWeight;
 
         return Math.Clamp(
             severity * 0.35
@@ -180,7 +203,8 @@ public static class HotspotAnalyzer
         bool crossesBoundary,
         bool participatesInCycle,
         ComponentRoleContext? roleContext,
-        ComponentComplexity? complexity)
+        ComponentComplexity? complexity,
+        PrioritizationOptions prioritization)
     {
         List<string> reasons = [];
         Severity maxSeverity = issues.Count == 0 ? Severity.Low : issues.Max(issue => issue.Severity);
@@ -210,18 +234,7 @@ public static class HotspotAnalyzer
             reasons.Add("participates in a cycle");
         }
 
-        if (complexity is not null)
-        {
-            if (complexity.MaxCyclomaticComplexity >= CyclomaticWarningThreshold)
-            {
-                reasons.Add($"high cyclomatic complexity: {complexity.MaxCyclomaticComplexity}");
-            }
-
-            if (complexity.MaxCognitiveComplexity >= CognitiveWarningThreshold)
-            {
-                reasons.Add($"high cognitive complexity: {complexity.MaxCognitiveComplexity}");
-            }
-        }
+        reasons.AddRange(ComplexityPrioritizer.CreateReasons(complexity, prioritization));
 
         if (roleContext?.TechnicalRole is TechnicalRole technicalRole)
         {
@@ -234,41 +247,6 @@ public static class HotspotAnalyzer
         }
 
         return reasons;
-    }
-
-    private static double CalculateComplexityPriority(ComponentComplexity? complexity)
-    {
-        if (complexity is null)
-        {
-            return 0.0;
-        }
-
-        double cyclomaticPressure = Math.Clamp(
-            (complexity.MaxCyclomaticComplexity - CyclomaticWarningThreshold + 1) / CyclomaticBonusRange,
-            0.0,
-            1.0);
-        double cognitivePressure = Math.Clamp(
-            (complexity.MaxCognitiveComplexity - CognitiveWarningThreshold + 1) / CognitiveBonusRange,
-            0.0,
-            1.0);
-        return Math.Max(cyclomaticPressure, cognitivePressure);
-    }
-
-    private static HotspotComplexity? ToHotspotComplexity(ComponentComplexity? complexity)
-    {
-        if (complexity is null)
-        {
-            return null;
-        }
-
-        return new HotspotComplexity(
-            complexity.MaxCyclomaticComplexity,
-            complexity.MaxCognitiveComplexity,
-            complexity.TotalCyclomaticComplexity,
-            complexity.TotalCognitiveComplexity,
-            complexity.MemberCount,
-            complexity.MostComplexMember?.MemberName,
-            complexity.MostComplexMember?.Location);
     }
 
     private static Dictionary<string, ComponentComplexity> CreateComplexityLookup(IReadOnlyList<ComponentComplexity> complexities)
