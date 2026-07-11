@@ -364,16 +364,16 @@ Principles:
 - [x] `--hotspots` の ranking 補助として使う
 - [x] 高結合 + 高変更頻度 + 高複雑度の交点を優先する
 - [x] JSON schema には optional field として追加し、後方互換を保つ
-- [ ] `--impact` / `--ai` の ranking 補助として使う
+- [x] `--impact` / `--ai` の ranking 補助として使う
 
 Implementation:
 
 - [x] syntax mode で method / type 単位の cyclomatic complexity を計算
-- [ ] semantic mode で symbol と complexity metric を安定して紐づける
+- [x] semantic mode で symbol と complexity metric を安定して紐づける
 - [x] cognitive complexity のルールセットを明文化
 - [x] `priorityScore` / `riskPriority` を issue とは別概念として追加
 - [x] priority reasons を出力: high coupling, high volatility, high complexity など
-- [ ] threshold / weight を config で調整可能にする
+- [x] threshold / weight を config で調整可能にする
 - [x] complexity metric の unit / schema / CLI contract tests を追加
 - [x] complexity が高いだけでは fail しないことを CLI contract に明記
 
@@ -383,11 +383,19 @@ Phase 6 では semantic symbol identity、threshold / weight config、`--impact`
 
 #### Phase 6b: Investigation commands
 
-- [ ] `--impact`
-- [ ] `--trace`
-- [ ] Markdown report
-- [ ] 日本語出力
-- [ ] `--ai`
+- [x] `--impact`
+- [x] `--trace`
+- [x] Markdown report
+- [x] 日本語出力
+- [x] `--ai`
+
+Release gate:
+
+- [x] self + OSS 4 targets で investigation UX を dogfood
+- [x] adversarial review と remediation を完了
+- [x] full local quality gate を通過
+- [ ] PR / main quality gate を通過
+- [ ] signed `v0.6.0` tag と Trusted Publishing を検証
 
 ### Phase 7 Candidate: Default Auto Mode
 
