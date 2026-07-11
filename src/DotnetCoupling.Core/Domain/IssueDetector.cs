@@ -84,7 +84,7 @@ internal static class IssueDetector
 
         IEnumerable<CouplingMetrics> issueCouplings = issueScores.Select(score => score.Coupling);
         AddFanInFanOutIssues(issueCouplings, issues, options.Thresholds);
-        AddCircularDependencyIssues(issueCouplings, issues);
+        AddCircularDependencyIssues(issueCouplings, componentsById, issues);
         AddHiddenCouplingIssues(issueTemporalCouplings, observedIssueCouplings, componentsById, issues);
         AddScatteredExternalCouplingIssues(issueCouplings, issues, options.Thresholds);
         AddAccidentalVolatilityIssues(observedIssueCouplings, componentsById, issues, options.DomainContext);
@@ -152,13 +152,22 @@ internal static class IssueDetector
         }
     }
 
-    internal static void AddCircularDependencyIssues(IEnumerable<CouplingMetrics> couplings, List<CouplingIssue> issues)
+    internal static void AddCircularDependencyIssues(
+        IEnumerable<CouplingMetrics> couplings,
+        IReadOnlyDictionary<string, Component> componentsById,
+        List<CouplingIssue> issues)
     {
         Dictionary<string, HashSet<string>> graph = new(StringComparer.Ordinal);
         foreach (CouplingMetrics coupling in couplings)
         {
-            string sourceNamespace = NamespaceOf(coupling.Source);
-            string targetNamespace = NamespaceOf(coupling.Target);
+            if (!componentsById.TryGetValue(coupling.Source, out Component? source)
+                || !componentsById.TryGetValue(coupling.Target, out Component? target))
+            {
+                continue;
+            }
+
+            string sourceNamespace = source.Namespace;
+            string targetNamespace = target.Namespace;
             if (string.IsNullOrWhiteSpace(sourceNamespace) || sourceNamespace == targetNamespace)
             {
                 continue;
@@ -338,12 +347,6 @@ internal static class IssueDetector
     internal static (string FileA, string FileB) OrderPair(string first, string second)
     {
         return string.CompareOrdinal(first, second) <= 0 ? (first, second) : (second, first);
-    }
-
-    internal static string NamespaceOf(string componentId)
-    {
-        int lastDot = componentId.LastIndexOf('.');
-        return lastDot < 0 ? "" : componentId[..lastDot];
     }
 
     private static IEnumerable<CouplingIssue> ApplyIgnores(IEnumerable<CouplingIssue> issues, AnalysisOptions options)

@@ -286,15 +286,92 @@ public sealed class IssueDetectorTests
     public void AddCircularDependencyIssues_NamespaceCycle_AddsCircularDependency()
     {
         List<CouplingIssue> issues = [];
+        Component firstSource = Component("A.One.Source", "/repo/FirstSource.cs");
+        Component firstTarget = Component("A.One.Target", "/repo/FirstTarget.cs");
+        Component secondSource = Component("A.Two.Source", "/repo/SecondSource.cs");
+        Component secondTarget = Component("A.Two.Target", "/repo/SecondTarget.cs");
+        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
+        {
+            [firstSource.Id] = firstSource,
+            [firstTarget.Id] = firstTarget,
+            [secondSource.Id] = secondSource,
+            [secondTarget.Id] = secondTarget,
+        };
 
         IssueDetector.AddCircularDependencyIssues(
             [
                 Coupling("A.One.Source", "A.Two.Target", IntegrationStrength.Model, Distance.DifferentNamespace),
                 Coupling("A.Two.Source", "A.One.Target", IntegrationStrength.Model, Distance.DifferentNamespace),
             ],
+            componentsById,
             issues);
 
         Assert.Contains(issues, issue => issue.Type == IssueType.CircularDependency);
+    }
+
+    [Fact]
+    public void AddCircularDependencyIssues_NestedTypesInSameNamespace_DoesNotCreatePseudoNamespaceCycle()
+    {
+        const string namespaceName = "DotnetCoupling.Roslyn.Collection";
+        Component collector = new(
+            $"{namespaceName}.CSharpComplexityCollector",
+            "CSharpComplexityCollector",
+            namespaceName,
+            "DotnetCoupling.Roslyn",
+            "/repo/CSharpComplexityCollector.cs",
+            ComponentKind.Class,
+            Visibility.Internal);
+        Component nestedCalculator = new(
+            $"{collector.Id}.ComplexityMetricCalculator",
+            "ComplexityMetricCalculator",
+            namespaceName,
+            "DotnetCoupling.Roslyn",
+            collector.FilePath,
+            ComponentKind.Class,
+            Visibility.Private);
+        Component syntaxCollector = new(
+            $"{namespaceName}.CSharpSyntaxDependencyCollector",
+            "CSharpSyntaxDependencyCollector",
+            namespaceName,
+            "DotnetCoupling.Roslyn",
+            "/repo/CSharpSyntaxDependencyCollector.cs",
+            ComponentKind.Class,
+            Visibility.Internal);
+        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
+        {
+            [collector.Id] = collector,
+            [nestedCalculator.Id] = nestedCalculator,
+            [syntaxCollector.Id] = syntaxCollector,
+        };
+        List<CouplingIssue> issues = [];
+
+        IssueDetector.AddCircularDependencyIssues(
+            [
+                Coupling(syntaxCollector.Id, nestedCalculator.Id, IntegrationStrength.Model, Distance.SameNamespace),
+                Coupling(nestedCalculator.Id, syntaxCollector.Id, IntegrationStrength.Model, Distance.SameNamespace),
+            ],
+            componentsById,
+            issues);
+
+        Assert.DoesNotContain(issues, issue => issue.Type == IssueType.CircularDependency);
+    }
+
+    [Fact]
+    public void AddCircularDependencyIssues_UnknownEndpoint_IgnoresCoupling()
+    {
+        Component source = Component("A.One.Source", "/repo/Source.cs");
+        Dictionary<string, Component> componentsById = new(StringComparer.Ordinal)
+        {
+            [source.Id] = source,
+        };
+        List<CouplingIssue> issues = [];
+
+        IssueDetector.AddCircularDependencyIssues(
+            [Coupling(source.Id, "External.Unknown.Target", IntegrationStrength.Model, Distance.DifferentNamespace)],
+            componentsById,
+            issues);
+
+        Assert.Empty(issues);
     }
 
     [Fact]
