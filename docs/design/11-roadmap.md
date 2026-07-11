@@ -394,8 +394,8 @@ Release gate:
 - [x] self + OSS 4 targets で investigation UX を dogfood
 - [x] adversarial review と remediation を完了
 - [x] full local quality gate を通過
-- [ ] PR / main quality gate を通過
-- [ ] signed `v0.6.0` tag と Trusted Publishing を検証
+- [x] PR / main quality gate を通過
+- [x] signed `v0.6.0` tag と Trusted Publishing を検証
 
 ### Phase 7 Candidate: Default Auto Mode
 
